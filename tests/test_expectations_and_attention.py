@@ -1,6 +1,5 @@
 """V2 feature tests: expanded loader, expectations, scenarios, thesis, attention."""
 
-import numpy as np
 import pandas as pd
 import pytest
 

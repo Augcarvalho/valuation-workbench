@@ -29,7 +29,7 @@ from src.modeling.valuation_case import (
 from src.reporting.board_pack import load_dataset
 from src.reporting.valuation_case_template import VALUATION_CASE_TEMPLATE, valuation_case_css
 from src.reporting.valuation_charts import assumptions_provenance, assumptions_status, case_chart_images
-from src.utils import ensure_dir, fmt_money, fmt_multiple, fmt_pct, fmt_signed_pct
+from src.utils import ensure_dir, fmt_money, fmt_multiple, fmt_pct
 
 
 def _pct(value, digits=1) -> str:

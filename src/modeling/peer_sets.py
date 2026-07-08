@@ -22,7 +22,7 @@ saves an approved set. All peer-set files live in ``data_private/``
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 

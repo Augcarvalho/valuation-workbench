@@ -5,7 +5,6 @@ import pandas as pd
 import pytest
 
 from src.modeling.dcf import (
-    implied_perpetuity_growth,
     run_dcf,
     sensitivity_growth_margin,
     sensitivity_wacc_multiple,

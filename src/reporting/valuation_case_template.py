@@ -74,7 +74,7 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
     <h1>{{ company.company_name }}<span class="status-pill status-{{ status_key }}">{{ status_label }}</span></h1>
     <div class="cover-sub">{{ company.ticker }} | {{ peer_group }} comps | {{ currency_label }} | As of {{ as_of }}</div>
     <div class="rec-band">
-      <span class="rec-pill rec-{{ rec.stance }}">{{ rec.stance }}</span>
+      <span class="rec-pill rec-{{ rec.stance }}">INDICATIVE {{ rec.stance }}</span>
       <div>
         <div class="rec-nums">Target {{ target_price }} vs current {{ current_price }} &rarr; <b>{{ upside }}</b> base case</div>
         <div class="rec-nums" style="opacity:.8">Bear {{ bear_upside }} &middot; Bull {{ bull_upside }} &middot; WACC {{ wacc_pct }} &middot; Exit {{ exit_multiple }} EV/EBITDA</div>

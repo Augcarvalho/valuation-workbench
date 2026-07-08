@@ -1,7 +1,6 @@
 """Licensed-data safeguards: private data never reaches public folders."""
 
 import subprocess
-from pathlib import Path
 
 import pytest
 

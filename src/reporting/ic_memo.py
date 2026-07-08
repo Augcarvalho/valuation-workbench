@@ -18,7 +18,7 @@ from src.branding import PALETTE, VERDICT_COLORS
 from src.config import PRIVATE_DATA_DIR, REPORTS_SAMPLE_DIR
 from src.ingestion.store import WatchlistStore, load_store
 from src.modeling.assessment import build_assessment
-from src.modeling.scenarios import cases_from_thesis, implied_expectations, run_cases
+from src.modeling.scenarios import implied_expectations, run_cases
 from src.reporting.board_pack import _history_chart, _peer_chart, _png_uri, load_dataset
 from src.reporting.ic_memo_template import IC_MEMO_TEMPLATE, ic_memo_css
 from src.utils import ensure_dir, fmt_money, fmt_multiple, fmt_ordinal, fmt_pct, fmt_signed_pct

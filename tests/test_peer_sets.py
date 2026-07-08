@@ -9,7 +9,6 @@ from src.config import PROJECT_ROOT
 from src.ingestion.store import load_store
 from src.modeling.metrics import latest_rows
 from src.modeling.peer_sets import (
-    MIN_VALID_PEERS,
     generate_peer_sets_for_all,
     get_approved_peer_set,
     load_capiq_comp_set,

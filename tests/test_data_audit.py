@@ -1,7 +1,6 @@
 """Data Audit checks: each rule verified on synthetic rows with known defects."""
 
 import pandas as pd
-import pytest
 
 from src.modeling.data_audit import (
     audit_scores,

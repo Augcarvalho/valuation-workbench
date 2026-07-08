@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -155,12 +154,18 @@ def test_watchlist_summary_ranks_do_work_first():
 
 
 def test_peer_taxonomy_follows_comps_discipline():
-    """Guard the IB comps rules on the committed taxonomy: every peer group has
-    at least 3 members, and known model-mixing mistakes stay fixed."""
-    from src.config import PROJECT_ROOT
-    ref = pd.read_csv(PROJECT_ROOT / "data" / "reference" / "company_classification.csv")
-    # De-duplicate the BOVESPA:/.SA aliases before counting group sizes.
+    """Guard the IB comps rules on the merged taxonomy (committed demo file +
+    private overlay when present): peer groups need >=3 members, and known
+    model-mixing mistakes stay fixed. The composition of the private book is
+    never committed, so the name-level assertions only run where the overlay
+    exists (the analyst's machine)."""
+    from src.ingestion.classification import load_classification
+
+    ref = load_classification()
     ref = ref[~ref["company_id"].str.endswith(".SA")]
+    if ref.empty:
+        pytest.skip("private classification overlay not present - demo file has no non-demo rows")
+
     sizes = ref.groupby("peer_group")["company_id"].count()
     assert (sizes >= 3).all(), f"peer groups below 3 members: {sizes[sizes < 3].to_dict()}"
 

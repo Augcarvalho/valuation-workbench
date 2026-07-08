@@ -9,7 +9,6 @@ from src.ingestion.classification import load_classification
 from src.ingestion.store import load_store
 from src.ingestion.universe import (
     add_company,
-    company_exists,
     ensure_universe,
     parse_lookup_result,
 )
