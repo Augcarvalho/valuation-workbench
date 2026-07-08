@@ -205,7 +205,7 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
     analyst_count = sum(1 for s in case.assumptions.scenarios.values() if s.source == "analyst")
     provenance = (
         f"{analyst_count} of 3 scenarios analyst-specified"
-        + (f" (file: {case.assumptions.path})" if case.assumptions.from_file else "")
+        + (f" (file: {Path(str(case.assumptions.path)).name})" if case.assumptions.from_file else "")
         + f"; remaining drivers anchored on TTM data. "
         + ("Notes: " + "; ".join(case.notes) + "." if case.notes else "")
     )

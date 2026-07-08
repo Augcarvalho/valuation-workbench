@@ -30,7 +30,6 @@ VIEWPORTS = [(1280, 720), (1440, 900)]
 
 PAGES = [
     "Watchlist Home",
-    "Macro Dashboard",
     "Company Situation",
     "Peer Benchmarking",
     "Actual vs Consensus",

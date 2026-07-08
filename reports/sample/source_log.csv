@@ -1,5 +1,0 @@
-table_name,source_name,source_url,retrieved_at,notes
-companies,B3-listed public company universe,https://www.b3.com.br/,2026-06-30,Company universe selected for PE-style B2B/software-enabled services monitoring demo.
-financials_quarterly,Yahoo Finance public market data via yfinance,https://finance.yahoo.com/,2026-06-30,Public-demo dataset only. Replace with CVM or Capital IQ exports for diligence work.
-market_data,Yahoo Finance public market data via yfinance,https://finance.yahoo.com/,2026-06-30,Market cap calculated from public closing price and shares outstanding where available.
-estimates,Capital IQ template,data/templates/estimates_template.csv,2026-06-30,Public demo intentionally leaves consensus/guidance blank unless supplied locally.

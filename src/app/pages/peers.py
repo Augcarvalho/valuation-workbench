@@ -301,8 +301,10 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             "Margin vs EV/EBITDA", "Margin quality should support the EBITDA multiple"),
             use_container_width=True, config=PLOTLY_CONFIG)
     s3, s4 = st.columns(2, gap="medium")
-    roe_spread = a.peers[["company_id", "ticker", "roe_ttm", "pe_ttm", "p_tbv"]].copy() \
-        if "roe_ttm" in a.peers.columns else pd.DataFrame()
+    # Older/demo datasets may not carry p_tbv - select only what exists.
+    _roe_cols = [c for c in ("company_id", "ticker", "roe_ttm", "pe_ttm", "p_tbv")
+                 if c in a.peers.columns]
+    roe_spread = a.peers[_roe_cols].copy() if "roe_ttm" in _roe_cols else pd.DataFrame()
     with s3:
         if not roe_spread.empty:
             st.plotly_chart(mch.fundamental_vs_multiple_scatter(

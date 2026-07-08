@@ -33,6 +33,16 @@ def test_sample_html_has_no_private_mode_marker():
         assert PRIVATE_MARKER not in text, f"{f.name} contains private-mode output"
 
 
+def test_sample_html_has_no_local_absolute_paths():
+    """Machine paths (C:\\Users\\<name>\\...) identify the analyst's machine."""
+    if not SAMPLE_DIR.exists():
+        pytest.skip("no sample outputs yet")
+    for f in SAMPLE_DIR.rglob("*.html"):
+        text = f.read_text(encoding="utf-8", errors="ignore")
+        assert "C:\\Users" not in text and "/c/Users" not in text, \
+            f"{f.name} embeds a local absolute path"
+
+
 def test_sample_html_names_no_private_tickers():
     if not SAMPLE_DIR.exists():
         pytest.skip("no sample outputs yet")
