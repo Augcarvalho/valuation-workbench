@@ -1,0 +1,28 @@
+# Sample demo assumptions (public demo data only - illustrative, not investment advice).
+# TOTVS: quality compounder case - growth fading from ~20% to 6% over 5 years,
+# modest margin expansion from cloud mix, disciplined capex.
+
+status: illustrative
+horizon_years: 5
+
+scenarios:
+  base:
+    revenue_growth: {start: 0.16, end: 0.06}
+    ebitda_margin: {start: auto, end: 0.30}
+    capex_pct_revenue: {start: auto, end: 0.035}
+  bear:
+    revenue_growth: {start: 0.08, end: 0.03}
+    ebitda_margin: {start: auto, end: 0.25}
+  bull:
+    revenue_growth: {start: 0.22, end: 0.09}
+    ebitda_margin: {start: auto, end: 0.33}
+
+wacc:
+  beta: 0.9          # local software franchise, below-market cyclicality
+
+terminal:
+  # Analyst override: TOTVS trades far above the local peer median; exiting a
+  # quality compounder at deep-value peers' 5.5x would embed a de-rating thesis.
+  # 12x reflects a retained-premium exit, still below the current multiple.
+  exit_multiple: 12.0
+  perpetuity_growth: 0.04    # IPCA-anchored nominal growth

@@ -1,0 +1,2 @@
+table_name,source_name,source_url,retrieved_at,notes
+financials_quarterly,Capital IQ,local private export,2026-06-30,Do not commit raw export

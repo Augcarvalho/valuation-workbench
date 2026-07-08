@@ -1,0 +1,35 @@
+# Thesis file template.
+# Copy to data_private/theses/<company_id>.yaml (replace ":" with "_" in the
+# filename, e.g. BOVESPA:TOTS3 -> BOVESPA_TOTS3.yaml) and fill in.
+# Private theses are never committed (data_private/ is gitignored).
+
+stage: watch            # watch | work | core | pass
+
+thesis: >
+  One paragraph: what you would own and why the economics work.
+
+variant_perception: >
+  What you believe that the market does not (or vice versa). This is the
+  single highest-value field in the file.
+
+key_debate: >
+  The one question that decides the outcome, stated fairly with both sides.
+
+catalysts:
+  - date: 2026-08-15
+    event: Next earnings report
+    note: What specifically to watch.
+
+risks:
+  - Biggest way the thesis breaks.
+  - Second failure mode.
+
+# Optional: overrides for the scenario engine (otherwise auto-derived).
+scenarios:
+  bear: { revenue_cagr: 0.00, exit_margin: 0.15, exit_multiple: 8.0, horizon_years: 3 }
+  base: { revenue_cagr: 0.06, exit_margin: 0.20, exit_multiple: 11.0, horizon_years: 3 }
+  bull: { revenue_cagr: 0.12, exit_margin: 0.24, exit_multiple: 14.0, horizon_years: 3 }
+
+journal:
+  - date: 2026-07-01
+    note: Dated observations, decisions, and mind changes live here.

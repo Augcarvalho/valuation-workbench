@@ -1,0 +1,37 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+.venv/
+venv/
+env/
+.env
+.streamlit/secrets.toml
+
+# Licensed or confidential data must stay local.
+data_private/
+reports/private/
+data/processed/private_*
+*.xlsb
+
+# Local generated artifacts.
+tmp/
+*.sqlite
+*.db
+*.log
+
+# OS/editor noise.
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+
+# Build artifacts (rebuilt by the quick start) and archived planning docs.
+data/processed/
+docs/archive/

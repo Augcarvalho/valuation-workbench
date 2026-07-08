@@ -1,0 +1,46 @@
+# Sample demo thesis (public demo data only — illustrative, not investment advice).
+
+stage: core
+
+thesis: >
+  TOTVS is the dominant Brazilian ERP franchise with a sticky SMB installed
+  base, pricing power indexed to inflation, and an under-monetized fintech
+  attach opportunity. Recurring revenue and disciplined capital allocation
+  make it the quality compounder of the local software universe.
+
+variant_perception: >
+  The market treats TOTVS as a mature license business and prices the fintech
+  and cloud migration optionality at close to zero. If cross-sell attach on
+  the captive base performs even modestly, mix shift extends the growth
+  runway well beyond consensus assumptions.
+
+key_debate: >
+  Is double-digit organic growth sustainable once the cloud migration wave
+  normalizes, or does TOTVS revert to GDP-plus pricing growth? Bulls point to
+  fintech attach and share gains from fragile local competitors; bears point
+  to SMB churn sensitivity in a high-rate Brazilian macro.
+
+catalysts:
+  - date: 2026-08-06
+    event: Q2 2026 earnings
+    note: Watch recurring revenue mix and fintech credit take-rates.
+  - date: 2026-11-05
+    event: Q3 2026 earnings
+    note: Cloud migration cohort economics disclosure.
+
+risks:
+  - SMB churn spike if Brazilian rates stay restrictive longer than expected.
+  - Fintech credit book introduces provisioning volatility the market may
+    re-rate as lender risk rather than software risk.
+  - FX translation for USD-based screeners masks local-currency compounding.
+
+scenarios:
+  bear: { revenue_cagr: 0.08, exit_margin: 0.24, exit_multiple: 10.0, horizon_years: 3 }
+  base: { revenue_cagr: 0.16, exit_margin: 0.28, exit_multiple: 13.0, horizon_years: 3 }
+  bull: { revenue_cagr: 0.22, exit_margin: 0.31, exit_multiple: 16.0, horizon_years: 3 }
+
+journal:
+  - date: 2026-06-20
+    note: Initiated demo coverage; margin expansion trend confirmed by Q1 print.
+  - date: 2026-07-01
+    note: Premium to local peers widened; monitor for entry on macro-driven pullbacks.

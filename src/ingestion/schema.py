@@ -1,0 +1,208 @@
+COMPANY_COLUMNS = [
+    "company_id",
+    "ticker",
+    "company_name",
+    "sector",
+    "exchange",
+    "currency",
+    "source",
+]
+
+FINANCIAL_COLUMNS = [
+    "company_id",
+    "period",
+    "revenue",
+    "gross_profit",
+    "ebitda",
+    "ebit",
+    "net_income",
+    "cfo",
+    "capex",
+    "fcf",
+    "cash",
+    "total_debt",
+    "net_debt",
+    "working_capital",
+    "interest_expense",
+    "source",
+]
+
+MARKET_COLUMNS = [
+    "company_id",
+    "period",
+    "share_price",
+    "shares_outstanding",
+    "market_cap",
+    "enterprise_value",
+    "source",
+]
+
+ESTIMATE_COLUMNS = [
+    "company_id",
+    "period",
+    "revenue_consensus",
+    "ebitda_consensus",
+    "guidance_low",
+    "guidance_high",
+    "source",
+]
+
+SOURCE_LOG_COLUMNS = [
+    "table_name",
+    "source_name",
+    "source_url",
+    "retrieved_at",
+    "notes",
+]
+
+# Optional deep-dive columns. Loaders keep them when present but never require
+# them, so older exports and the public demo keep working unchanged.
+FINANCIAL_OPTIONAL_COLUMNS = [
+    "d_and_a",
+    "sbc",
+    "dividends_paid",
+    "buybacks",
+    "shares_diluted",
+    "total_assets",
+    "total_equity",
+    "goodwill",
+    "ar",
+    "inventory",
+    "ap",
+    # Capital-structure detail (equity bridge / debt capacity).
+    "minority_interest",
+    "preferred_equity",
+    "lease_liabilities",
+    "pension_liabilities",
+    "non_operating_assets",
+    # Cash incl. short-term investments (CapIQ's TEV cash basis).
+    "cash_st_invest",
+    # Financial-institution fields (financials-specific valuation).
+    "tangible_common_equity",
+    "book_value",
+    "deposits",
+    "loans",
+    "net_interest_income",
+    "provision_expense",
+]
+
+ESTIMATE_OPTIONAL_COLUMNS = [
+    "eps_consensus",
+    "revenue_est_ntm",
+    "ebitda_est_ntm",
+    "eps_est_ntm",
+    "num_analysts",
+    "revenue_est_ntm_30d_ago",
+    "eps_est_ntm_30d_ago",
+    "revenue_est_ntm_90d_ago",
+    "eps_est_ntm_90d_ago",
+    "next_earnings_date",
+    # FY+1 / FY+2 consensus (forward comps; export v3).
+    "revenue_est_fy1",
+    "revenue_est_fy2",
+    "ebitda_est_fy1",
+    "ebitda_est_fy2",
+    "eps_est_fy1",
+    "eps_est_fy2",
+    # EBITDA revision snapshots + guidance labeling.
+    "ebitda_est_ntm_30d_ago",
+    "ebitda_est_ntm_90d_ago",
+    "guidance_metric",
+]
+
+# Optional market-data columns (never required; NA when absent).
+MARKET_OPTIONAL_COLUMNS = [
+    "beta_2y",
+    "beta_5y",
+    "diluted_market_cap",
+    "avg_daily_value_traded",
+    "week52_high",
+    "week52_low",
+]
+
+# Monthly (or better) valuation series per company — powers multiple-vs-own-
+# history percentiles, derating context, and "why now".
+VALUATION_HISTORY_COLUMNS = [
+    "company_id",
+    "date",
+    "share_price",
+    "market_cap",
+    "enterprise_value",
+    "ev_to_ebitda_ltm",
+    "ev_to_revenue_ltm",
+    "pe_ltm",
+    "source",
+]
+
+NUMERIC_COLUMNS = [
+    "revenue",
+    "gross_profit",
+    "ebitda",
+    "ebit",
+    "net_income",
+    "cfo",
+    "capex",
+    "fcf",
+    "cash",
+    "total_debt",
+    "net_debt",
+    "working_capital",
+    "interest_expense",
+    "share_price",
+    "shares_outstanding",
+    "market_cap",
+    "enterprise_value",
+    "revenue_consensus",
+    "ebitda_consensus",
+    "guidance_low",
+    "guidance_high",
+    # Optional deep-dive fields.
+    "d_and_a",
+    "sbc",
+    "dividends_paid",
+    "buybacks",
+    "shares_diluted",
+    "total_assets",
+    "total_equity",
+    "goodwill",
+    "ar",
+    "inventory",
+    "ap",
+    "eps_consensus",
+    "revenue_est_ntm",
+    "ebitda_est_ntm",
+    "eps_est_ntm",
+    "num_analysts",
+    "revenue_est_ntm_30d_ago",
+    "eps_est_ntm_30d_ago",
+    "revenue_est_ntm_90d_ago",
+    "eps_est_ntm_90d_ago",
+    # New optional numerics.
+    "minority_interest",
+    "preferred_equity",
+    "lease_liabilities",
+    "pension_liabilities",
+    "non_operating_assets",
+    "cash_st_invest",
+    "tangible_common_equity",
+    "book_value",
+    "deposits",
+    "loans",
+    "net_interest_income",
+    "provision_expense",
+    "revenue_est_fy1",
+    "revenue_est_fy2",
+    "ebitda_est_fy1",
+    "ebitda_est_fy2",
+    "eps_est_fy1",
+    "eps_est_fy2",
+    "ebitda_est_ntm_30d_ago",
+    "ebitda_est_ntm_90d_ago",
+    "beta_2y",
+    "beta_5y",
+    "diluted_market_cap",
+    "avg_daily_value_traded",
+    "week52_high",
+    "week52_low",
+]
+

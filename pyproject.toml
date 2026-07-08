@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "valuation-workbench"
+version = "0.1.0"
+description = "Capital IQ-powered micro-underwriting and valuation workbench for public-company investment analysis. Runs offline on demo data; licensed data stays local."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "jinja2>=3.1",
+  "matplotlib>=3.7",
+  "numpy>=1.26",
+  "openpyxl>=3.1",
+  "pandas>=2.0",
+  "plotly>=5.20",
+  "PyMuPDF>=1.23",
+  "pytest>=8.0",
+  "requests>=2.31",
+  "streamlit>=1.35",
+  "yfinance>=0.2.40"
+]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

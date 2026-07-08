@@ -1,0 +1,10 @@
+# Force the light base theme so Streamlit's native widgets (selects, inputs,
+# radios, expanders, alerts) never render dark-mode text on our light canvas.
+# Colors mirror src/branding.py.
+
+[theme]
+base = "light"
+primaryColor = "#687a61"
+backgroundColor = "#f3f0e8"
+secondaryBackgroundColor = "#fffdf7"
+textColor = "#20221d"

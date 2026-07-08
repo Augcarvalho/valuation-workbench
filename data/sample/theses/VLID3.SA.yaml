@@ -1,0 +1,32 @@
+# Sample demo thesis (public demo data only — illustrative, not investment advice).
+
+stage: work
+
+thesis: >
+  Valid trades at a deep discount to the local software group while margins
+  expand and the balance sheet has deleveraged to near net cash. If the
+  revenue decline proves to be contract timing rather than structural loss,
+  the multiple has room to re-rate.
+
+variant_perception: >
+  The screen reads the revenue contraction as a broken story; the operating
+  data (margin expansion, cash conversion, deleveraging) reads like a company
+  managing mix deliberately. That gap is the opportunity.
+
+key_debate: >
+  Is the top-line contraction cyclical (government ID contract timing) or
+  structural (secular decline in physical credentials)? The margin trajectory
+  argues cyclical; the segment mix argues caution.
+
+catalysts:
+  - date: 2026-08-12
+    event: Q2 2026 earnings
+    note: Contract renewals in government ID; digital segment growth rate.
+
+risks:
+  - Physical document secular decline accelerates faster than digital offsets.
+  - Small-cap liquidity keeps the discount persistent regardless of delivery.
+
+journal:
+  - date: 2026-06-28
+    note: Added to demo work queue after revenue red flag; margins say cyclical.

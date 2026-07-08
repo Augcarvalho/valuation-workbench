@@ -1,0 +1,6 @@
+currency,usd_per_unit,as_of,notes
+USD,1.00,2026-06-30,identity
+BRL,0.19,2026-06-30,approximate rate for cross-currency size comparisons only; refresh manually
+CNY,0.14,2026-06-30,approximate rate for cross-currency size comparisons only; refresh manually
+HKD,0.13,2026-06-30,approximate rate for cross-currency size comparisons only; refresh manually
+TWD,0.031,2026-06-30,approximate rate for cross-currency size comparisons only; refresh manually
