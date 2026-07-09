@@ -1,12 +1,18 @@
 # Sample demo thesis (public demo data only — illustrative, not investment advice).
 
 stage: work
+analyst_status: draft
 
 thesis: >
   Valid trades at a deep discount to the local software group while margins
   expand and the balance sheet has deleveraged to near net cash. If the
   revenue decline proves to be contract timing rather than structural loss,
   the multiple has room to re-rate.
+
+investment_pillars:
+  - Margin expansion suggests the business is managing mix rather than simply shrinking.
+  - Balance-sheet repair lowers the risk of permanent equity dilution.
+  - A discounted multiple creates asymmetric upside if revenue stabilizes.
 
 variant_perception: >
   The screen reads the revenue contraction as a broken story; the operating
@@ -27,6 +33,25 @@ risks:
   - Physical document secular decline accelerates faster than digital offsets.
   - Small-cap liquidity keeps the discount persistent regardless of delivery.
 
+swot:
+  strengths:
+    - Deleveraged balance sheet and improving profitability.
+  weaknesses:
+    - Revenue trajectory is not yet clean.
+  opportunities:
+    - Contract timing normalization could trigger a multiple re-rating.
+  threats:
+    - Digital transition may not fully offset physical credential decline.
+
+management_questions:
+  - Which revenue lines are recurring versus contract-timing driven?
+  - What margin level is sustainable if government ID volumes normalize?
+
 journal:
   - date: 2026-06-28
     note: Added to demo work queue after revenue red flag; margins say cyclical.
+
+source:
+  deck: Public demo thesis file.
+  as_of: 2026-06-28
+  notes: Synthetic/demo workflow; not investment advice.

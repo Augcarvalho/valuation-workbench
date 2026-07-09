@@ -62,7 +62,34 @@ def load_classification(path: Path = CLASSIFICATION_PATH, overlay_path: Path | N
         df["business_model"].astype(str).str.strip().str.lower()
         .where(lambda s: s.isin(BUSINESS_MODELS), DEFAULT_BUSINESS_MODEL)
     )
-    return df[["company_id", "peer_group", "business_model"]]
+    keep = ["company_id", "peer_group", "business_model"]
+    if "coverage_role" in df.columns:
+        df["coverage_role"] = (
+            df["coverage_role"].astype(str).str.strip().str.lower()
+            .where(lambda s: s.isin(("watchlist", "comparable")), pd.NA)
+        )
+        keep.append("coverage_role")
+    return df[keep]
+
+
+def _watchlist_ids() -> set[str]:
+    """Private universe defines thesis names; exported extras are comparables.
+
+    Public/demo datasets do not depend on this file, so callers only apply the
+    role inference to private Capital IQ exports.
+    """
+    from src.config import PRIVATE_DATA_DIR
+
+    path = PRIVATE_DATA_DIR / "universe.csv"
+    if not path.exists():
+        return set()
+    try:
+        universe = pd.read_csv(path)
+    except Exception:
+        return set()
+    if "id" not in universe.columns:
+        return set()
+    return set(universe["id"].dropna().astype(str))
 
 
 def apply_classification(companies: pd.DataFrame, path: Path = CLASSIFICATION_PATH) -> pd.DataFrame:
@@ -77,17 +104,24 @@ def apply_classification(companies: pd.DataFrame, path: Path = CLASSIFICATION_PA
 
     mapping = load_classification(path)
     if not mapping.empty:
+        rename = {"peer_group": "_pg_ref", "business_model": "_bm_ref"}
+        if "coverage_role" in mapping.columns:
+            rename["coverage_role"] = "_role_ref"
         out = out.merge(
-            mapping.rename(columns={"peer_group": "_pg_ref", "business_model": "_bm_ref"}),
+            mapping.rename(columns=rename),
             on="company_id",
             how="left",
         )
     else:
         out["_pg_ref"] = pd.NA
         out["_bm_ref"] = pd.NA
+        out["_role_ref"] = pd.NA
+    if "_role_ref" not in out.columns:
+        out["_role_ref"] = pd.NA
 
     existing_pg = out["peer_group"] if "peer_group" in out.columns else pd.Series(pd.NA, index=out.index, dtype="object")
     existing_bm = out["business_model"] if "business_model" in out.columns else pd.Series(pd.NA, index=out.index, dtype="object")
+    existing_role = out["coverage_role"] if "coverage_role" in out.columns else pd.Series(pd.NA, index=out.index, dtype="object")
 
     out["peer_group"] = (
         existing_pg.astype("object").combine_first(out["_pg_ref"]).combine_first(out["theme"])
@@ -95,4 +129,24 @@ def apply_classification(companies: pd.DataFrame, path: Path = CLASSIFICATION_PA
     out["business_model"] = (
         existing_bm.astype("object").combine_first(out["_bm_ref"]).fillna(DEFAULT_BUSINESS_MODEL)
     )
-    return out.drop(columns=["_pg_ref", "_bm_ref"])
+    inferred_role = pd.Series("watchlist", index=out.index, dtype="object")
+    is_private_capiq = out.get("company_source", pd.Series("", index=out.index)).astype(str).str.contains(
+        "Capital IQ", case=False, na=False
+    )
+    watchlist_ids = _watchlist_ids()
+    if watchlist_ids:
+        inferred_role = inferred_role.where(
+            ~is_private_capiq | out["company_id"].astype(str).isin(watchlist_ids),
+            "comparable",
+        )
+    out["coverage_role"] = (
+        existing_role.astype("object")
+        .combine_first(out["_role_ref"])
+        .combine_first(inferred_role)
+        .fillna("watchlist")
+    )
+    out["coverage_role"] = (
+        out["coverage_role"].astype(str).str.strip().str.lower()
+        .where(lambda s: s.isin(("watchlist", "comparable")), "watchlist")
+    )
+    return out.drop(columns=["_pg_ref", "_bm_ref", "_role_ref"])

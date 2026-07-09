@@ -32,6 +32,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     # --- Peer provenance ---------------------------------------------------------
     source_labels = {
         "capiq_comp_set": ("Capital IQ comp set", "green"),
+        "capiq_web_peer_comps": ("Capital IQ Web peers (suggested)", "yellow"),
         "manual": ("Analyst-approved set", "green"),
         "fallback": ("Scored comps (approved)", "green") if a.peer_reviewed
                     else ("Scored comps (generated, unreviewed)", "yellow"),
@@ -194,7 +195,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     with st.expander("Peer methodology"):
         st.markdown(
             "**Hierarchy:** 1) Capital IQ comp-set import (analyst-approved) -> 2) scored comp sets "
-            "(analyst-approved, or batch-generated and labeled *not reviewed* until approved) -> "
+            "and Capital IQ Web peer-comps (batch-generated and labeled *not reviewed* until approved) -> "
             "3) static peer-group mapping -> 4) full universe (flagged).\n\n"
             "**Suggestion scoring (0-100):** " +
             ", ".join(f"{k.replace('_', ' ')} {v}pts" for k, v in WEIGHTS.items()) +

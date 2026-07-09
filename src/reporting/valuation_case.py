@@ -98,6 +98,7 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         overview = a.thesis.thesis
     else:
         overview = a.commentary
+    thesis = a.thesis
 
     f = base.forecast
     money = lambda v: fmt_money(v, currency)  # noqa: E731
@@ -230,6 +231,16 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         "exit_multiple": f"{case.exit_multiple:g}x",
         "exit_multiple_source": case.exit_multiple_source,
         "overview": overview,
+        "analyst_thesis": {
+            "status": thesis.analyst_status if thesis else "",
+            "pillars": thesis.investment_pillars if thesis else [],
+            "variant_perception": thesis.variant_perception if thesis else "",
+            "key_debate": thesis.key_debate if thesis else "",
+            "management_questions": thesis.management_questions if thesis else [],
+            "source_deck": thesis.source_deck if thesis else "",
+            "source_as_of": thesis.source_as_of if thesis else "",
+            "source_notes": thesis.source_notes if thesis else "",
+        },
         "snapshot": {
             "revenue": money(row.get("revenue_ttm")),
             "growth": _pct(row.get("revenue_yoy_growth")),

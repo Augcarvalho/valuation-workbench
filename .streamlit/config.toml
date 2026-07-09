@@ -2,6 +2,9 @@
 # radios, expanders, alerts) never render dark-mode text on our light canvas.
 # Colors mirror src/branding.py.
 
+[client]
+showSidebarNavigation = false
+
 [theme]
 base = "light"
 primaryColor = "#687a61"

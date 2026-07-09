@@ -1,12 +1,18 @@
 # Sample demo thesis (public demo data only — illustrative, not investment advice).
 
 stage: core
+analyst_status: reviewed
 
 thesis: >
   TOTVS is the dominant Brazilian ERP franchise with a sticky SMB installed
   base, pricing power indexed to inflation, and an under-monetized fintech
   attach opportunity. Recurring revenue and disciplined capital allocation
   make it the quality compounder of the local software universe.
+
+investment_pillars:
+  - Mission-critical ERP creates high retention and recurring revenue visibility.
+  - Fintech attach can extend the growth runway without changing the core customer base.
+  - Local software leadership deserves a quality multiple if margins hold.
 
 variant_perception: >
   The market treats TOTVS as a mature license business and prices the fintech
@@ -34,6 +40,21 @@ risks:
     re-rate as lender risk rather than software risk.
   - FX translation for USD-based screeners masks local-currency compounding.
 
+swot:
+  strengths:
+    - Dominant Brazilian ERP installed base.
+    - Recurring revenue and pricing discipline.
+  weaknesses:
+    - SMB exposure can amplify macro cyclicality.
+  opportunities:
+    - Fintech and cloud attach can improve lifetime value per customer.
+  threats:
+    - Credit losses or macro stress could dilute the software-quality narrative.
+
+management_questions:
+  - What share of the installed base can realistically adopt fintech products?
+  - How much of margin expansion is structural versus post-migration normalization?
+
 scenarios:
   bear: { revenue_cagr: 0.08, exit_margin: 0.24, exit_multiple: 10.0, horizon_years: 3 }
   base: { revenue_cagr: 0.16, exit_margin: 0.28, exit_multiple: 13.0, horizon_years: 3 }
@@ -44,3 +65,8 @@ journal:
     note: Initiated demo coverage; margin expansion trend confirmed by Q1 print.
   - date: 2026-07-01
     note: Premium to local peers widened; monitor for entry on macro-driven pullbacks.
+
+source:
+  deck: Public demo thesis file.
+  as_of: 2026-07-01
+  notes: Synthetic/demo workflow; not investment advice.

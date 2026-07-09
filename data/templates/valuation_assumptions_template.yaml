@@ -41,7 +41,7 @@ terminal:
 
 # --- Tier-2 operational drivers (optional) -------------------------------------
 # When present, REVENUE is built from physical drivers per segment
-# (units x revenue/unit, Grupo Mateus style) instead of % growth.
+# (units x revenue/unit, store-based or segment-based style) instead of % growth.
 # Margins/capex/working capital still come from the scenario drivers above.
 # unit_adds and rpu_growth accept a scalar, a per-year list, or a bear/base/bull map.
 #

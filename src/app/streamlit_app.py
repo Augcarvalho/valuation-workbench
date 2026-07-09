@@ -70,9 +70,15 @@ def sidebar(df: pd.DataFrame) -> tuple[str, str]:
     )
     st.sidebar.markdown('<div class="sb-group">Company</div>', unsafe_allow_html=True)
     latest = latest_rows(df)
+    if "coverage_role" in latest.columns:
+        selectable = latest[latest["coverage_role"].fillna("watchlist") == "watchlist"].copy()
+    else:
+        selectable = latest
+    if selectable.empty:
+        selectable = latest
     labels = {
         f"{row.ticker.replace('.SA', '')} | {row.company_name}": row.company_id
-        for row in latest.sort_values("ticker").itertuples()
+        for row in selectable.sort_values("ticker").itertuples()
     }
     selection = st.sidebar.selectbox("Select company", list(labels.keys()), label_visibility="collapsed")
     company_id = labels[selection]

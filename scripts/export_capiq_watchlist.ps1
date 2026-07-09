@@ -13,8 +13,9 @@
 #   - consensus estimates sheet (current quarter + NTM, with 30d/90d-ago
 #     as-of snapshots for revision momentum) and next earnings date
 #   - refresh_log.csv appended on every run
-#   - universe read from data_private\universe.csv (columns: id,ticker,
-#     sector,currency) - the watchlist composition is never committed
+#   - universe read from data_private\universe.csv by default (columns: id,
+#     ticker, sector, currency), or from -UniverseCsv for a larger private
+#     export universe such as watchlist + comparables.
 #
 # NOTE ON MNEMONICS: field mnemonics vary slightly by CIQ entitlement/version.
 # Any formula the add-in rejects resolves to an error cell, which the parser
@@ -22,6 +23,10 @@
 # fields. Verify questionable mnemonics in Excel with a single CIQ() call.
 #
 # All outputs are licensed data and MUST stay inside data_private/ (gitignored).
+
+param(
+    [string]$UniverseCsv = ""
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -49,14 +54,17 @@ $WorkbookPath = Join-Path $OutDir "capiq_watchlist_workbook.xlsx"
 # The watchlist composition is private. It lives OUTSIDE Git in
 # data_private\universe.csv (columns: id,ticker,sector,currency) and is the
 # only source of names for this export - nothing about the book is committed.
-$UniverseCsv = Join-Path $ProjectRoot "data_private\universe.csv"
+$DefaultUniverseCsv = Join-Path $ProjectRoot "data_private\universe.csv"
+if (-not $UniverseCsv) {
+    $UniverseCsv = $DefaultUniverseCsv
+}
 if (-not (Test-Path $UniverseCsv)) {
-    throw "data_private\universe.csv not found. Create it (columns: id,ticker,sector,currency) - the watchlist composition is never committed."
+    throw "$UniverseCsv not found. Create it (columns: id,ticker,sector,currency) - the composition is private and never committed."
 }
 $Universe = @(Import-Csv $UniverseCsv | ForEach-Object {
     @{id=$_.id; ticker=$_.ticker; sector=$_.sector; currency=$_.currency}
 })
-Write-Host "Universe: $($Universe.Count) names (data_private\universe.csv)"
+Write-Host "Universe: $($Universe.Count) names ($UniverseCsv)"
 
 $Periods = @(0..($QuarterCount - 1) | ForEach-Object { if ($_ -eq 0) { "IQ_FQ" } else { "IQ_FQ-$_" } })
 

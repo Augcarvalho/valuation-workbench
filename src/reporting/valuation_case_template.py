@@ -30,6 +30,12 @@ def valuation_case_css() -> str:
 .kv .cell .l { font-size:9.5px; font-weight:750; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
 .kv .cell .v { font-size:16px; font-weight:750; color:var(--ink); margin-top:5px; }
 .kv .cell .s { font-size:10px; color:var(--muted-2); margin-top:2px; }
+.case-thesis { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+.case-thesis .box { background: var(--panel); border:1px solid var(--line); border-radius:6px; padding:12px 14px; }
+.case-thesis h4 { margin:0 0 8px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.case-thesis p, .case-thesis li { font-size:12px; line-height:1.48; color:var(--slate); }
+.case-thesis ul, .case-thesis ol { margin:0; padding-left:16px; }
+.case-source { margin-top:9px; font-size:10.5px; color:var(--muted-2); }
 .grid-table td, .grid-table th { text-align:center; font-family: var(--font-mono); font-size:11.5px; }
 .grid-table td:first-child, .grid-table th:first-child { text-align:left; font-family: var(--font-sans); }
 .grid-anchor { background: var(--sage-soft); font-weight:800; }
@@ -125,6 +131,46 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
       <div class="cell"><div class="l">Current Multiple</div><div class="v">{{ snapshot.multiple }}</div><div class="s">LTM EV/EBITDA</div></div>
     </div>
   </section>
+
+  {% if analyst_thesis.pillars or analyst_thesis.variant_perception or analyst_thesis.key_debate %}
+  <section>
+    <div class="s-head"><div class="s-bar"></div><h2>1A &middot; Analyst Thesis Overlay</h2>
+      <span class="s-note">{{ analyst_thesis.status or 'thesis file' }}</span></div>
+    <div class="case-thesis">
+      {% if analyst_thesis.pillars %}
+      <div class="box">
+        <h4>Investment Pillars</h4>
+        <ul>{% for p in analyst_thesis.pillars %}<li>{{ p }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if analyst_thesis.variant_perception %}
+      <div class="box">
+        <h4>Variant Perception</h4>
+        <p>{{ analyst_thesis.variant_perception }}</p>
+      </div>
+      {% endif %}
+      {% if analyst_thesis.key_debate %}
+      <div class="box">
+        <h4>Key Debate</h4>
+        <p>{{ analyst_thesis.key_debate }}</p>
+      </div>
+      {% endif %}
+      {% if analyst_thesis.management_questions %}
+      <div class="box">
+        <h4>Diligence Questions</h4>
+        <ol>{% for q in analyst_thesis.management_questions %}<li>{{ q }}</li>{% endfor %}</ol>
+      </div>
+      {% endif %}
+    </div>
+    {% if analyst_thesis.source_deck or analyst_thesis.source_as_of or analyst_thesis.source_notes %}
+    <div class="case-source">
+      {% if analyst_thesis.source_deck %}Source: {{ analyst_thesis.source_deck }}. {% endif %}
+      {% if analyst_thesis.source_as_of %}As of {{ analyst_thesis.source_as_of }}. {% endif %}
+      {% if analyst_thesis.source_notes %}{{ analyst_thesis.source_notes }}{% endif %}
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
 
   <section>
     <div class="s-head"><div class="s-bar"></div><h2>2 &middot; Trading Comparables</h2>

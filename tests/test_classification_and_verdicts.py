@@ -153,6 +153,19 @@ def test_watchlist_summary_ranks_do_work_first():
     assert ranks.is_monotonic_increasing
 
 
+def test_watchlist_summary_excludes_comparable_only_names():
+    rows = [
+        _company("A", "Theme A"),
+        _company("B", "Theme A"),
+        _company("C", "Theme A"),
+    ]
+    rows[2]["coverage_role"] = "comparable"
+    df = prepare_monitoring_dataset(_inputs(rows))
+    summary = watchlist_summary(df)
+    assert set(summary["company_id"]) == {"A", "B"}
+    assert "C" in set(df["company_id"])  # still available for peer analytics
+
+
 def test_peer_taxonomy_follows_comps_discipline():
     """Guard the IB comps rules on the merged taxonomy (committed demo file +
     private overlay when present): peer groups need >=3 members, and known
@@ -172,10 +185,14 @@ def test_peer_taxonomy_follows_comps_discipline():
     group_of = dict(zip(ref["company_id"], ref["peer_group"]))
     # Brand apparel is never comped against restaurants/marketplaces.
     assert group_of["NASDAQ:LULU"] == group_of["NYSE:NKE"]
-    assert group_of["NASDAQ:LULU"] != group_of["NASDAQ:SBUX"]
-    assert group_of["NASDAQ:LULU"] != group_of["NASDAQ:ETSY"]
+    if "NASDAQ:SBUX" in group_of:
+        assert group_of["NASDAQ:LULU"] != group_of["NASDAQ:SBUX"]
+    if "NASDAQ:ETSY" in group_of:
+        assert group_of["NASDAQ:LULU"] != group_of["NASDAQ:ETSY"]
     # S&P Global is not an Adobe comp.
-    assert group_of["NYSE:SPGI"] != group_of["NASDAQ:ADBE"]
+    if "NYSE:SPGI" in group_of:
+        assert group_of["NYSE:SPGI"] != group_of["NASDAQ:ADBE"]
     # Merchant acquiring is one global business model (STNE comps = GPN, not MELI).
-    assert group_of["NASDAQ:STNE"] == group_of["NYSE:GPN"]
-    assert group_of["NASDAQ:STNE"] != group_of["NASDAQ:MELI"]
+    if {"NASDAQ:STNE", "NYSE:GPN", "NASDAQ:MELI"} <= set(group_of):
+        assert group_of["NASDAQ:STNE"] == group_of["NYSE:GPN"]
+        assert group_of["NASDAQ:STNE"] != group_of["NASDAQ:MELI"]

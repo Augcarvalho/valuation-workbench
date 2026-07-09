@@ -30,6 +30,14 @@ def ic_memo_css() -> str:
   border-radius:6px; padding:14px 18px; }
 .debate p { font-family: var(--font-serif); font-size:14px; line-height:1.55; color:var(--slate); margin:0; }
 .empty-note { font-size:12px; color:var(--muted-2); font-style:italic; }
+.pillar-list { display:grid; grid-template-columns: repeat(3,1fr); gap:10px; margin-top:12px; }
+.pillar-list .pillar { background: var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:10px 12px; font-size:12px; line-height:1.45; color:var(--slate); }
+.swot-grid { display:grid; grid-template-columns: repeat(4,1fr); gap:10px; }
+.swot-card { background: var(--panel); border:1px solid var(--line); border-radius:6px; padding:11px 12px; }
+.swot-card h4 { margin:0 0 8px; font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.swot-card ul { margin:0; padding-left:15px; }
+.swot-card li { font-size:11.2px; line-height:1.42; color:var(--slate); margin-bottom:5px; }
 .grid-table td, .grid-table th { text-align:center; }
 .grid-table td:first-child, .grid-table th:first-child { text-align:left; }
 .irr-pos { color: var(--green); font-weight:750; } .irr-neg { color: var(--red); font-weight:750; }
@@ -67,6 +75,11 @@ IC_MEMO_TEMPLATE = """<!doctype html>
   <section>
     <div class="s-head"><div class="s-bar"></div><h2>1 &middot; Situation Overview</h2></div>
     <div class="memo"><p>{{ situation }}</p></div>
+    {% if thesis.investment_pillars %}
+    <div class="pillar-list">
+      {% for p in thesis.investment_pillars %}<div class="pillar">{{ p }}</div>{% endfor %}
+    </div>
+    {% endif %}
   </section>
 
   <section>
@@ -166,17 +179,31 @@ IC_MEMO_TEMPLATE = """<!doctype html>
     </div>
   </section>
 
+  {% if thesis.swot %}
   <section>
-    <div class="s-head"><div class="s-bar"></div><h2>10 &middot; Diligence Questions</h2></div>
+    <div class="s-head"><div class="s-bar"></div><h2>10 &middot; SWOT From Analyst Case</h2></div>
+    <div class="swot-grid">
+      {% for key, label in [('strengths','Strengths'),('weaknesses','Weaknesses'),('opportunities','Opportunities'),('threats','Threats')] %}
+      <div class="swot-card">
+        <h4>{{ label }}</h4>
+        <ul>{% for item in thesis.swot.get(key, []) %}<li>{{ item }}</li>{% endfor %}</ul>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section>
+    <div class="s-head"><div class="s-bar"></div><h2>11 &middot; Diligence Questions</h2></div>
     <div class="lst q"><ol style="margin:0;padding-left:18px">
       {% for q in questions %}<li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">{{ q }}</li>{% endfor %}
     </ol></div>
   </section>
 
   <section>
-    <div class="s-head"><div class="s-bar"></div><h2>11 &middot; Decision &amp; Next Steps</h2></div>
+    <div class="s-head"><div class="s-bar"></div><h2>12 &middot; Decision &amp; Next Steps</h2></div>
     <div class="decision-box">
-      <p style="margin:0 0 8px;font-size:13.5px;color:var(--ink)"><b>Stage:</b> {{ stage_label }} &nbsp;|&nbsp; <b>Verdict:</b> {{ verdict.label }}</p>
+      <p style="margin:0 0 8px;font-size:13.5px;color:var(--ink)"><b>Stage:</b> {{ stage_label }}{% if thesis.analyst_status %} &nbsp;|&nbsp; <b>Thesis status:</b> {{ thesis.analyst_status }}{% endif %} &nbsp;|&nbsp; <b>Verdict:</b> {{ verdict.label }}</p>
       <p style="margin:0;font-size:13px;color:var(--slate)">{{ decision_text }}</p>
       {% if journal %}
       <div class="journal" style="margin-top:12px">
@@ -188,8 +215,14 @@ IC_MEMO_TEMPLATE = """<!doctype html>
   </section>
 
   <section>
-    <div class="s-head"><div class="s-bar"></div><h2>12 &middot; Methodology Appendix</h2></div>
+    <div class="s-head"><div class="s-bar"></div><h2>13 &middot; Methodology Appendix</h2></div>
     <div class="memo"><div class="appendix">
+      {% if thesis.source_deck or thesis.source_as_of or thesis.source_notes %}
+      <p><b>Analyst source.</b>
+      {% if thesis.source_deck %}Deck/case: {{ thesis.source_deck }}. {% endif %}
+      {% if thesis.source_as_of %}Thesis as of {{ thesis.source_as_of }}. {% endif %}
+      {% if thesis.source_notes %}{{ thesis.source_notes }}{% endif %}</p>
+      {% endif %}
       <p><b>Data.</b> {{ mode }}. TTM metrics require four reported quarters; partial windows are excluded rather than annualized.
       Peer statistics use the true trading comp set ({{ peer_group }}), separate from the thesis theme. Signals marked N/M are
       not meaningful for the company's business model.</p>

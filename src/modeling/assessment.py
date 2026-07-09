@@ -739,7 +739,12 @@ def watchlist_summary(df: pd.DataFrame, store=None) -> pd.DataFrame:
     breaks ties so Do Work names float above equally-scored Watch names.
     """
     rows = []
-    for company_id in latest_rows(df)["company_id"]:
+    latest = latest_rows(df)
+    if "coverage_role" in latest.columns:
+        anchors = latest[latest["coverage_role"].fillna("watchlist") == "watchlist"]
+    else:
+        anchors = latest
+    for company_id in anchors["company_id"]:
         a = build_assessment(df, company_id, store=store)
         r = a.row
         financial = a.business_model == "financial"
@@ -751,6 +756,7 @@ def watchlist_summary(df: pd.DataFrame, store=None) -> pd.DataFrame:
             "theme": a.theme,
             "peer_group": a.peer_group,
             "business_model": a.business_model,
+            "coverage_role": r.get("coverage_role", "watchlist"),
             "currency": r.get("currency", ""),
             "verdict_key": a.verdict_key,
             "verdict_label": a.verdict_label,

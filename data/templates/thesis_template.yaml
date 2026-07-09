@@ -4,9 +4,15 @@
 # Private theses are never committed (data_private/ is gitignored).
 
 stage: watch            # watch | work | core | pass
+analyst_status: draft   # draft | reviewed | final | stale | legacy_refresh_required
 
 thesis: >
   One paragraph: what you would own and why the economics work.
+
+investment_pillars:
+  - Why the business quality deserves diligence time.
+  - Why the valuation may be mispriced.
+  - Why now: catalyst, inflection, or setup.
 
 variant_perception: >
   What you believe that the market does not (or vice versa). This is the
@@ -24,6 +30,20 @@ risks:
   - Biggest way the thesis breaks.
   - Second failure mode.
 
+swot:
+  strengths:
+    - Durable advantage or execution proof point.
+  weaknesses:
+    - Structural limitation or operational issue.
+  opportunities:
+    - Upside driver not fully priced.
+  threats:
+    - External or competitive risk.
+
+management_questions:
+  - The first question you would ask management or IR.
+  - The diligence item that would change your mind.
+
 # Optional: overrides for the scenario engine (otherwise auto-derived).
 scenarios:
   bear: { revenue_cagr: 0.00, exit_margin: 0.15, exit_multiple: 8.0, horizon_years: 3 }
@@ -33,3 +53,8 @@ scenarios:
 journal:
   - date: 2026-07-01
     note: Dated observations, decisions, and mind changes live here.
+
+source:
+  deck: Optional internal deck or case-study file name.
+  as_of: 2026-07-01
+  notes: Keep licensed data, screenshots, and raw CapIQ exports out of GitHub.

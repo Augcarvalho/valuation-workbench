@@ -143,6 +143,14 @@ tr.median td { background: #f3eadb; font-style: italic; color: var(--slate); }
   border-radius:6px; padding:14px 18px; }
 .debate p { font-family: var(--font-serif); font-size:14px; line-height:1.55; color:var(--slate); margin:0; }
 .empty-note { font-size:12px; color:var(--muted-2); font-style:italic; }
+.pillar-list { display:grid; grid-template-columns: repeat(3,1fr); gap:10px; margin-top:12px; }
+.pillar-list .pillar { background: var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:10px 12px; font-size:12px; line-height:1.45; color:var(--slate); }
+.swot-grid { display:grid; grid-template-columns: repeat(4,1fr); gap:10px; }
+.swot-card { background: var(--panel); border:1px solid var(--line); border-radius:6px; padding:11px 12px; }
+.swot-card h4 { margin:0 0 8px; font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.swot-card ul { margin:0; padding-left:15px; }
+.swot-card li { font-size:11.2px; line-height:1.42; color:var(--slate); margin-bottom:5px; }
 .grid-table td, .grid-table th { text-align:center; }
 .grid-table td:first-child, .grid-table th:first-child { text-align:left; }
 .irr-pos { color: var(--green); font-weight:750; } .irr-neg { color: var(--red); font-weight:750; }
@@ -157,7 +165,7 @@ tr.median td { background: #f3eadb; font-style: italic; color: var(--slate); }
 <main>
 
   <div class="cover">
-    <div class="cover-kicker">Investment Committee Memo | 08 Jul 2026</div>
+    <div class="cover-kicker">Investment Committee Memo | 09 Jul 2026</div>
     <h1>TOTVS S.A.<span class="stage-pill">Core Position</span></h1>
     <div class="cover-sub">TOTS3.SA | Brazil Software & Services comps | BRL millions | As of 31 Mar 2026</div>
     <div class="cover-verdict" style="border-left-color:#4f7658">
@@ -171,6 +179,11 @@ tr.median td { background: #f3eadb; font-style: italic; color: var(--slate); }
   <section>
     <div class="s-head"><div class="s-bar"></div><h2>1 &middot; Situation Overview</h2></div>
     <div class="memo"><p>TOTVS S.A. posted 22.6% TTM revenue growth versus the prior-year quarter, with a EBITDA margin of 28.7%. Cash conversion is adequate at 51.5% of EBITDA, and the balance sheet carries 1.9x net leverage. TOTVS is the dominant Brazilian ERP franchise with a sticky SMB installed base, pricing power indexed to inflation, and an under-monetized fintech attach opportunity. Recurring revenue and disciplined capital allocation make it the quality compounder of the local software universe.</p></div>
+    
+    <div class="pillar-list">
+      <div class="pillar">Mission-critical ERP creates high retention and recurring revenue visibility.</div><div class="pillar">Fintech attach can extend the growth runway without changing the core customer base.</div><div class="pillar">Local software leadership deserves a quality multiple if margins hold.</div>
+    </div>
+    
   </section>
 
   <section>
@@ -311,17 +324,46 @@ tr.median td { background: #f3eadb; font-style: italic; color: var(--slate); }
     </div>
   </section>
 
+  
   <section>
-    <div class="s-head"><div class="s-bar"></div><h2>10 &middot; Diligence Questions</h2></div>
+    <div class="s-head"><div class="s-bar"></div><h2>10 &middot; SWOT From Analyst Case</h2></div>
+    <div class="swot-grid">
+      
+      <div class="swot-card">
+        <h4>Strengths</h4>
+        <ul><li>Dominant Brazilian ERP installed base.</li><li>Recurring revenue and pricing discipline.</li></ul>
+      </div>
+      
+      <div class="swot-card">
+        <h4>Weaknesses</h4>
+        <ul><li>SMB exposure can amplify macro cyclicality.</li></ul>
+      </div>
+      
+      <div class="swot-card">
+        <h4>Opportunities</h4>
+        <ul><li>Fintech and cloud attach can improve lifetime value per customer.</li></ul>
+      </div>
+      
+      <div class="swot-card">
+        <h4>Threats</h4>
+        <ul><li>Credit losses or macro stress could dilute the software-quality narrative.</li></ul>
+      </div>
+      
+    </div>
+  </section>
+  
+
+  <section>
+    <div class="s-head"><div class="s-bar"></div><h2>11 &middot; Diligence Questions</h2></div>
     <div class="lst q"><ol style="margin:0;padding-left:18px">
-      <li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">How much of the cash conversion pressure is recurring versus timing-related working capital?</li><li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">How durable is the current growth rate, and what is the organic vs inorganic split?</li><li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">What are the top two uses of free cash flow over the next 12 months, and at what return?</li>
+      <li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">What share of the installed base can realistically adopt fintech products?</li><li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">How much of margin expansion is structural versus post-migration normalization?</li><li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">How much of the cash conversion pressure is recurring versus timing-related working capital?</li><li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">How durable is the current growth rate, and what is the organic vs inorganic split?</li><li style="font-size:12px;color:var(--slate);line-height:1.45;margin-bottom:6px">What are the top two uses of free cash flow over the next 12 months, and at what return?</li>
     </ol></div>
   </section>
 
   <section>
-    <div class="s-head"><div class="s-bar"></div><h2>11 &middot; Decision &amp; Next Steps</h2></div>
+    <div class="s-head"><div class="s-bar"></div><h2>12 &middot; Decision &amp; Next Steps</h2></div>
     <div class="decision-box">
-      <p style="margin:0 0 8px;font-size:13.5px;color:var(--ink)"><b>Stage:</b> Core Position &nbsp;|&nbsp; <b>Verdict:</b> Constructive</p>
+      <p style="margin:0 0 8px;font-size:13.5px;color:var(--ink)"><b>Stage:</b> Core Position &nbsp;|&nbsp; <b>Thesis status:</b> reviewed &nbsp;|&nbsp; <b>Verdict:</b> Constructive</p>
       <p style="margin:0;font-size:13px;color:var(--slate)">Maintain coverage; revisit sizing on weakness or thesis-confirming data points.</p>
       
       <div class="journal" style="margin-top:12px">
@@ -333,8 +375,14 @@ tr.median td { background: #f3eadb; font-style: italic; color: var(--slate); }
   </section>
 
   <section>
-    <div class="s-head"><div class="s-bar"></div><h2>12 &middot; Methodology Appendix</h2></div>
+    <div class="s-head"><div class="s-bar"></div><h2>13 &middot; Methodology Appendix</h2></div>
     <div class="memo"><div class="appendix">
+      
+      <p><b>Analyst source.</b>
+      Deck/case: Public demo thesis file.. 
+      Thesis as of 2026-07-01. 
+      Synthetic/demo workflow; not investment advice.</p>
+      
       <p><b>Data.</b> Public Demo Data. TTM metrics require four reported quarters; partial windows are excluded rather than annualized.
       Peer statistics use the true trading comp set (Brazil Software & Services), separate from the thesis theme. Signals marked N/M are
       not meaningful for the company's business model.</p>
@@ -348,7 +396,7 @@ tr.median td { background: #f3eadb; font-style: italic; color: var(--slate); }
     </div></div>
   </section>
 
-  <div class="footer">Generated by the Investment Watchlist workflow · 08 Jul 2026 · Public Demo Data · Not investment advice.</div>
+  <div class="footer">Generated by the Investment Watchlist workflow · 09 Jul 2026 · Public Demo Data · Not investment advice.</div>
 </main>
 </body>
 </html>

@@ -25,11 +25,11 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     # Why-now strip.
     hc, rev = a.history_context, a.revisions
     why_cards = [
-        Kpi("attn", "Attention Score", f"{a.attention_score:.0f}", "0–100 · drives Home ranking",
+        Kpi("attn", "Attention Score", f"{a.attention_score:.0f}", "0-100 | drives Home ranking",
             "yellow" if a.attention_score >= 40 else "n/a"),
         Kpi("hist", "Multiple vs Own History",
             fmt_ordinal(hc.get("percentile")) + " pctile" if hc.get("available") else "n/a",
-            (f"median {fmt_multiple(hc.get('median'))} · z {hc.get('z_score'):+.1f}" if hc.get("available")
+            (f"median {fmt_multiple(hc.get('median'))} | z {hc.get('z_score'):+.1f}" if hc.get("available")
              else "valuation history not populated"),
             "n/a"),
         Kpi("revs", "Estimate Momentum", rev.get("direction", "n/a").title(),
@@ -78,30 +78,62 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             No analyst thesis exists for this name yet. Copy
             <code>data/templates/thesis_template.yaml</code> to
             <code>{target_dir}\\{thesis_filename(company_id)}</code>
-            and fill in the variant perception, key debate, catalysts, risks, and scenario cases.
+            and fill in the investment pillars, variant perception, key debate, SWOT,
+            management questions, catalysts, risks, and scenario cases.
             This section, the IC memo, and the scenario engine pick it up automatically on the next rerun.</p></div>
             """,
             unsafe_allow_html=True,
         )
-    else:
-        ui.section("Analyst Thesis", f"Stage: {thesis.stage_label} | from the thesis file")
-        ui.memo("What We Would Own", thesis.thesis or "—")
-        c1, c2 = st.columns(2, gap="medium")
-        with c1:
-            ui.memo("Variant Perception", thesis.variant_perception or "—")
-        with c2:
-            ui.memo("Key Debate", thesis.key_debate or "—")
+        return
 
-        c1, c2 = st.columns(2, gap="medium")
-        with c1:
-            items = [f"{c.get('date', '')} — {c.get('event', '')}" + (f" ({c.get('note')})" if c.get("note") else "")
-                     for c in thesis.catalysts] or ["No dated catalysts on file."]
-            ui.bullet_list("Catalysts", items, "q")
-        with c2:
-            ui.bullet_list("Risks", thesis.risks or ["No analyst risks on file."], "con")
+    status = f" | Status: {thesis.analyst_status}" if thesis.analyst_status else ""
+    ui.section("Analyst Thesis", f"Stage: {thesis.stage_label}{status} | from the thesis file")
+    ui.memo("What We Would Own", thesis.thesis or "--")
 
-        if thesis.journal:
-            entries = [f"{j.get('date', '')}: {j.get('note', '')}" for j in reversed(thesis.journal)]
-            ui.bullet_list("Journal — Latest Entries", entries[:6], "q")
+    if thesis.investment_pillars:
+        ui.bullet_list("Investment Pillars", thesis.investment_pillars, "pos")
 
-        ui.footnote(f"Source file: <code>{thesis.path}</code> — edit and rerun to update.")
+    c1, c2 = st.columns(2, gap="medium")
+    with c1:
+        ui.memo("Variant Perception", thesis.variant_perception or "--")
+    with c2:
+        ui.memo("Key Debate", thesis.key_debate or "--")
+
+    c1, c2 = st.columns(2, gap="medium")
+    with c1:
+        items = [f"{c.get('date', '')} - {c.get('event', '')}" + (f" ({c.get('note')})" if c.get("note") else "")
+                 for c in thesis.catalysts] or ["No dated catalysts on file."]
+        ui.bullet_list("Catalysts", items, "q")
+    with c2:
+        ui.bullet_list("Risks", thesis.risks or ["No analyst risks on file."], "con")
+
+    if thesis.swot:
+        ui.section("SWOT From Analyst Case", "Qualitative work imported from the thesis file")
+        swot_cols = st.columns(4, gap="medium")
+        labels = [
+            ("strengths", "Strengths", "pos"),
+            ("weaknesses", "Weaknesses", "con"),
+            ("opportunities", "Opportunities", "q"),
+            ("threats", "Threats", "con"),
+        ]
+        for col, (key, label, kind) in zip(swot_cols, labels):
+            with col:
+                ui.bullet_list(label, thesis.swot.get(key) or ["--"], kind)
+
+    if thesis.management_questions:
+        ui.bullet_list("Analyst Diligence Questions", thesis.management_questions, "q")
+
+    if thesis.journal:
+        entries = [f"{j.get('date', '')}: {j.get('note', '')}" for j in reversed(thesis.journal)]
+        ui.bullet_list("Journal - Latest Entries", entries[:6], "q")
+
+    source_bits = []
+    if thesis.source_deck:
+        source_bits.append(f"Deck: {thesis.source_deck}")
+    if thesis.source_as_of:
+        source_bits.append(f"As of: {thesis.source_as_of}")
+    if thesis.source_notes:
+        source_bits.append(thesis.source_notes)
+    source = " | ".join(source_bits)
+    ui.footnote(f"Source file: <code>{thesis.path}</code> - edit and rerun to update."
+                + (f" {source}" if source else ""))

@@ -11,7 +11,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $OutDir = Join-Path $ProjectRoot "data_private\capiq_exports"
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $RunStart = Get-Date
@@ -147,6 +147,12 @@ for ($r = 2; $r -le $D.rows; $r++) {
         ar = As-Double (Get-Val $D $r $M "ar")
         inventory = As-Double (Get-Val $D $r $M "inventory")
         ap = As-Double (Get-Val $D $r $M "ap")
+        minority_interest = As-Double (Get-Val $D $r $M "minority_interest")
+        preferred_equity = As-Double (Get-Val $D $r $M "preferred_equity")
+        lease_liabilities = As-Double (Get-Val $D $r $M "lease_liabilities")
+        pension_liabilities = As-Double (Get-Val $D $r $M "pension_liabilities")
+        cash_st_invest = As-Double (Get-Val $D $r $M "cash_st_invest")
+        tangible_common_equity = As-Double (Get-Val $D $r $M "tangible_common_equity")
         source = "Capital IQ Pro Excel Add-In"
     }
 }
@@ -269,7 +275,7 @@ $Entry = [PSCustomObject]@{
     pending_valuation = 0
     pending_estimates = 0
 }
-if (Test-Path $RefreshLogPath) { $Entry | Export-Csv -NoTypeInformation -Encoding UTF8 -Append -Path $RefreshLogPath }
+if (Test-Path $RefreshLogPath) { $Entry | Export-Csv -NoTypeInformation -Encoding UTF8 -Append -Force -Path $RefreshLogPath }
 else { $Entry | Export-Csv -NoTypeInformation -Encoding UTF8 -Path $RefreshLogPath }
 
 Write-Host "DONE: companies=$($Companies.Count) financials=$($Financials.Count) market=$($Market.Count) valuation=$($Valuation.Count) estimates=$($Estimates.Count)"

@@ -183,6 +183,11 @@ def build_memo_context(df: pd.DataFrame, company_id: str, store: WatchlistStore)
         for c in (thesis.catalysts if thesis else [])
     ]
     risks = thesis.risks if thesis else []
+    thesis_questions = thesis.management_questions if thesis else []
+    questions = list(thesis_questions)
+    for q in a.management_questions:
+        if q not in questions:
+            questions.append(q)
     journal = list(reversed((thesis.journal if thesis else [])))[:3]
     journal = [{"date": str(j.get("date", "")), "note": str(j.get("note", ""))} for j in journal]
 
@@ -227,13 +232,19 @@ def build_memo_context(df: pd.DataFrame, company_id: str, store: WatchlistStore)
         "scenario_profit_label": ie["metric"],
         "horizon": horizon,
         "thesis": {
+            "analyst_status": thesis.analyst_status if thesis else "",
+            "investment_pillars": thesis.investment_pillars if thesis else [],
             "variant_perception": thesis.variant_perception if thesis else "",
             "key_debate": thesis.key_debate if thesis else "",
+            "swot": thesis.swot if thesis else {},
+            "source_deck": thesis.source_deck if thesis else "",
+            "source_as_of": thesis.source_as_of if thesis else "",
+            "source_notes": thesis.source_notes if thesis else "",
         },
         "catalysts": catalysts,
         "risks": risks,
         "concerns": a.concerns,
-        "questions": a.management_questions,
+        "questions": questions,
         "journal": journal,
         "decision_text": decision_text,
     }

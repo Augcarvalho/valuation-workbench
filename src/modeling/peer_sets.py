@@ -355,7 +355,7 @@ def rejected_suggestions(anchor_company_id: str, path: Path = SUGGESTIONS_LOG_PA
 @dataclass
 class PeerResolution:
     peers: pd.DataFrame
-    source: str            # capiq_comp_set | manual | fallback | peer_group | universe
+    source: str            # capiq_comp_set | capiq_web_peer_comps | manual | fallback | peer_group | universe
     reviewed: bool
     warning: str | None = None
     set_name: str = ""
