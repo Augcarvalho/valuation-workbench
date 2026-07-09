@@ -1,0 +1,28 @@
+# Public demo assumptions only - illustrative, not investment advice.
+# Alphabet: mature platform case with AI capex pressure offset by cloud and
+# operating leverage. Values are deliberately transparent placeholders for the
+# public GitHub demo; private work should use analyst-reviewed Capital IQ data.
+
+status: illustrative
+horizon_years: 5
+
+scenarios:
+  base:
+    revenue_growth: {start: 0.10, end: 0.06}
+    ebitda_margin: {start: auto, end: 0.49}
+    capex_pct_revenue: {start: auto, end: 0.13}
+  bear:
+    revenue_growth: {start: 0.04, end: 0.03}
+    ebitda_margin: {start: auto, end: 0.45}
+    capex_pct_revenue: {start: auto, end: 0.15}
+  bull:
+    revenue_growth: {start: 0.13, end: 0.08}
+    ebitda_margin: {start: auto, end: 0.53}
+    capex_pct_revenue: {start: auto, end: 0.11}
+
+wacc:
+  beta: 1.05
+
+terminal:
+  exit_multiple: 10.5
+  perpetuity_growth: 0.035

@@ -43,8 +43,8 @@ portfolio-company-monitoring-dashboard/
       04_football_field.png
       05_multiples_scorecard.png
       06_data_audit.png
-      ic_memo_TOTS3.html
-      valuation_case_TOTS3.html
+      ic_memo_GOOGL.html
+      valuation_case_GOOGL.html
   scripts/
   src/
   tests/

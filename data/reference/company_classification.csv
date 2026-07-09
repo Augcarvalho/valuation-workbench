@@ -1,8 +1,15 @@
-company_id,peer_group,business_model
-TOTS3.SA,Brazil Software & Services,operating
-LWSA3.SA,Brazil Software & Services,operating
-BMOB3.SA,Brazil Software & Services,operating
-CSUD3.SA,Brazil Software & Services,operating
-VLID3.SA,Brazil Software & Services,operating
-NGRD3.SA,Brazil Software & Services,operating
-PRNR3.SA,Brazil Software & Services,operating
+company_id,peer_group,business_model,coverage_role
+TOTS3.SA,Brazil Software & Services,operating,watchlist
+LWSA3.SA,Brazil Software & Services,operating,watchlist
+BMOB3.SA,Brazil Software & Services,operating,watchlist
+CSUD3.SA,Brazil Software & Services,operating,watchlist
+VLID3.SA,Brazil Software & Services,operating,watchlist
+NGRD3.SA,Brazil Software & Services,operating,watchlist
+PRNR3.SA,Brazil Software & Services,operating,watchlist
+GOOGL,US Mega-Cap Digital Platforms,operating,watchlist
+MSFT,US Mega-Cap Digital Platforms,operating,comparable
+META,US Mega-Cap Digital Platforms,operating,comparable
+AMZN,US Mega-Cap Digital Platforms,operating,comparable
+ADBE,US Mega-Cap Digital Platforms,operating,comparable
+CRM,US Mega-Cap Digital Platforms,operating,comparable
+NFLX,US Mega-Cap Digital Platforms,operating,comparable

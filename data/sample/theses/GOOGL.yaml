@@ -1,0 +1,73 @@
+# Public demo thesis only - illustrative, not investment advice.
+
+stage: core
+analyst_status: reviewed
+
+thesis: >
+  Alphabet is a scaled digital platform with one of the highest-quality
+  advertising franchises globally, a growing cloud business, and a balance
+  sheet that gives management unusual strategic flexibility. The investment
+  question is whether AI disruption compresses search economics or reinforces
+  the company's distribution, data, and infrastructure advantages.
+
+investment_pillars:
+  - Search and YouTube remain scaled, cash-generative advertising assets.
+  - Google Cloud can keep improving margins as utilization and enterprise mix mature.
+  - Net cash and buybacks provide downside support while the company invests through the AI transition.
+
+variant_perception: >
+  The market often frames Alphabet as an AI-disruption risk. The variant view
+  is that AI raises capex intensity but also deepens the value of distribution,
+  proprietary data, cloud infrastructure, and advertiser relationships.
+
+key_debate: >
+  Is AI a margin headwind that permanently lowers search monetization, or a
+  product-cycle cost that Alphabet can absorb while defending query share and
+  expanding cloud profitability?
+
+catalysts:
+  - date: 2026-07-28
+    event: Q2 2026 earnings
+    note: Watch search revenue resilience, cloud margin, and capex commentary.
+  - date: 2026-10-27
+    event: Q3 2026 earnings
+    note: Monitor AI product adoption and capital-allocation updates.
+
+risks:
+  - AI answers could reduce commercial search click-through rates.
+  - Regulatory remedies could pressure distribution, data usage, or ad-market structure.
+  - Elevated AI capex may defer free-cash-flow conversion.
+
+swot:
+  strengths:
+    - Global distribution across search, YouTube, Android, Chrome, and cloud.
+    - Net cash balance sheet and durable advertising cash generation.
+  weaknesses:
+    - Heavy dependence on search advertising economics.
+    - Capex and R&D intensity are rising with AI infrastructure demand.
+  opportunities:
+    - Cloud margin expansion and AI monetization across enterprise products.
+    - YouTube connected-TV and creator monetization growth.
+  threats:
+    - Regulatory intervention and AI-native competition.
+    - Traffic-acquisition-cost inflation.
+
+management_questions:
+  - How should investors separate temporary AI investment from structural margin pressure?
+  - Which AI products are already improving monetization rather than only engagement?
+  - What is the long-term capital intensity of serving AI-enhanced search results?
+  - How much flexibility does the balance sheet give buybacks if capex remains elevated?
+
+scenarios:
+  bear: { revenue_cagr: 0.05, exit_margin: 0.45, exit_multiple: 8.5, horizon_years: 5 }
+  base: { revenue_cagr: 0.09, exit_margin: 0.49, exit_multiple: 10.5, horizon_years: 5 }
+  bull: { revenue_cagr: 0.12, exit_margin: 0.53, exit_multiple: 12.5, horizon_years: 5 }
+
+journal:
+  - date: 2026-07-09
+    note: Added as the public showcase company because the comp set is familiar and easy for reviewers to evaluate.
+
+source:
+  deck: Public demo thesis file.
+  as_of: 2026-07-09
+  notes: Demonstration workflow using public data only; not investment advice.

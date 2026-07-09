@@ -11,6 +11,9 @@ ou public equities usaria internamente.
 
 O repositório público roda com dados demonstrativos. Os dados reais do Capital IQ,
 as teses privadas e a watchlist real ficam fora do GitHub em `data_private/`.
+Os prints públicos usam Alphabet/Google como empresa de referência, com um peer
+set de mega-cap tech reconhecível, para mostrar o produto sem expor dados
+licenciados ou posições privadas.
 
 `Python` | `Streamlit` | `Pandas` | `Plotly` | `Capital IQ Excel Add-In` | `DCF` | `Comps` | `IC Memo`
 
@@ -169,8 +172,8 @@ portfolio-company-monitoring-dashboard/
       04_football_field.png
       05_multiples_scorecard.png
       06_data_audit.png
-      ic_memo_TOTS3.html
-      valuation_case_TOTS3.html
+      ic_memo_GOOGL.html
+      valuation_case_GOOGL.html
   scripts/
   src/
   tests/
@@ -224,8 +227,8 @@ pip install -e .
 python -m src.pipeline.build_dataset --source public-demo
 streamlit run src/app/streamlit_app.py -- --demo
 
-python -m src.reporting.ic_memo --demo --company TOTS3.SA
-python -m src.reporting.valuation_case --demo --company TOTS3.SA
+python -m src.reporting.ic_memo --demo --company GOOGL
+python -m src.reporting.valuation_case --demo --company GOOGL
 pytest
 ```
 

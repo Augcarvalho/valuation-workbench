@@ -23,6 +23,7 @@ COMPANIES = [
         "sector": "Software-Enabled Services",
         "exchange": "B3",
         "currency": "BRL",
+        "source": "B3-listed public company universe",
     },
     {
         "company_id": "LWSA3.SA",
@@ -31,6 +32,7 @@ COMPANIES = [
         "sector": "Software-Enabled Services",
         "exchange": "B3",
         "currency": "BRL",
+        "source": "B3-listed public company universe",
     },
     {
         "company_id": "BMOB3.SA",
@@ -39,6 +41,7 @@ COMPANIES = [
         "sector": "Software-Enabled Services",
         "exchange": "B3",
         "currency": "BRL",
+        "source": "B3-listed public company universe",
     },
     {
         "company_id": "CSUD3.SA",
@@ -47,6 +50,7 @@ COMPANIES = [
         "sector": "Software-Enabled Services",
         "exchange": "B3",
         "currency": "BRL",
+        "source": "B3-listed public company universe",
     },
     {
         "company_id": "VLID3.SA",
@@ -55,6 +59,7 @@ COMPANIES = [
         "sector": "Software-Enabled Services",
         "exchange": "B3",
         "currency": "BRL",
+        "source": "B3-listed public company universe",
     },
     {
         "company_id": "NGRD3.SA",
@@ -63,6 +68,7 @@ COMPANIES = [
         "sector": "Software-Enabled Services",
         "exchange": "B3",
         "currency": "BRL",
+        "source": "B3-listed public company universe",
     },
     {
         "company_id": "PRNR3.SA",
@@ -71,6 +77,70 @@ COMPANIES = [
         "sector": "B2B Services",
         "exchange": "B3",
         "currency": "BRL",
+        "source": "B3-listed public company universe",
+    },
+    {
+        "company_id": "GOOGL",
+        "ticker": "GOOGL",
+        "company_name": "Alphabet Inc.",
+        "sector": "Mega-Cap Tech & Digital Platforms",
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "source": "US mega-cap technology public universe",
+    },
+    {
+        "company_id": "MSFT",
+        "ticker": "MSFT",
+        "company_name": "Microsoft Corporation",
+        "sector": "Mega-Cap Tech & Digital Platforms",
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "source": "US mega-cap technology public universe",
+    },
+    {
+        "company_id": "META",
+        "ticker": "META",
+        "company_name": "Meta Platforms, Inc.",
+        "sector": "Mega-Cap Tech & Digital Platforms",
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "source": "US mega-cap technology public universe",
+    },
+    {
+        "company_id": "AMZN",
+        "ticker": "AMZN",
+        "company_name": "Amazon.com, Inc.",
+        "sector": "Mega-Cap Tech & Digital Platforms",
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "source": "US mega-cap technology public universe",
+    },
+    {
+        "company_id": "ADBE",
+        "ticker": "ADBE",
+        "company_name": "Adobe Inc.",
+        "sector": "Mega-Cap Tech & Digital Platforms",
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "source": "US mega-cap technology public universe",
+    },
+    {
+        "company_id": "CRM",
+        "ticker": "CRM",
+        "company_name": "Salesforce, Inc.",
+        "sector": "Mega-Cap Tech & Digital Platforms",
+        "exchange": "NYSE",
+        "currency": "USD",
+        "source": "US mega-cap technology public universe",
+    },
+    {
+        "company_id": "NFLX",
+        "ticker": "NFLX",
+        "company_name": "Netflix, Inc.",
+        "sector": "Mega-Cap Tech & Digital Platforms",
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "source": "US mega-cap technology public universe",
     },
 ]
 
@@ -193,7 +263,7 @@ def _company_rows(company: dict[str, str]) -> tuple[list[dict], list[dict]]:
 
 def main() -> None:
     ensure_dir(SAMPLE_PUBLIC_DIR)
-    companies = pd.DataFrame([{**company, "source": "B3-listed public company universe"} for company in COMPANIES])
+    companies = pd.DataFrame(COMPANIES)
     all_financials: list[dict] = []
     all_market: list[dict] = []
 
@@ -219,10 +289,10 @@ def main() -> None:
         [
             {
                 "table_name": "companies",
-                "source_name": "B3-listed public company universe",
-                "source_url": "https://www.b3.com.br/",
+                "source_name": "Public company demo universe",
+                "source_url": "https://www.b3.com.br/; https://finance.yahoo.com/",
                 "retrieved_at": datetime.now(timezone.utc).date().isoformat(),
-                "notes": "Company universe selected for PE-style B2B/software-enabled services monitoring demo.",
+                "notes": "Demo universe includes Brazilian software/services names and a US mega-cap technology comp set centered on Alphabet/Google.",
             },
             {
                 "table_name": "financials_quarterly",
