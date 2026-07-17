@@ -3,3 +3,6 @@
 *.jpg binary
 *.pdf binary
 *.xlsx binary
+
+# Generated investment reports are showcase outputs, not application source.
+reports/sample/*.html linguist-generated=true
