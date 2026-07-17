@@ -87,6 +87,9 @@ FINANCIAL_OPTIONAL_COLUMNS = [
 ]
 
 ESTIMATE_OPTIONAL_COLUMNS = [
+    "consensus_period",
+    "consensus_as_of",
+    "consensus_basis",
     "eps_consensus",
     "revenue_est_ntm",
     "ebitda_est_ntm",
@@ -205,4 +208,3 @@ NUMERIC_COLUMNS = [
     "week52_high",
     "week52_low",
 ]
-

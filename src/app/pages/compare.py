@@ -53,22 +53,22 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         metric_row("Attention score", lambda a: f"{a.attention_score:.0f}"),
         metric_row("Peer group", lambda a: str(a.peer_group)[:28]),
         metric_row("Thesis stage", lambda a: a.thesis.stage_label if (a.thesis and a.thesis.exists) else "—"),
-        metric_row("Revenue (TTM)", lambda a: fmt_money(a.row.get("revenue_ttm"), a.row.get("currency", "USD"))),
-        metric_row("Revenue YoY", lambda a: fmt_signed_pct(a.row.get("revenue_yoy_growth"))),
-        metric_row("Profitability (TTM)", lambda a: fmt_pct(a.row.get(
+        metric_row("Revenue (LTM)", lambda a: fmt_money(a.row.get("revenue_ttm"), a.row.get("currency", "USD"))),
+        metric_row("Revenue growth (latest Q YoY)", lambda a: fmt_signed_pct(a.row.get("revenue_yoy_growth"))),
+        metric_row("Profitability margin (LTM)", lambda a: fmt_pct(a.row.get(
             "net_income_margin_ttm" if a.business_model == "financial" else "ebitda_margin_ttm"))),
-        metric_row("FCF conversion", lambda a: fmt_pct(a.row.get("fcf_conversion_ttm"))),
-        metric_row("ROIC / ROE", lambda a: fmt_pct(a.row.get("roe_ttm" if a.business_model == "financial" else "roic_ttm"))),
-        metric_row("Net debt / EBITDA", lambda a: fmt_multiple(a.row.get("net_debt_to_ebitda_ttm"))),
-        metric_row("Multiple", lambda a: f"{fmt_multiple(a.row.get('pe_ttm' if a.business_model == 'financial' else 'ev_to_ebitda_ttm'))} {a.valuation.get('multiple_name')}"),
+        metric_row("FCF conversion (LTM)", lambda a: fmt_pct(a.row.get("fcf_conversion_ttm"))),
+        metric_row("ROIC / ROE (LTM)", lambda a: fmt_pct(a.row.get("roe_ttm" if a.business_model == "financial" else "roic_ttm"))),
+        metric_row("Net debt / EBITDA (LTM)", lambda a: fmt_multiple(a.row.get("net_debt_to_ebitda_ttm"))),
+        metric_row("Current multiple (LTM)", lambda a: f"{fmt_multiple(a.row.get('pe_ttm' if a.business_model == 'financial' else 'ev_to_ebitda_ttm'))} {a.valuation.get('multiple_name')}"),
         metric_row("vs peer median", lambda a: a.valuation.get("premium_label", "n/a")),
         metric_row("vs own history", lambda a: fmt_ordinal(a.history_context.get("percentile")) + " pctile"
                    if a.history_context.get("available") else "n/a"),
         metric_row("Estimate momentum", lambda a: a.revisions.get("direction", "n/a").title()),
         metric_row("Open flags", lambda a: str(sum(1 for f in a.red_flags if f.get("severity") in {"High", "Medium"}))),
-        metric_row("As of", lambda a: ui.quarter_label(a.row["period"])),
+        metric_row("Financials through", lambda a: ui.quarter_label(a.row["period"])),
     ]
-    ui.section("Side-by-Side")
+    ui.section("Side-by-Side", "Quarterly growth is latest-quarter YoY; margins, returns, leverage and multiples are LTM")
     ui.html_table(headers, rows, numeric_from=1)
 
     ui.section("Verdict Rationale")

@@ -20,7 +20,7 @@ from src.branding import FONT_SANS, FONT_SERIF, PALETTE
 
 INK = PALETTE["ink"]
 GRAPHITE = PALETTE["charcoal"]
-SAGE = PALETTE["sage"]
+SAGE = PALETTE["anchor"]
 GOLD = PALETTE["gold"]
 COPPER = PALETTE["copper"]
 GREEN = PALETTE["green"]
@@ -114,7 +114,10 @@ def _implied_price_from_multiple(row: pd.Series, multiple: float) -> float | Non
         return None
     net_debt = _clean(row.get("net_debt"))
     if net_debt is None:
-        net_debt = (_clean(row.get("total_debt")) or 0.0) - (_clean(row.get("cash")) or 0.0)
+        cash = _clean(row.get("cash_st_invest"))
+        if cash is None:
+            cash = _clean(row.get("cash"))
+        net_debt = (_clean(row.get("total_debt")) or 0.0) - (cash or 0.0)
     minority = _clean(row.get("minority_interest")) or 0.0
     preferred = _clean(row.get("preferred_equity")) or 0.0
     implied_equity = ebitda * multiple - net_debt - minority - preferred
@@ -132,7 +135,10 @@ def _implied_price_from_revenue_multiple(row: pd.Series, multiple: float) -> flo
         return None
     net_debt = _clean(row.get("net_debt"))
     if net_debt is None:
-        net_debt = (_clean(row.get("total_debt")) or 0.0) - (_clean(row.get("cash")) or 0.0)
+        cash = _clean(row.get("cash_st_invest"))
+        if cash is None:
+            cash = _clean(row.get("cash"))
+        net_debt = (_clean(row.get("total_debt")) or 0.0) - (cash or 0.0)
     minority = _clean(row.get("minority_interest")) or 0.0
     preferred = _clean(row.get("preferred_equity")) or 0.0
     implied_equity = revenue * multiple - net_debt - minority - preferred
@@ -179,7 +185,7 @@ def football_field_data(case, price_history: pd.DataFrame | None = None) -> dict
         if metric not in stats.index:
             return
         q1, q3 = stats.loc[metric, "q1"], stats.loc[metric, "q3"]
-        med = stats.loc[metric, "median"]
+        med = stats.loc[metric, "adjusted_median"]
         lo = implied(row, q1) if pd.notna(q1) else None
         hi = implied(row, q3) if pd.notna(q3) else None
         mid = implied(row, med) if pd.notna(med) else None
@@ -188,9 +194,9 @@ def football_field_data(case, price_history: pd.DataFrame | None = None) -> dict
                            "note": f"{q1:.1f}x-{q3:.1f}x"})
 
     # Peer comps quartiles, one bar per applicable multiple lens.
-    _comps_range("ev_to_ebitda_ttm", "EV/EBITDA comps (Q1-Q3)", _implied_price_from_multiple)
-    _comps_range("ev_to_revenue_ttm", "EV/Revenue comps (Q1-Q3)", _implied_price_from_revenue_multiple)
-    _comps_range("pe_ttm", "P/E comps (Q1-Q3)", _implied_price_from_pe)
+    _comps_range("ev_to_ebitda_ttm", "EV/EBITDA LTM comps (25th-75th pct)", _implied_price_from_multiple)
+    _comps_range("ev_to_revenue_ttm", "EV/Revenue LTM comps (25th-75th pct)", _implied_price_from_revenue_multiple)
+    _comps_range("pe_ttm", "P/E LTM comps (25th-75th pct)", _implied_price_from_pe)
 
     # Own multiple history band.
     hc = case.assessment.history_context
@@ -204,7 +210,7 @@ def football_field_data(case, price_history: pd.DataFrame | None = None) -> dict
 
     # 52-week price range: exported fields first, else derived from the
     # monthly price history (approximate - monthly closes, labeled as such).
-    wk_lo, wk_hi = _clean(row.get("price_52wk_low")), _clean(row.get("price_52wk_high"))
+    wk_lo, wk_hi = _clean(row.get("week52_low")), _clean(row.get("week52_high"))
     if not (wk_lo and wk_hi) and price_history is not None and not price_history.empty \
             and {"date", "share_price"}.issubset(price_history.columns):
         recent = price_history[price_history["date"]
@@ -287,13 +293,27 @@ def assumptions_provenance(case) -> pd.DataFrame:
                   "source": "anchored"})
     if w.overridden:
         items.append({"item": "WACC override", "value": f"{w.wacc:.1%}", "source": "analyst"})
+    items.append({"item": "Terminal WACC", "value": f"{a.terminal_wacc:.1%} ({a.terminal_wacc_source})",
+                  "source": "analyst" if a.terminal_wacc_source == "analyst" else "anchored"})
 
-    items.append({"item": "Exit multiple", "value": f"{case.exit_multiple:g}x ({case.exit_multiple_source})",
+    items.append({"item": "Exit multiple", "value": f"{case.exit_multiple:.1f}x ({case.exit_multiple_source})",
                   "source": "analyst" if "analyst" in case.exit_multiple_source else
                             ("default" if "fallback" in " ".join(case.notes) and "peer" not in case.exit_multiple_source
                              else "anchored")})
+    items.append({
+        "item": "Market multiple reference",
+        "value": (f"{case.market_reference_multiple:.1f}x ({case.market_reference_source})"
+                  if case.market_reference_multiple is not None else case.market_reference_source),
+        "source": "anchored" if case.market_reference_multiple is not None else "default",
+    })
     items.append({"item": "Perpetuity growth", "value": f"{a.perpetuity_growth:.1%}",
                   "source": getattr(a, "perpetuity_source", "anchored")})
+    items.append({"item": "Terminal ROIC", "value": f"{a.terminal_roic:.1%}",
+                  "source": getattr(a, "terminal_roic_source", "anchored")})
+    items.append({"item": "Stable reinvestment",
+                  "value": f"g / ROIC = {case.base.terminal_reinvestment_rate:.1%}"
+                  if case.base.terminal_reinvestment_rate is not None else "n/m",
+                  "source": "anchored"})
     items.append({"item": "Working capital basis",
                   "value": "DSO/DIH/DPO days" if a.scenarios["base"].nwc_mode == "days" else "% of revenue",
                   "source": "anchored" if a.scenarios["base"].nwc_mode == "days" else "default"})
@@ -437,12 +457,13 @@ def value_creation_bridge_chart(lbo, height: int = 380) -> go.Figure:
     b = lbo.bridge
     if not b or not lbo.valid:
         return _empty_state("LBO not applicable for this name.", "Value-Creation Bridge")
-    labels = ["Equity check", "EBITDA growth", "Multiple change", "Deleveraging", "Fees", "Exit equity"]
+    labels = ["Equity check", "EBITDA growth", "Multiple change", "Deleveraging",
+              "Excess cash", "Fees", "Exit equity"]
     values = [b["equity_check"], b["ebitda_growth"], b["multiple_change"],
-              b["deleveraging"], b["fees"], b["exit_equity"]]
+              b["deleveraging"], b.get("excess_cash", 0.0), b["fees"], b["exit_equity"]]
     fig = go.Figure(go.Waterfall(
         x=labels, y=values,
-        measure=["absolute", "relative", "relative", "relative", "relative", "total"],
+        measure=["absolute", "relative", "relative", "relative", "relative", "relative", "total"],
         connector=dict(line=dict(color=LINE, width=1)),
         increasing=dict(marker=dict(color=GREEN)),
         decreasing=dict(marker=dict(color=RED)),
@@ -590,7 +611,7 @@ def forecast_chart(case, scenario_name: str = "base", height: int = 380) -> go.F
     res = case.scenarios[scenario_name]
     row = case.assessment.row
     f = res.forecast
-    x = ["TTM"] + [f"Y{int(y)}" for y in f["year"]]
+    x = ["LTM"] + [f"Y{int(y)}" for y in f["year"]]
 
     revenue = [_clean(row.get("revenue_ttm"))] + list(f["revenue"])
     ebitda = [_clean(row.get("ebitda_ttm"))] + list(f["ebitda"])
@@ -608,7 +629,7 @@ def forecast_chart(case, scenario_name: str = "base", height: int = 380) -> go.F
                     hovertemplate="%{x} UFCF %{y:,.0f}<extra></extra>")
     fig.add_vline(x=0.5, line=dict(color=LINE, width=1, dash="dot"))
     fig = _style(fig, f"Operating Forecast - {scenario_name.title()} Case",
-                 "Gray bar = TTM anchor; forecast traceable to the assumption glidepaths", height)
+                 "Gray bar = LTM anchor; forecast traceable to the assumption glidepaths", height)
     fig.update_yaxes(title=f"{row.get('currency', '')}m")
     fig.update_xaxes(showgrid=False)
     return apply_status_footnote(fig, case)
@@ -688,9 +709,13 @@ def wacc_build_chart(case, height: int = 360) -> go.Figure:
     fig.add_bar(y=["WACC"], x=[w.wacc], orientation="h",
                 marker=dict(color=GRAPHITE, line=dict(width=0)), showlegend=False,
                 hovertemplate="WACC: %{x:.2%}<extra></extra>")
+    fig.add_bar(y=["Terminal WACC"], x=[case.base.terminal_wacc], orientation="h",
+                marker=dict(color=GOLD, line=dict(width=0)), showlegend=False,
+                hovertemplate="Terminal WACC: %{x:.2%}<extra></extra>")
     for label, value in [("Cost of equity", w.cost_of_equity),
                          ("After-tax cost of debt", w.cost_of_debt_aftertax),
-                         ("WACC", w.wacc)]:
+                         ("WACC", w.wacc),
+                         ("Terminal WACC", case.base.terminal_wacc)]:
         fig.add_annotation(y=label, x=value, text=f" {value:.2%}", showarrow=False,
                            xanchor="left", font=dict(size=12, color=INK))
     weights = f"weights: {w.equity_weight:.0%} equity / {w.debt_weight:.0%} debt | beta source: {w.beta_source}"
@@ -699,28 +724,40 @@ def wacc_build_chart(case, height: int = 360) -> go.Figure:
     fig = _style(fig, "WACC Build", weights, height)
     fig.update_layout(barmode="stack")
     fig.update_yaxes(showgrid=False, categoryorder="array",
-                     categoryarray=["WACC", "After-tax cost of debt", "Cost of equity"])
-    fig.update_xaxes(tickformat=".1%", range=[0, max(w.cost_of_equity, w.wacc) * 1.35])
+                     categoryarray=["Terminal WACC", "WACC", "After-tax cost of debt", "Cost of equity"])
+    fig.update_xaxes(tickformat=".1%", range=[0, max(w.cost_of_equity, w.wacc,
+                                                     case.base.terminal_wacc) * 1.35])
     return apply_status_footnote(fig, case)
 
 
 def terminal_value_chart(case, height: int = 360) -> go.Figure:
     base = case.base
     perp_ok = not np.isnan(base.terminal_value_perp)
-    x = ["Exit multiple", "Perpetuity"]
+    exit_label = "Analyst exit multiple" if "analyst" in case.exit_multiple_source else "Fundamental multiple"
+    x = [exit_label, "Perpetuity"]
     tv = [base.pv_terminal_exit, base.pv_terminal_perp if perp_ok else 0]
+    colors = [SAGE, MUTED2]
+    if case.market_reference_multiple is not None and base.exit_multiple > 0:
+        market_pv = base.pv_terminal_exit * case.market_reference_multiple / base.exit_multiple
+        x.append("Market reference")
+        tv.append(market_pv)
+        colors.append(GOLD)
     fig = go.Figure(go.Bar(
         x=x, y=tv, width=0.5,
-        marker=dict(color=[SAGE, MUTED2], line=dict(width=0)),
+        marker=dict(color=colors, line=dict(width=0)),
         text=[f"{v:,.0f}" if v else "n/m" for v in tv], textposition="outside",
         textfont=dict(size=12, color=INK), showlegend=False,
         hovertemplate="%{x}: PV %{y:,.0f}<extra></extra>",
     ))
     notes = []
     if base.implied_terminal_growth is not None:
-        notes.append(f"exit {case.exit_multiple:g}x implies g = {base.implied_terminal_growth:+.1%}")
+        notes.append(f"exit {case.exit_multiple:.1f}x implies g = {base.implied_terminal_growth:+.1%}")
     if base.implied_exit_multiple is not None:
         notes.append(f"perpetuity {case.assumptions.perpetuity_growth:.1%} implies {base.implied_exit_multiple:.1f}x")
+    if base.terminal_reinvestment_rate is not None:
+        notes.append(f"stable reinvestment {base.terminal_reinvestment_rate:.0%}")
+    if case.market_reference_multiple is not None:
+        notes.append(f"market reference {case.market_reference_multiple:.1f}x")
     subtitle = "PV of terminal value | " + "; ".join(notes) if notes else "PV of terminal value"
     fig = _style(fig, "Terminal Value - Two Methods", subtitle, height)
     fig.update_yaxes(title=f"{case.assessment.row.get('currency', '')}m")
@@ -733,10 +770,13 @@ def terminal_value_divergence(case) -> str | None:
     base = case.base
     if np.isnan(base.terminal_value_perp) or base.pv_terminal_exit <= 0:
         return None
-    gap = abs(base.pv_terminal_exit - base.pv_terminal_perp) / base.pv_terminal_exit
+    signed_gap = base.pv_terminal_perp / base.pv_terminal_exit - 1.0
+    gap = abs(signed_gap)
     if gap > 0.25:
-        return (f"Terminal value methods diverge by {gap:.0%}. The exit multiple and the perpetuity "
-                f"growth rate are telling different stories - revisit one of them before relying on the target.")
+        direction = "above" if signed_gap > 0 else "below"
+        return (f"Perpetuity terminal value is {gap:.0%} {direction} the exit-multiple result. "
+                f"The market multiple and stable-growth economics are telling different stories; "
+                f"reconcile terminal growth, ROIC, WACC, and the exit multiple before relying on the target.")
     return None
 
 
@@ -744,11 +784,11 @@ def peer_quartile_panels(case, height: int = 360) -> go.Figure:
     stats = case.spread_stats
     row = case.assessment.row
     panels = [
-        ("Revenue growth", "revenue_yoy_growth", row.get("revenue_yoy_growth"), ".0%"),
-        ("EBITDA margin", "ebitda_margin_ttm", row.get("ebitda_margin_ttm"), ".0%"),
-        ("EV/Revenue", "ev_to_revenue_ttm", row.get("ev_to_revenue_ttm"), ".1f"),
-        ("EV/EBITDA", "ev_to_ebitda_ttm", row.get("ev_to_ebitda_ttm"), ".1f"),
-        ("P/E", "pe_ttm", row.get("pe_ttm"), ".1f"),
+        ("Rev growth\nLatest Q YoY", "revenue_yoy_growth", row.get("revenue_yoy_growth"), ".0%"),
+        ("EBITDA margin\nLTM", "ebitda_margin_ttm", row.get("ebitda_margin_ttm"), ".0%"),
+        ("EV/Revenue\nLTM", "ev_to_revenue_ttm", row.get("ev_to_revenue_ttm"), ".1f"),
+        ("EV/EBITDA\nLTM", "ev_to_ebitda_ttm", row.get("ev_to_ebitda_ttm"), ".1f"),
+        ("P/E\nLTM", "pe_ttm", row.get("pe_ttm"), ".1f"),
     ]
     usable = [p for p in panels
               if p[1] in stats.index and pd.notna(stats.loc[p[1], "median"]) and stats.loc[p[1], "n"] >= 3]
@@ -764,7 +804,7 @@ def peer_quartile_panels(case, height: int = 360) -> go.Figure:
                     showlegend=False, hoverinfo="skip", row=1, col=i)
         fig.add_scatter(x=[label], y=[med], mode="markers",
                         marker=dict(symbol="line-ew", size=26, line=dict(color=GRAPHITE, width=2.5)),
-                        showlegend=(i == 1), name="Peer median", row=1, col=i)
+                        showlegend=(i == 1), name="Peer median (ex-company)", row=1, col=i)
         if pd.notna(own):
             fig.add_scatter(x=[label], y=[float(own)], mode="markers",
                             marker=dict(symbol="diamond", size=12, color=GOLD,
@@ -774,7 +814,7 @@ def peer_quartile_panels(case, height: int = 360) -> go.Figure:
         fig.update_yaxes(tickformat=fmt.replace("f", "f") if "f" in fmt else fmt, row=1, col=i, **_AXIS)
         fig.update_xaxes(visible=False, row=1, col=i)
     fig = _style(fig, "Peer Benchmarking - Quartile Positioning",
-                 "Band = Q1-Q3 | tick = median | diamond = company", height)
+                 "Peer-only band and median | selected company shown as diamond | metric basis in each panel", height)
     fig.update_annotations(font=dict(size=11.5, color=MUTED))
     return apply_status_footnote(fig, case)
 
@@ -783,8 +823,6 @@ def revision_momentum_chart(case, height: int = 300) -> go.Figure | None:
     rev = case.assessment.revisions
     if not rev.get("available"):
         return None
-    row_est = None
-    estimates = getattr(case, "_estimates", None)  # not stored; rebuild from revisions fields
     points = {
         "revenue": [rev.get("revenue_90d"), rev.get("revenue_30d")],
         "eps": [rev.get("eps_90d"), rev.get("eps_30d")],
@@ -857,7 +895,18 @@ def figure_to_png_uri(fig: go.Figure, width: int = 860, height: int | None = Non
 
 
 def case_chart_images(case, df: pd.DataFrame | None = None) -> dict[str, str]:
-    """All embeddable chart images for the HTML export (missing ones skipped)."""
+    """Render all HTML-export charts in one Kaleido session.
+
+    Plotly's per-figure ``to_image`` path starts a browser renderer for every
+    chart. Besides being slow, that can flash several temporary windows on
+    Windows. The batch API reuses one renderer for the complete case.
+    """
+    import base64
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    import plotly.io as pio
+
     builders = {
         "scenario_targets": lambda: scenario_target_chart(case),
         "football_field": lambda: football_field_chart(case),
@@ -873,7 +922,8 @@ def case_chart_images(case, df: pd.DataFrame | None = None) -> dict[str, str]:
         "revisions": lambda: revision_momentum_chart(case),
         "working_capital": (lambda: working_capital_chart(df, case)) if df is not None else (lambda: None),
     }
-    images: dict[str, str] = {}
+    keys: list[str] = []
+    figures: list[go.Figure] = []
     for key, build in builders.items():
         try:
             fig = build()
@@ -881,7 +931,26 @@ def case_chart_images(case, df: pd.DataFrame | None = None) -> dict[str, str]:
             fig = None
         if fig is None:
             continue
-        uri = figure_to_png_uri(fig)
-        if uri:
-            images[key] = uri
-    return images
+        export_fig = go.Figure(fig)
+        export_fig.update_layout(paper_bgcolor=CREAM, plot_bgcolor=CREAM)
+        keys.append(key)
+        figures.append(export_fig)
+
+    if not figures:
+        return {}
+
+    try:
+        with TemporaryDirectory(prefix="valuation-case-charts-") as temp_dir:
+            files = [Path(temp_dir) / f"{key}.png" for key in keys]
+            heights = [int(fig.layout.height or 380) for fig in figures]
+            pio.write_images(figures, files, format="png", width=860,
+                             height=heights, scale=2.0)
+            return {
+                key: "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+                for key, path in zip(keys, files)
+                if path.exists() and path.stat().st_size > 0
+            }
+    except Exception:
+        # The HTML template is designed to degrade gracefully when a static
+        # renderer is unavailable; the financial tables still export in full.
+        return {}

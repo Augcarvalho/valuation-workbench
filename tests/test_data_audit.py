@@ -88,7 +88,7 @@ def test_stale_periods_use_dates():
     issues = check_stale_periods(latest)
     by_id = {i["company_id"]: i for i in issues}
     assert "A" not in by_id
-    assert by_id["B"]["severity"] == "medium"
+    assert "B" not in by_id  # one normalized calendar quarter is not enough to call stale
     assert by_id["C"]["severity"] == "high"
 
 

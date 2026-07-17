@@ -127,8 +127,9 @@ def build_financials_valuation(row: pd.Series, cost_of_equity: float,
         return out
     if book and mcap and mcap > 0:
         out.pb = mcap / book
+    average_book = _clean(row.get(f"average_{source}")) if source else None
     if book and ni is not None and ni > 0:
-        out.roe = ni / book
+        out.roe = ni / (average_book or book)
         if out.roe > 0.40:
             warnings.append(f"ROE {out.roe:.0%} is extreme - check equity base (buybacks can "
                             f"shrink book and inflate ROE).")

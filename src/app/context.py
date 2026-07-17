@@ -129,7 +129,7 @@ def snapshot_financials(row: pd.Series, currency: str) -> None:
     if pd.notna(row.get("sbc_ttm")):
         rows.append(["Stock-based comp", fmt_money(row.get("sbc"), currency), fmt_money(row.get("sbc_ttm"), currency),
                      fmt_pct(row.get("sbc_pct_of_fcf_ttm"))])
-    ui.html_table(["Metric", "Latest Qtr", "TTM", "Margin / YoY"], rows)
+    ui.html_table(["Metric", "Latest Reported Quarter", "LTM", "Growth / LTM Margin"], rows)
 
 
 def snapshot_valuation(row: pd.Series, currency: str) -> None:
@@ -137,10 +137,10 @@ def snapshot_valuation(row: pd.Series, currency: str) -> None:
         ["Market cap", fmt_money(row.get("market_cap"), currency)],
         ["Net debt", fmt_money(row.get("net_debt"), currency)],
         ["Enterprise value", fmt_money(row.get("enterprise_value"), currency)],
-        ["EV / Revenue", fmt_multiple(row.get("ev_to_revenue_ttm"))],
-        ["EV / EBITDA", fmt_multiple(row.get("ev_to_ebitda_ttm"))],
-        ["P / E", fmt_multiple(row.get("pe_ttm"))],
-        ["Net debt / EBITDA", fmt_multiple(row.get("net_debt_to_ebitda_ttm"))],
-        ["ROIC (TTM)", fmt_pct(row.get("roic_ttm"))],
+        ["EV / Revenue (LTM)", fmt_multiple(row.get("ev_to_revenue_ttm"))],
+        ["EV / EBITDA (LTM)", fmt_multiple(row.get("ev_to_ebitda_ttm"))],
+        ["P / E (LTM)", fmt_multiple(row.get("pe_ttm"))],
+        ["Net debt / EBITDA (LTM)", fmt_multiple(row.get("net_debt_to_ebitda_ttm"))],
+        ["ROIC (LTM)", fmt_pct(row.get("roic_ttm"))],
     ]
-    ui.html_table(["Trading & Valuation", "Current"], rows)
+    ui.html_table(["Trading & Valuation", "Current Market Snapshot / LTM Denominator"], rows)

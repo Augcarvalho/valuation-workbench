@@ -1,5 +1,5 @@
 table_name,source_name,source_url,retrieved_at,notes
-companies,Public company demo universe,https://www.b3.com.br/; https://finance.yahoo.com/,2026-07-09,Demo universe includes Brazilian software/services names and a US mega-cap technology comp set centered on Alphabet/Google.
-financials_quarterly,Yahoo Finance public market data via yfinance,https://finance.yahoo.com/,2026-07-09,Public-demo dataset only. Replace with CVM or Capital IQ exports for diligence work.
-market_data,Yahoo Finance public market data via yfinance,https://finance.yahoo.com/,2026-07-09,Market cap calculated from public closing price and shares outstanding where available.
-estimates,Capital IQ template,data/templates/estimates_template.csv,2026-07-09,Public demo intentionally leaves consensus/guidance blank unless supplied locally.
+companies,Public company demo universe,https://www.b3.com.br/; https://finance.yahoo.com/,2026-07-10,Demo universe includes Brazilian software/services names and a US mega-cap technology comp set centered on Alphabet/Google.
+financials_quarterly,Yahoo Finance public market data via yfinance,https://finance.yahoo.com/,2026-07-10,Public-demo dataset only. Replace with CVM or Capital IQ exports for diligence work.
+market_data,Yahoo Finance public market data via yfinance,https://finance.yahoo.com/,2026-07-10,Market cap calculated from public closing price and shares outstanding where available.
+estimates,Synthetic demo estimates,data/templates/estimates_template.csv,2026-07-10,Generated deterministically from public-demo actuals for UI testing; not analyst consensus.

@@ -20,14 +20,14 @@ from src.modeling.multiples import MULTIPLE_SPECS
 from src.modeling.outliers import adjusted_stats, multiple_outlier_reason
 from src.reporting.charts import _scatter_label_text, _style, stamp_period
 
-SAGE = PALETTE["sage"]
+SAGE = PALETTE["anchor"]
 GREEN = PALETTE["green"]
 GOLD = PALETTE["gold"]
 COPPER = PALETTE["copper"]
 GRAPHITE = PALETTE["charcoal"]
 MUTED = PALETTE["muted"]
 MUTED2 = PALETTE["muted_2"]
-BLUE = PALETTE["blue"]
+BLUE = PALETTE["peer"]
 
 
 def _empty(title: str, note: str, height: int = 280) -> go.Figure:
@@ -53,9 +53,9 @@ def multiple_history_chart(hist: dict, label: str, height: int = 420) -> go.Figu
                         line=dict(width=0), hoverinfo="skip", showlegend=False)
         fig.add_scatter(x=peers["date"], y=peers["q1"], mode="lines", line=dict(width=0),
                         fill="tonexty", fillcolor="rgba(122,138,115,0.16)",
-                        name="Peer Q1-Q3", hoverinfo="skip")
+                        name="Peer 25th-75th pct", hoverinfo="skip")
         fig.add_scatter(x=peers["date"], y=peers["median"], mode="lines",
-                        line=dict(color=GRAPHITE, width=1.8, dash="dash"), name="Peer median",
+                        line=dict(color=GRAPHITE, width=1.8, dash="dash"), name="Peer median (ex-company)",
                         hovertemplate="%{x|%b %y} peers %{y:.1f}x<extra></extra>")
     # Own-history references: median solid gold dots, quartiles faint.
     for key, dash, w in (("own_q1", "dot", 1), ("own_q3", "dot", 1), ("own_median", "dot", 1.6)):
@@ -72,7 +72,7 @@ def multiple_history_chart(hist: dict, label: str, height: int = 420) -> go.Figu
                     name="Current", hovertemplate="current %{y:.1f}x<extra></extra>")
     pct = float((own["value"] < own["value"].iloc[-1]).mean())
     fig = _style(fig, f"{label} - History",
-                 f"Company vs peer median | gold dots = own median & quartiles | "
+                 f"Company vs peer median (ex-company) | gold dots = own median & quartiles | "
                  f"current = {pct:.0%} pctile of own history", height)
     fig.update_yaxes(ticksuffix="x", rangemode="tozero")
     fig.update_xaxes(showgrid=False)
@@ -127,7 +127,7 @@ def momentum_heatmap(momentum: dict[str, dict], height: int | None = None) -> go
 
 def peer_distribution_panels(spread: pd.DataFrame, metrics: list[str], company_id: str,
                              row_height: int = 96) -> go.Figure:
-    """IB-style spread visual: one horizontal strip per multiple - Q1-Q3 box,
+    """IB-style spread visual: one horizontal strip per multiple - interquartile box,
     median tick, every valid peer as a dot, anchor as a gold diamond, flagged
     outliers in copper. Invalid (negative-base) names are counted, not drawn."""
     usable = []
@@ -142,9 +142,11 @@ def peer_distribution_panels(spread: pd.DataFrame, metrics: list[str], company_i
     for i, metric in enumerate(usable, start=1):
         label = MULTIPLE_SPECS.get(metric, {}).get("label", metric)
         vals = pd.to_numeric(spread[metric], errors="coerce")
-        stats = adjusted_stats(spread, metric)
+        peer_reference = spread.loc[spread["company_id"].astype(str) != str(company_id)] \
+            if "company_id" in spread.columns else spread
+        stats = adjusted_stats(peer_reference if not peer_reference.empty else spread, metric)
         n_invalid = int((vals <= 0).sum() + vals.isna().sum())
-        # Q1-Q3 box + median tick (adjusted stats, outliers excluded).
+        # 25th-75th percentile box + median tick (adjusted stats, outliers excluded).
         if not np.isnan(stats["q1"]) and not np.isnan(stats["q3"]):
             fig.add_shape(type="rect", x0=stats["q1"], x1=stats["q3"], y0=-0.32, y1=0.32,
                           line=dict(color=SAGE, width=1.2),
@@ -164,9 +166,11 @@ def peer_distribution_panels(spread: pd.DataFrame, metrics: list[str], company_i
                 continue
             t = str(r.get("ticker", "")).replace(".SA", "")
             if multiple_outlier_reason(metric, float(v)):
-                out_x.append(float(v)); out_t.append(t)
+                out_x.append(float(v))
+                out_t.append(t)
             else:
-                clean_x.append(float(v)); clean_t.append(t)
+                clean_x.append(float(v))
+                clean_t.append(t)
         in_range = clean_x + ([own_v] if own_v is not None else []) \
             + [v for v in (stats["q3"], stats["high"]) if not np.isnan(v)]
         cap = (max(in_range) if in_range else 1.0) * 1.15
@@ -196,7 +200,7 @@ def peer_distribution_panels(spread: pd.DataFrame, metrics: list[str], company_i
         fig.update_xaxes(ticksuffix="x", range=[0, cap * 1.04], row=i, col=1)
     height = 140 + row_height * len(usable)
     fig = _style(fig, "Peer Multiple Distribution",
-                 "Box = adjusted Q1-Q3 | tick = adjusted median | diamond = company | x = flagged outlier",
+                 "Box/tick use peers only: adjusted 25th-75th percentile and median | diamond = company | x = flagged outlier",
                  height)
     return fig
 
@@ -236,8 +240,9 @@ def fundamental_vs_multiple_scatter(spread: pd.DataFrame, company_id: str,
             hovertemplate="%{customdata}<br>" + xlabel + " %{x:" + xfmt + "}<br>"
                           + ylabel + " %{y:.1f}x<extra></extra>",
         )
-    med_x = data[xcol].median(skipna=True)
-    med_y = data[ycol].median(skipna=True)
+    peer_reference = data.loc[data["company_id"].astype(str) != str(company_id)]
+    med_x = peer_reference[xcol].median(skipna=True)
+    med_y = peer_reference[ycol].median(skipna=True)
     if pd.notna(med_x):
         fig.add_vline(x=med_x, line=dict(color=MUTED2, width=1, dash="dash"))
     if pd.notna(med_y):

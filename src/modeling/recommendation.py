@@ -48,9 +48,9 @@ def recommend(
     bull_upside: float | None,
     verdict_key: str | None = None,
     formal: bool = True,
+    formal_reason: str | None = None,
 ) -> Recommendation:
-    """``formal=False`` (no analyst assumptions file) never issues BUY/HOLD/SELL:
-    an auto-anchored case is a calibration, not an investment view."""
+    """Return a formal recommendation only after all readiness gates pass."""
     if upside is None:
         return Recommendation(
             stance="N/A",
@@ -60,14 +60,14 @@ def recommend(
         )
 
     if not formal:
+        reason = formal_reason or "The case has not completed analyst review."
         conviction, conviction_note = _conviction(upside, bear_upside, bull_upside)
         return Recommendation(
             stance="INDICATIVE",
             headline=(f"Auto-anchored calibration: mechanical extrapolation of TTM data implies "
                       f"{upside:+.0%} - NOT an investment view."),
             conviction="n/a",
-            reconciliation=("No analyst assumptions file exists. Write one (see "
-                            "data/templates/valuation_assumptions_template.yaml) to unlock a formal "
+            reconciliation=(f"{reason}. Complete the readiness checks before issuing a formal "
                             f"recommendation. {conviction_note}"),
         )
 

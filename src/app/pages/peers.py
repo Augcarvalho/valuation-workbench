@@ -11,6 +11,7 @@ from src.config import PROJECT_ROOT
 from src.modeling.assessment import build_assessment
 from src.modeling.metrics import latest_rows
 from src.reporting.charts import peer_scatter, peer_valuation_scatter, valuation_chart
+from src.reporting.periods import peer_metric_basis_note, peer_snapshot_context
 from src.utils import fmt_multiple, fmt_pct
 
 
@@ -204,9 +205,12 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             "exported universe - add outside names via Data & Refresh first."
         )
 
-    ui.section("Peer Universe", f"{a.peer_set_name} | {src_label.lower()}")
+    time_context = peer_snapshot_context(store, a.peers)
+    ui.section("Peer Universe", f"{a.peer_set_name} | {src_label.lower()} | {time_context}")
     peers = a.peers.sort_values("ev_to_ebitda_ttm")
-    headers = ["Ticker", "Company", "Growth", "EBITDA mgn", "FCF conv", "ND/EBITDA", "EV/Rev", "EV/EBITDA", "As Of"]
+    headers = ["Ticker", "Company", "Rev Growth (Latest Q YoY)", "EBITDA Margin (LTM)",
+               "FCF Conv. (LTM)", "Net Debt / EBITDA (LTM)", "EV / Revenue (LTM)",
+               "EV / EBITDA (LTM)", "Financials Through"]
     rows, classes = [], []
     for _, p in peers.iterrows():
         g = p.get("revenue_yoy_growth")
@@ -224,7 +228,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         classes.append("anchor" if p["company_id"] == company_id else "")
     med = a.peer_median
     rows.append([
-        "--", "Peer median",
+        "--", "Peer median (ex-company)",
         fmt_pct(med.get("revenue_yoy_growth")),
         fmt_pct(med.get("ebitda_margin_ttm")),
         fmt_pct(med.get("fcf_conversion_ttm")),
@@ -234,16 +238,18 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         "",
     ])
     classes.append("median")
-    ui.html_table(headers, rows, classes)
-    ui.footnote("Per-name as-of dates differ because fiscal year ends differ; medians mix the latest reported quarter of each peer.")
+    ui.html_table(headers, rows, classes, numeric_from=2, wrap=True, dense=True)
+    ui.footnote(peer_metric_basis_note() + " Financial periods can differ because fiscal calendars differ.")
 
     # --- IB-style valuation spread ------------------------------------------------
     from src.modeling.comps import comps_spread, quartile_stats
     from src.reporting import multiples_charts as mch
 
     spread = comps_spread(a.peers, store.estimates)
-    stats = quartile_stats(spread)
-    ui.section("Valuation Spread", "LTM and NTM multiples per peer | N/M = negative base, never in a median")
+    peer_spread = spread.loc[spread["company_id"].astype(str) != str(company_id)].copy()
+    stats = quartile_stats(peer_spread if not peer_spread.empty else spread)
+    ui.section("Valuation Spread",
+               f"{time_context} | LTM = trailing four quarters; NTM = next twelve months consensus")
 
     spread_cols = [("ev_to_revenue_ttm", "EV/Rev LTM"), ("ev_to_revenue_ntm", "EV/Rev NTM"),
                    ("ev_to_ebitda_ttm", "EV/EBITDA LTM"), ("ev_to_ebitda_ntm", "EV/EBITDA NTM"),
@@ -277,7 +283,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         if mcol in stats.index and stats.loc[mcol, "n_excluded"]:
             names = ", ".join(t for t, _ in stats.loc[mcol, "excluded"][:4])
             excl_notes.append(f"{lbl}: {names}")
-    ui.footnote("* flagged outlier (extreme multiple), excluded from the ex-outlier median. "
+    ui.footnote("All summary statistics exclude the selected company. * flagged outlier (extreme multiple), excluded from the ex-outlier median. "
                 + ("Excluded - " + " | ".join(excl_notes) if excl_notes else "No outliers flagged.")
                 + " Negative EBITDA/earnings/tangible book show n/m and never enter medians.")
 
@@ -292,14 +298,14 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     with s1:
         st.plotly_chart(mch.fundamental_vs_multiple_scatter(
             spread, company_id, "revenue_yoy_growth", "ev_to_revenue_ttm",
-            "Revenue growth (YoY)", "EV / Revenue",
-            "Growth vs EV/Revenue", "Growth should command the revenue multiple"),
+            "Revenue growth (latest Q YoY)", "EV / Revenue (LTM)",
+            "Growth vs EV/Revenue (LTM)", "Latest-quarter growth should help explain the LTM revenue multiple"),
             use_container_width=True, config=PLOTLY_CONFIG)
     with s2:
         st.plotly_chart(mch.fundamental_vs_multiple_scatter(
             spread, company_id, "ebitda_margin_ttm", "ev_to_ebitda_ttm",
-            "EBITDA margin (TTM)", "EV / EBITDA",
-            "Margin vs EV/EBITDA", "Margin quality should support the EBITDA multiple"),
+            "EBITDA margin (LTM)", "EV / EBITDA (LTM)",
+            "LTM Margin vs EV/EBITDA", "LTM margin quality should support the LTM EBITDA multiple"),
             use_container_width=True, config=PLOTLY_CONFIG)
     s3, s4 = st.columns(2, gap="medium")
     # Older/demo datasets may not carry p_tbv - select only what exists.
@@ -310,14 +316,14 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         if not roe_spread.empty:
             st.plotly_chart(mch.fundamental_vs_multiple_scatter(
                 roe_spread, company_id, "roe_ttm", "pe_ttm",
-                "ROE (TTM)", "P / E",
+                "ROE (LTM)", "P / E (LTM)",
                 "ROE vs P/E", "Return on equity should earn the earnings multiple"),
                 use_container_width=True, config=PLOTLY_CONFIG)
     with s4:
         if not roe_spread.empty and a.business_model == "financial":
             st.plotly_chart(mch.fundamental_vs_multiple_scatter(
                 roe_spread, company_id, "roe_ttm", "p_tbv",
-                "ROE (TTM)", "P / TBV",
+                "ROE (LTM)", "P / TBV",
                 "ROE vs P/TBV", "The justified-P/B logic: higher ROE earns a book premium"),
                 use_container_width=True, config=PLOTLY_CONFIG)
 

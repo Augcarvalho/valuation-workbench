@@ -30,6 +30,9 @@ from src.branding import MPL_FONT_STACK, PALETTE, VERDICT_COLORS, signal_hex
 from src.config import DEFAULT_PROCESSED_DATASET, REPORTS_SAMPLE_DIR
 from src.ingestion.store import load_store
 from src.modeling.assessment import build_assessment
+from src.modeling.assessment import watchlist_summary
+from src.modeling.capital_structure import build_capital_structure, ev_bridge
+from src.modeling.consensus import build_consensus_read
 from src.modeling.data_audit import audit_scores, run_audit
 from src.modeling.metrics import latest_rows
 from src.modeling.multiples import multiples_summary
@@ -46,10 +49,11 @@ SLATE = PALETTE["slate"]
 MUTED = PALETTE["muted"]
 LINE = PALETTE["line"]
 BG = PALETTE["bg"]
-BLUE = PALETTE["blue"]
-BLUE2 = PALETTE["blue_2"]
-GREEN = PALETTE["green"]
-GOLD = PALETTE["gold"]
+BLUE = PALETTE["series_revenue"]
+BLUE2 = PALETTE["series_ebitda"]
+GREEN = PALETTE["anchor"]
+PEER = PALETTE["peer"]
+GOLD = PALETTE["series_margin"]
 
 SIG_TEXT = {"green": "GREEN", "yellow": "AMBER", "red": "RED", "n/a": "N/A"}
 SHOWCASE_COMPANY_ID = "GOOGL"
@@ -89,9 +93,9 @@ def _header(ax, row, verdict=None, height=0.135, y=0.865):
     meta = [
         ("SECTOR", str(row.get("sector", ""))),
         ("LISTING", f"{row.get('exchange','')} · Brazil"),
-        ("PERIOD", f"Q{period.quarter} {period.year}"),
+        ("FINANCIALS THROUGH", f"Q{period.quarter} {period.year}"),
         ("CURRENCY", f"{row.get('currency','BRL')} · m"),
-        ("AS OF", period.strftime("%d %b %Y")),
+        ("MARKET SNAPSHOT", period.strftime("%d %b %Y")),
     ]
     positions = [0.018, 0.320, 0.475, 0.625, 0.815]
     for x, (label, value) in zip(positions, meta):
@@ -110,7 +114,7 @@ def _header_clean(ax, row, verdict=None, height=0.135, y=0.865):
     ax.text(
         0.018,
         y + height - 0.028,
-        "VALUATION WORKBENCH | PUBLIC DEMO | QUARTERLY REVIEW",
+        "INVESTMENT ANALYSIS PLATFORM | PUBLIC DEMO | QUARTERLY REVIEW",
         fontsize=7.5,
         color="#93acc6",
         zorder=2,
@@ -122,12 +126,14 @@ def _header_clean(ax, row, verdict=None, height=0.135, y=0.865):
     sector_label = str(row.get("sector", ""))
     if sector_label == "Mega-Cap Tech & Digital Platforms":
         sector_label = "Mega-Cap Tech Platforms"
+    elif sector_label == "Software-Enabled Services":
+        sector_label = "Software & Services"
     meta = [
         ("SECTOR", sector_label),
         ("LISTING", f"{row.get('exchange', '')} | {country}"),
-        ("PERIOD", f"Q{period.quarter} {period.year}"),
+        ("FINANCIALS THROUGH", f"Q{period.quarter} {period.year}"),
         ("CURRENCY", f"{row.get('currency', 'BRL')}m"),
-        ("AS OF", period.strftime("%d %b %Y")),
+        ("MARKET SNAPSHOT", period.strftime("%d %b %Y")),
     ]
     x = 0.018
     for label, value in meta:
@@ -187,13 +193,22 @@ def _section(ax, x, y, title, note=""):
         ax.text(x + 0.012 + 0.0072 * len(title), y + 0.007, "   " + note, fontsize=7, color=MUTED, va="center", zorder=3)
 
 
+def _platform_header(ax, title: str, subtitle: str, badge: str = "PUBLIC DEMO") -> None:
+    ax.add_patch(Rectangle((0, 0.865), 1, 0.135, color=NAVY, zorder=1))
+    ax.text(0.018, 0.971, "INVESTMENT ANALYSIS PLATFORM", fontsize=7.5,
+            color="#93acc6", zorder=2, va="center")
+    ax.text(0.018, 0.929, title, fontsize=18, color="white", weight="bold", zorder=2, va="center")
+    ax.text(0.018, 0.891, subtitle, fontsize=8.3, color="#dce5ec", zorder=2, va="center")
+    ax.text(0.982, 0.969, badge, fontsize=8, color="white", weight="bold", ha="right", va="center",
+            bbox=dict(boxstyle="round,pad=0.45", facecolor=PALETTE["navy_3"], edgecolor="none"))
+
+
 def _table(ax, headers, rows, bbox, anchor_idx=None, median_idx=None, colw=None, numeric_from=1):
     headers = [_clean_text(h) for h in headers]
     rows = [[_clean_text(c) for c in row] for row in rows]
     table = ax.table(cellText=rows, colLabels=headers, loc="center", bbox=bbox, colWidths=colw)
     table.auto_set_font_size(False)
     table.set_fontsize(8.2)
-    n = len(rows)
     for (r, c), cell in table.get_celld().items():
         cell.set_edgecolor(PALETTE["line_soft"])
         cell.set_linewidth(0.6)
@@ -213,6 +228,128 @@ def _table(ax, headers, rows, bbox, anchor_idx=None, median_idx=None, colw=None,
         if c >= numeric_from:
             cell.set_text_props(ha="right")
     return table
+
+
+# --- 1. Multi-company universe ----------------------------------------------
+
+def watchlist_overview(path: Path) -> None:
+    df, _ = _load()
+    store = _store()
+    summary = watchlist_summary(df, store=store).copy()
+    latest = latest_rows(df)
+
+    fig = plt.figure(figsize=(12.8, 7.5), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _platform_header(
+        ax,
+        "Multi-Company Investment Watchlist",
+        f"{len(summary)} monitored names | {len(latest)} companies in the demo universe | "
+        f"{summary['peer_group'].nunique()} reviewed peer groups",
+    )
+
+    verdict_counts = summary["verdict_key"].value_counts().to_dict()
+    cards = [
+        ("MONITORED NAMES", str(len(summary)), "ranked by analytical attention", GREEN),
+        ("DEMO UNIVERSE", str(len(latest)), "watchlist companies plus trading comps", BLUE),
+        ("PEER GROUPS", str(summary["peer_group"].nunique()), "Brazil and U.S. coverage", GOLD),
+        ("DO WORK", str(verdict_counts.get("do_work", 0)), "dislocations requiring analyst review", GOLD),
+        ("OPEN FLAGS", str(int(summary["flags"].sum())), "high and medium severity", PALETTE["red"]),
+    ]
+    gap = 0.012
+    w = (0.964 - gap * 4) / 5
+    for i, (label, value, note, color) in enumerate(cards):
+        x = 0.018 + i * (w + gap)
+        ax.add_patch(Rectangle((x, 0.705), w, 0.112, facecolor="white", edgecolor=LINE, linewidth=0.8))
+        ax.add_patch(Rectangle((x, 0.812), w, 0.005, facecolor=color, edgecolor="none"))
+        ax.text(x + 0.012, 0.785, label, fontsize=6.8, color=MUTED, weight="bold")
+        ax.text(x + 0.012, 0.747, value, fontsize=19, color=INK, weight="bold")
+        ax.text(x + 0.012, 0.720, note, fontsize=6.5, color=MUTED)
+
+    _section(
+        ax,
+        0.018,
+        0.665,
+        "Ranked Watchlist",
+        "Latest-quarter growth | LTM profitability and valuation | target excluded from peer median",
+    )
+    headers = ["#", "Attn", "Ticker", "Company", "Peer group", "Verdict",
+               "Growth\nLatest Q YoY", "Profitability\nLTM", "Current multiple\nLTM", "Flags"]
+    rows = []
+    for _, r in summary.sort_values("rank").iterrows():
+        mult = fmt_multiple(r.get("multiple_value"))
+        mult = f"{mult} {r.get('multiple_name', '')}" if mult != "n/a" else "n/a"
+        rows.append([
+            str(int(r["rank"])), f"{r['attention_score']:.0f}", str(r["ticker"]),
+            str(r["company_name"])[:25], str(r["peer_group"])[:28], str(r["verdict_label"]),
+            fmt_pct(r.get("revenue_yoy_growth")), fmt_pct(r.get("profitability")), mult,
+            str(int(r.get("flags", 0))),
+        ])
+    tax = fig.add_axes([0.018, 0.205, 0.964, 0.43])
+    tax.axis("off")
+    _table(tax, headers, rows, bbox=[0, 0, 1, 1], colw=[0.04, 0.06, 0.07, 0.17, 0.20, 0.11, 0.10, 0.09, 0.12, 0.04], numeric_from=6)
+
+    ax.add_patch(Rectangle((0.018, 0.075), 0.964, 0.09, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.018, 0.075), 0.004, 0.09, facecolor=GREEN))
+    ax.text(0.035, 0.142, "SCALABLE COVERAGE MODEL", fontsize=7.2, color=NAVY, weight="bold")
+    ax.text(
+        0.035,
+        0.108,
+        "The same ingestion, data audit, peer review, consensus, capital-structure and valuation workflow can be "
+        "applied to any company added through a Capital IQ export.",
+        fontsize=8.2,
+        color=SLATE,
+    )
+    ax.text(0.982, 0.047, "Demo estimates are illustrative; licensed Capital IQ data stays outside GitHub.",
+            fontsize=6.8, color=MUTED, ha="right")
+
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
+def comparison_snapshot(path: Path) -> None:
+    df, _ = _load()
+    store = _store()
+    selected = ["GOOGL", "TOTS3.SA", "VLID3.SA", "CSUD3.SA"]
+    assessments = [build_assessment(df, cid, store=store) for cid in selected]
+
+    fig = plt.figure(figsize=(12.8, 7.2), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _platform_header(
+        ax,
+        "Cross-Company Comparison",
+        "A single analytical framework across geographies, sectors and currencies",
+    )
+    _section(ax, 0.018, 0.815, "Side-by-Side", "Company-specific values; no cross-currency aggregation")
+
+    headers = ["Metric"] + [a.row["ticker"].replace(".SA", "") for a in assessments]
+    rows = [
+        ["Company"] + [str(a.row["company_name"])[:23] for a in assessments],
+        ["Peer group"] + [str(a.peer_group)[:28] for a in assessments],
+        ["Investment read"] + [a.verdict_label for a in assessments],
+        ["Revenue growth (latest Q YoY)"] + [fmt_pct(a.row.get("revenue_yoy_growth")) for a in assessments],
+        ["EBITDA margin (LTM)"] + [fmt_pct(a.row.get("ebitda_margin_ttm")) for a in assessments],
+        ["FCF conversion (LTM)"] + [fmt_pct(a.row.get("fcf_conversion_ttm")) for a in assessments],
+        ["Net debt / EBITDA (LTM)"] + [fmt_multiple(a.row.get("net_debt_to_ebitda_ttm")) for a in assessments],
+        ["EV / Revenue (LTM)"] + [fmt_multiple(a.row.get("ev_to_revenue_ttm")) for a in assessments],
+        ["EV / EBITDA (LTM)"] + [fmt_multiple(a.row.get("ev_to_ebitda_ttm")) for a in assessments],
+        ["P / E (LTM)"] + [fmt_multiple(a.row.get("pe_ttm")) for a in assessments],
+        ["Estimate momentum"] + [str(a.revisions.get("direction", "n/a")).title() for a in assessments],
+        ["Financials through"] + [f"Q{pd.Timestamp(a.row['period']).quarter} {pd.Timestamp(a.row['period']).year}" for a in assessments],
+    ]
+    tax = fig.add_axes([0.018, 0.21, 0.964, 0.56])
+    tax.axis("off")
+    _table(tax, headers, rows, bbox=[0, 0, 1, 1], colw=[0.28, 0.18, 0.18, 0.18, 0.18], numeric_from=1)
+
+    ax.add_patch(Rectangle((0.018, 0.075), 0.964, 0.09, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.018, 0.075), 0.004, 0.09, facecolor=GOLD))
+    ax.text(0.035, 0.139, "ANALYST USE", fontsize=7.2, color=NAVY, weight="bold")
+    ax.text(0.035, 0.106, "Compare operating quality, valuation and estimate momentum before deciding where deeper diligence is worth the time.",
+            fontsize=8.2, color=SLATE)
+
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
 
 
 # --- 1. KPI / Executive dashboard ------------------------------------------
@@ -244,9 +381,11 @@ def kpi_dashboard(path: Path) -> None:
         _kpi_card(ax, 0.018 + i * (w + gap), 0.578, w, h, k)
 
     # Peer snapshot table.
-    _section(ax, 0.018, 0.545, "Peer Snapshot", f"{row.get('sector')} comps, sorted by EV/EBITDA")
+    _section(ax, 0.018, 0.545, "Peer Snapshot",
+             "Latest-quarter growth | LTM margins, cash, leverage and multiples | anchor excluded from median")
     peers = a.peers.sort_values("ev_to_ebitda_ttm")
-    headers = ["Ticker", "Company", "Growth", "EBITDA mgn", "FCF conv", "ND/EBITDA", "EV/Rev", "EV/EBITDA"]
+    headers = ["Ticker", "Company", "Growth\nLatest Q YoY", "EBITDA mgn\nLTM", "FCF conv\nLTM",
+               "ND/EBITDA\nLTM", "EV/Rev\nLTM", "EV/EBITDA\nLTM"]
     trows, anchor_idx = [], None
     for i, (_, p) in enumerate(peers.iterrows()):
         if p["company_id"] == cid:
@@ -258,7 +397,7 @@ def kpi_dashboard(path: Path) -> None:
             fmt_multiple(p.get("ev_to_revenue_ttm")), fmt_multiple(p.get("ev_to_ebitda_ttm")),
         ])
     med = a.peer_median
-    trows.append(["—", "Peer median", fmt_pct(med.get("revenue_yoy_growth")), fmt_pct(med.get("ebitda_margin_ttm")),
+    trows.append(["—", "Peer median (ex-company)", fmt_pct(med.get("revenue_yoy_growth")), fmt_pct(med.get("ebitda_margin_ttm")),
                   fmt_pct(med.get("fcf_conversion_ttm")), fmt_multiple(med.get("net_debt_to_ebitda_ttm")),
                   fmt_multiple(med.get("ev_to_revenue_ttm")), fmt_multiple(med.get("ev_to_ebitda_ttm"))])
     tax = fig.add_axes([0.018, 0.07, 0.62, 0.46])
@@ -309,7 +448,7 @@ def company_tearsheet(path: Path) -> None:
 
     # Financial snapshot table.
     _section(ax, 0.018, 0.712, "Financial Snapshot")
-    fin_headers = ["Metric", "Latest Qtr", "TTM", "Margin/YoY"]
+    fin_headers = ["Metric", "Latest Reported Qtr", "LTM", "Growth / LTM Margin"]
     fin_rows = [
         ["Revenue", fmt_money(row.get("revenue"), currency), fmt_money(row.get("revenue_ttm"), currency), fmt_pct(row.get("revenue_yoy_growth"))],
         ["Gross profit", fmt_money(row.get("gross_profit"), currency), fmt_money(row.get("gross_profit_ttm"), currency), fmt_pct(row.get("gross_margin_ttm"))],
@@ -338,14 +477,16 @@ def company_tearsheet(path: Path) -> None:
     _table(tax2, val_headers, val_rows, bbox=[0, 0, 1, 1], colw=[0.6, 0.4])
 
     # Revenue / EBITDA chart.
-    _section(ax, 0.018, 0.355, "Quarterly Revenue & EBITDA")
+    _section(ax, 0.018, 0.355, "Reported Quarterly Revenue & EBITDA",
+             "Standalone-quarter bars and margin")
     cax = fig.add_axes([0.06, 0.08, 0.90, 0.25])
     history = df[df["company_id"] == cid].sort_values("period")
     x = range(len(history))
-    cax.bar([i - 0.2 for i in x], history["revenue"], width=0.4, color=BLUE, label="Revenue")
-    cax.bar([i + 0.2 for i in x], history["ebitda"], width=0.4, color=BLUE2, label="EBITDA")
+    cax.bar([i - 0.2 for i in x], history["revenue"], width=0.4, color=BLUE, label="Revenue (quarter)")
+    cax.bar([i + 0.2 for i in x], history["ebitda"], width=0.4, color=BLUE2, label="EBITDA (quarter)")
     cax2 = cax.twinx()
-    cax2.plot(list(x), history["ebitda_margin"], color=GOLD, marker="o", linewidth=2, label="EBITDA margin")
+    cax2.plot(list(x), history["ebitda_margin"], color=GOLD, marker="o", linewidth=2,
+              label="EBITDA margin (quarter)")
     cax2.yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
     cax2.tick_params(colors=GOLD, labelsize=8)
     cax.set_xticks(list(x))
@@ -377,7 +518,8 @@ def peer_benchmarking(path: Path) -> None:
 
     _section(ax, 0.018, 0.815, "Peer Universe", f"{row.get('sector')} comps · Q{pd.Timestamp(row['period']).quarter} {pd.Timestamp(row['period']).year}")
     peers = a.peers.sort_values("ev_to_ebitda_ttm")
-    headers = ["Ticker", "Company", "Growth", "EBITDA mgn", "FCF conv", "ND/EBITDA", "EV/Rev", "EV/EBITDA"]
+    headers = ["Ticker", "Company", "Growth\nLatest Q YoY", "EBITDA mgn\nLTM", "FCF conv\nLTM",
+               "ND/EBITDA\nLTM", "EV/Rev\nLTM", "EV/EBITDA\nLTM"]
     trows, anchor_idx = [], None
     for i, (_, p) in enumerate(peers.iterrows()):
         if p["company_id"] == cid:
@@ -389,7 +531,7 @@ def peer_benchmarking(path: Path) -> None:
             fmt_multiple(p.get("ev_to_revenue_ttm")), fmt_multiple(p.get("ev_to_ebitda_ttm")),
         ])
     med = a.peer_median
-    trows.append(["—", "Peer median", fmt_pct(med.get("revenue_yoy_growth")), fmt_pct(med.get("ebitda_margin_ttm")),
+    trows.append(["—", "Peer median (ex-company)", fmt_pct(med.get("revenue_yoy_growth")), fmt_pct(med.get("ebitda_margin_ttm")),
                   fmt_pct(med.get("fcf_conversion_ttm")), fmt_multiple(med.get("net_debt_to_ebitda_ttm")),
                   fmt_multiple(med.get("ev_to_revenue_ttm")), fmt_multiple(med.get("ev_to_ebitda_ttm"))])
     tax = fig.add_axes([0.018, 0.50, 0.964, 0.29])
@@ -400,20 +542,21 @@ def peer_benchmarking(path: Path) -> None:
     # Scatter: growth vs margin.
     _section(ax, 0.018, 0.455, "Growth vs Margin")
     sax = fig.add_axes([0.06, 0.08, 0.40, 0.35])
-    med_x = peers["revenue_yoy_growth"].median()
-    med_y = peers["ebitda_margin_ttm"].median()
+    peers_only = peers[peers["company_id"] != cid]
+    med_x = peers_only["revenue_yoy_growth"].median()
+    med_y = peers_only["ebitda_margin_ttm"].median()
     for _, p in peers.iterrows():
         anc = p["company_id"] == cid
         sax.scatter(p["revenue_yoy_growth"], p["ebitda_margin_ttm"], s=170 if anc else 90,
-                    c=GREEN if anc else BLUE, edgecolors="white", linewidths=1.2, zorder=3)
+                    c=GREEN if anc else PEER, edgecolors="white", linewidths=1.2, zorder=3)
         sax.annotate(p["ticker"].replace(".SA", ""), (p["revenue_yoy_growth"], p["ebitda_margin_ttm"]),
                      xytext=(5, 4), textcoords="offset points", fontsize=8, color=SLATE)
     sax.axvline(med_x, color=PALETTE["muted_2"], ls="--", lw=1)
     sax.axhline(med_y, color=PALETTE["muted_2"], ls="--", lw=1)
     sax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
     sax.yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
-    sax.set_xlabel("Revenue YoY growth", fontsize=8)
-    sax.set_ylabel("TTM EBITDA margin", fontsize=8)
+    sax.set_xlabel("Revenue growth (latest quarter YoY)", fontsize=8)
+    sax.set_ylabel("EBITDA margin (LTM)", fontsize=8)
     sax.grid(True, alpha=0.18)
     sax.set_axisbelow(True)
     for s in ("top", "right"):
@@ -423,19 +566,182 @@ def peer_benchmarking(path: Path) -> None:
     _section(ax, 0.52, 0.455, "EV / EBITDA Benchmark")
     bax = fig.add_axes([0.56, 0.08, 0.40, 0.35])
     pv = peers.dropna(subset=["ev_to_ebitda_ttm"])
-    colors = [GREEN if c == cid else BLUE for c in pv["company_id"]]
+    colors = [GREEN if c == cid else PEER for c in pv["company_id"]]
     bars = bax.bar([t.replace(".SA", "") for t in pv["ticker"]], pv["ev_to_ebitda_ttm"], color=colors)
-    median = pv["ev_to_ebitda_ttm"].median()
+    median = pv.loc[pv["company_id"] != cid, "ev_to_ebitda_ttm"].median()
     bax.axhline(median, color=GOLD, ls="--", lw=1.3)
     bax.text(len(pv) - 0.5, median, f" median {median:.1f}x", color=GOLD, fontsize=7.5, va="bottom", ha="right")
     for b, v in zip(bars, pv["ev_to_ebitda_ttm"]):
         bax.text(b.get_x() + b.get_width() / 2, v, f"{v:.1f}x", ha="center", va="bottom", fontsize=7.5, color=SLATE)
-    bax.set_ylabel("EV / EBITDA (TTM)", fontsize=8)
+    bax.set_ylabel("Current EV / EBITDA (LTM)", fontsize=8)
     bax.tick_params(axis="x", labelsize=8)
     bax.grid(True, axis="y", alpha=0.18)
     bax.set_axisbelow(True)
     for s in ("top", "right"):
         bax.spines[s].set_visible(False)
+
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
+def consensus_snapshot(path: Path) -> None:
+    df, cid = _load()
+    a = build_assessment(df, cid, store=_store())
+    read = build_consensus_read(a.row)
+    currency = str(a.row.get("currency", "USD"))
+
+    fig = plt.figure(figsize=(12.8, 7.2), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _header_clean(ax, a.row, a)
+    _section(ax, 0.018, 0.815, "Actual vs Consensus & Revisions",
+             "Illustrative demo estimates | private workflow uses Capital IQ estimate exports")
+
+    cards = []
+    for metric in ("Revenue", "EBITDA"):
+        item = next((r for r in read.rows if r["metric"] == metric), None)
+        if item:
+            cards.append((f"{metric} vs estimate", _pct_signed(item["delta_pct"]), item["status"],
+                          GREEN if item["delta_pct"] >= 0 else PALETTE["red"]))
+    rev30 = read.revisions.get("revenue", {}).get("d30")
+    rev90 = read.revisions.get("revenue", {}).get("d90")
+    cards.extend([
+        ("Revenue revision 30d", _pct_signed(rev30), "NTM estimate momentum", GREEN if (rev30 or 0) >= 0 else PALETTE["red"]),
+        ("Revenue revision 90d", _pct_signed(rev90), "NTM estimate momentum", GREEN if (rev90 or 0) >= 0 else PALETTE["red"]),
+    ])
+    gap = 0.014
+    w = (0.964 - gap * 3) / 4
+    for i, (label, value, note, color) in enumerate(cards[:4]):
+        x = 0.018 + i * (w + gap)
+        ax.add_patch(Rectangle((x, 0.69), w, 0.10, facecolor="white", edgecolor=LINE, linewidth=0.8))
+        ax.add_patch(Rectangle((x, 0.785), w, 0.005, facecolor=color, edgecolor="none"))
+        ax.text(x + 0.012, 0.760, label.upper(), fontsize=6.7, color=MUTED, weight="bold")
+        ax.text(x + 0.012, 0.727, value, fontsize=17, color=INK, weight="bold")
+        ax.text(x + 0.012, 0.705, note, fontsize=6.8, color=MUTED)
+
+    _section(ax, 0.018, 0.645, read.comparison_label)
+    comparison_rows = []
+    for item in read.rows:
+        comparison_rows.append([
+            item["metric"], fmt_money(item["actual"], currency), fmt_money(item["consensus"], currency),
+            fmt_money(item["delta"], currency), _pct_signed(item["delta_pct"]), item["status"].title(),
+        ])
+    tax = fig.add_axes([0.018, 0.39, 0.53, 0.22])
+    tax.axis("off")
+    _table(tax, ["Metric", "Actual", "Estimate", "Delta", "Delta %", "Read"], comparison_rows,
+           bbox=[0, 0, 1, 1], colw=[0.16, 0.19, 0.19, 0.17, 0.13, 0.16])
+
+    rax = fig.add_axes([0.61, 0.39, 0.34, 0.22])
+    labels = ["Revenue", "EPS"]
+    d30 = [read.revisions.get("revenue", {}).get("d30"), read.revisions.get("eps", {}).get("d30")]
+    d90 = [read.revisions.get("revenue", {}).get("d90"), read.revisions.get("eps", {}).get("d90")]
+    x = np.arange(len(labels))
+    rax.bar(x - 0.18, [v or 0 for v in d30], 0.36, color=GREEN, label="30 days")
+    rax.bar(x + 0.18, [v or 0 for v in d90], 0.36, color=GOLD, label="90 days")
+    rax.axhline(0, color=INK, linewidth=0.8)
+    rax.set_xticks(x)
+    rax.set_xticklabels(labels, fontsize=8)
+    rax.yaxis.set_major_formatter(lambda v, _: f"{v:+.0%}")
+    rax.set_ylabel("Change in NTM estimate", fontsize=8)
+    rax.grid(True, axis="y", alpha=0.18)
+    rax.legend(frameon=False, fontsize=8, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.02))
+    for s in ("top", "right"):
+        rax.spines[s].set_visible(False)
+
+    ax.add_patch(Rectangle((0.018, 0.075), 0.964, 0.25, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.018, 0.075), 0.004, 0.25, facecolor=GOLD))
+    ax.text(0.035, 0.292, "INTERPRETATION & DATA DISCIPLINE", fontsize=7.2, color=NAVY, weight="bold")
+    notes = [
+        "Actual-versus-estimate comparisons are only called beats or misses when a matched pre-report consensus exists.",
+        "The private workflow tracks revenue, EBITDA and EPS revisions over 30 and 90 days when exported from Capital IQ.",
+        "Missing guidance, analyst count or revision snapshots remain explicit; the model never fabricates unavailable fields.",
+    ]
+    y = 0.255
+    for note in notes:
+        ax.text(0.037, y, u"\u2022", fontsize=10, color=GREEN, va="top")
+        _wrapped(ax, note, 0.054, y, width=135, fontsize=8.0, color=SLATE, lh=0.018)
+        y -= 0.055
+    ax.text(0.982, 0.045, "Public-demo estimates are deterministic and illustrative, not market consensus.",
+            fontsize=6.8, color=MUTED, ha="right")
+
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
+def capital_structure_snapshot(path: Path) -> None:
+    # CSU's demo balance sheet reconciles cleanly and also demonstrates that the
+    # workflow is not tied to the Alphabet showcase company.
+    df, cid = _load("CSUD3.SA")
+    a = build_assessment(df, cid, store=_store())
+    cs = build_capital_structure(a.row)
+    bridge = ev_bridge(a.row)
+    currency = str(a.row.get("currency", "USD"))
+
+    fig = plt.figure(figsize=(12.8, 7.2), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _header_clean(ax, a.row, a)
+    _section(ax, 0.018, 0.815, "Capital Structure & Debt Capacity",
+             "Credit-side underwriting | illustrative leverage cases, not actual covenants")
+
+    cards = [
+        ("Gross debt", fmt_money(cs.gross_debt, currency), "latest reported quarter", BLUE),
+        ("Cash", fmt_money(cs.cash, currency), "cash and equivalents", GREEN),
+        ("Net leverage", fmt_multiple(cs.net_leverage), "net debt / LTM EBITDA", GOLD),
+        ("Interest coverage", fmt_multiple(cs.interest_coverage), "LTM EBITDA / interest", GREEN),
+    ]
+    gap = 0.014
+    w = (0.964 - gap * 3) / 4
+    for i, (label, value, note, color) in enumerate(cards):
+        x = 0.018 + i * (w + gap)
+        ax.add_patch(Rectangle((x, 0.69), w, 0.10, facecolor="white", edgecolor=LINE, linewidth=0.8))
+        ax.add_patch(Rectangle((x, 0.785), w, 0.005, facecolor=color, edgecolor="none"))
+        ax.text(x + 0.012, 0.760, label.upper(), fontsize=6.7, color=MUTED, weight="bold")
+        ax.text(x + 0.012, 0.727, value, fontsize=14, color=INK, weight="bold")
+        ax.text(x + 0.012, 0.705, note, fontsize=6.8, color=MUTED)
+
+    _section(ax, 0.018, 0.645, "Debt Capacity", "Net debt supported at standard leverage cases")
+    dax = fig.add_axes([0.07, 0.345, 0.40, 0.25])
+    turns = sorted(cs.capacity)
+    supported = [cs.capacity[t] for t in turns]
+    incremental = [cs.incremental[t] for t in turns]
+    x = np.arange(len(turns))
+    dax.bar(x - 0.18, supported, 0.36, color=GREEN, label="Supported net debt")
+    dax.bar(x + 0.18, incremental, 0.36, color=GOLD, label="Incremental vs today")
+    dax.set_xticks(x)
+    dax.set_xticklabels([f"{t:.1f}x" for t in turns], fontsize=8)
+    dax.set_ylabel(f"{currency}m", fontsize=8)
+    dax.grid(True, axis="y", alpha=0.18)
+    dax.legend(frameon=False, fontsize=8, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.02))
+    for s in ("top", "right"):
+        dax.spines[s].set_visible(False)
+
+    _section(ax, 0.535, 0.645, "Current EV Bridge", "Calculated from equity value and balance-sheet items")
+    bridge_rows = []
+    if bridge.get("available"):
+        bridge_rows = [
+            ["Market capitalization", fmt_money(bridge.get("market_cap"), currency)],
+            ["+ Total debt", fmt_money(bridge.get("total_debt"), currency)],
+            ["+ Minority interest", fmt_money(bridge.get("minority_interest"), currency)],
+            ["+ Preferred equity", fmt_money(bridge.get("preferred_equity"), currency)],
+            ["- Cash", fmt_money(bridge.get("cash"), currency)],
+            ["Calculated enterprise value", fmt_money(bridge.get("calculated_ev"), currency)],
+            ["Reported enterprise value", fmt_money(bridge.get("reported_ev"), currency)],
+            ["Reconciliation gap", _pct_signed(bridge.get("gap"))],
+        ]
+    tax = fig.add_axes([0.535, 0.305, 0.447, 0.29])
+    tax.axis("off")
+    _table(tax, ["EV bridge", "Value"], bridge_rows, bbox=[0, 0, 1, 1], colw=[0.62, 0.38])
+
+    ax.add_patch(Rectangle((0.018, 0.075), 0.964, 0.17, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.018, 0.075), 0.004, 0.17, facecolor=GOLD))
+    ax.text(0.035, 0.215, "SPONSOR / LENDER READ", fontsize=7.2, color=NAVY, weight="bold")
+    ax.text(0.035, 0.178, f"Illustrative incremental capacity at 4.0x EBITDA: {fmt_money(cs.sponsor_capacity, currency)}.",
+            fontsize=8.4, color=SLATE)
+    ax.text(0.035, 0.143, "The module separates reported capital structure, EV reconciliation and scenario capacity; actual debt pricing, "
+            "covenants and rating constraints remain analyst inputs.", fontsize=8.0, color=SLATE)
+    ax.text(0.035, 0.108, "Financial institutions are routed to a dedicated P/E, P/TBV, ROE and capital-ratio framework instead of EBITDA leverage.",
+            fontsize=8.0, color=SLATE)
 
     fig.savefig(path, facecolor=BG, bbox_inches="tight")
     plt.close(fig)
@@ -633,7 +939,7 @@ def multiples_scorecard_snapshot(path: Path) -> None:
 
     tax = fig.add_axes([0.018, 0.48, 0.964, 0.28])
     tax.axis("off")
-    _table(tax, ["Multiple", "Role", "Current", "Peer med.", "Premium", "History", "Read"],
+    _table(tax, ["Multiple", "Role", "Current", "Peer med.\n(ex-company)", "Premium", "History", "Read"],
            rows, bbox=[0, 0, 1, 1], colw=[0.16, 0.14, 0.12, 0.12, 0.11, 0.14, 0.16])
 
     bx = fig.add_axes([0.07, 0.12, 0.40, 0.28])
@@ -641,13 +947,14 @@ def multiples_scorecard_snapshot(path: Path) -> None:
         labels = [m["label"] for m in bar_items]
         x = np.arange(len(labels))
         bx.bar(x - 0.18, [m["current"] for m in bar_items], width=0.36, color=GREEN, label="Company")
-        bx.bar(x + 0.18, [m["peer_median"] for m in bar_items], width=0.36, color=BLUE, label="Peer median")
+        bx.bar(x + 0.18, [m["peer_median"] for m in bar_items], width=0.36, color=PEER,
+               label="Peer median (ex-company)")
         bx.set_xticks(x)
         bx.set_xticklabels(labels, fontsize=8, rotation=0)
         bx.set_ylabel("Multiple", fontsize=8)
         bx.yaxis.set_major_formatter(lambda v, _: f"{v:.0f}x")
         bx.grid(True, axis="y", alpha=0.18)
-        bx.legend(frameon=False, fontsize=8, ncols=2)
+        bx.legend(frameon=False, fontsize=8, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.02))
         for s in ("top", "right"):
             bx.spines[s].set_visible(False)
     else:
@@ -735,7 +1042,7 @@ def data_audit_snapshot(path: Path) -> None:
     controls = [
         "Market cap is reconciled against price x shares.",
         "Enterprise value is checked against market cap, debt, cash, minority interest, and preferred equity.",
-        "TTM completeness and stale periods are flagged before using multiples.",
+        "LTM completeness and stale periods are flagged before using multiples.",
         "Extreme multiples are excluded from adjusted peer medians.",
     ]
     y = 0.255
@@ -750,12 +1057,17 @@ def data_audit_snapshot(path: Path) -> None:
 
 def main() -> None:
     ensure_dir(REPORTS_SAMPLE_DIR)
-    kpi_dashboard(REPORTS_SAMPLE_DIR / "01_watchlist_home.png")
-    peer_benchmarking(REPORTS_SAMPLE_DIR / "02_peer_benchmarking.png")
-    valuation_case_snapshot(REPORTS_SAMPLE_DIR / "03_valuation_case.png")
-    football_field_snapshot(REPORTS_SAMPLE_DIR / "04_football_field.png")
-    multiples_scorecard_snapshot(REPORTS_SAMPLE_DIR / "05_multiples_scorecard.png")
-    data_audit_snapshot(REPORTS_SAMPLE_DIR / "06_data_audit.png")
+    watchlist_overview(REPORTS_SAMPLE_DIR / "01_watchlist_overview.png")
+    kpi_dashboard(REPORTS_SAMPLE_DIR / "02_company_situation.png")
+    company_tearsheet(REPORTS_SAMPLE_DIR / "03_company_financials.png")
+    comparison_snapshot(REPORTS_SAMPLE_DIR / "04_compare_companies.png")
+    peer_benchmarking(REPORTS_SAMPLE_DIR / "05_peer_benchmarking.png")
+    consensus_snapshot(REPORTS_SAMPLE_DIR / "06_actual_vs_consensus.png")
+    capital_structure_snapshot(REPORTS_SAMPLE_DIR / "07_capital_structure.png")
+    valuation_case_snapshot(REPORTS_SAMPLE_DIR / "08_valuation_case.png")
+    football_field_snapshot(REPORTS_SAMPLE_DIR / "09_football_field.png")
+    multiples_scorecard_snapshot(REPORTS_SAMPLE_DIR / "10_multiples_scorecard.png")
+    data_audit_snapshot(REPORTS_SAMPLE_DIR / "11_data_audit.png")
     print(f"Sample screenshots written to {REPORTS_SAMPLE_DIR}")
 
 

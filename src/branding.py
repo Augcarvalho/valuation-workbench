@@ -38,6 +38,16 @@ PALETTE = {
     "oxblood": "#8f2f3b",
     "cream": "#f8f4ea",
     "charcoal": "#1f2421",
+    # Chart roles. Peers recede, the selected company leads, and operating
+    # series remain distinct without borrowing traffic-light colors.
+    "anchor": "#28584a",
+    "peer": "#8b938f",
+    "series_revenue": "#3f6b63",
+    "series_ebitda": "#72586b",
+    "series_cash": "#4f7478",
+    "series_margin": "#ad843d",
+    "series_secondary": "#9a654f",
+    "series_debt": "#8a3f4c",
     # Signals (muted, institutional)
     "green": "#4f7658",
     "green_soft": "#e8efe5",

@@ -33,7 +33,7 @@ class CapitalStructure:
     interest_coverage: float | None = None
     cash_pct_debt: float | None = None
     net_debt_pct_ev: float | None = None
-    capacity: dict = field(default_factory=dict)      # turns -> total debt supported
+    capacity: dict = field(default_factory=dict)      # turns -> net debt supported
     incremental: dict = field(default_factory=dict)   # turns -> incremental vs today
     leverage_headroom: float | None = None            # turns to covenant
     coverage_headroom: float | None = None            # x above coverage floor
@@ -54,7 +54,7 @@ def _clean(v):
 
 def build_capital_structure(row: pd.Series) -> CapitalStructure:
     warnings: list[str] = []
-    if str(row.get("business_model")) == "financial":
+    if str(row.get("business_model")) in ("financial", "insurer"):
         return CapitalStructure(
             applicable=False,
             warnings=["Financial institution: EBITDA debt capacity is not meaningful - "
@@ -62,7 +62,9 @@ def build_capital_structure(row: pd.Series) -> CapitalStructure:
                       "provisions instead (see Financials Valuation)."])
 
     debt = _clean(row.get("total_debt"))
-    cash = _clean(row.get("cash"))
+    cash = _clean(row.get("cash_st_invest"))
+    if cash is None:
+        cash = _clean(row.get("cash"))
     net_debt = _clean(row.get("net_debt"))
     if net_debt is None and debt is not None and cash is not None:
         net_debt = debt - cash
@@ -109,8 +111,11 @@ def build_capital_structure(row: pd.Series) -> CapitalStructure:
 
 
 def ev_bridge(row: pd.Series) -> dict:
-    """Current EV bridge: market cap + debt + minority + preferred (+ leases
-    when exported) - cash = calculated EV, compared to the reported CapIQ TEV.
+    """Current EV bridge: market cap + debt + minority + preferred - cash.
+
+    ``IQ_TOTAL_DEBT`` already includes finance/capital lease obligations in the
+    current export, so adding the separately exported lease field would double
+    count them.
 
     Cash basis: CapIQ TEV subtracts total cash & short-term investments, so
     ``cash_st_invest`` is preferred when exported; plain cash & equivalents is
@@ -125,19 +130,18 @@ def ev_bridge(row: pd.Series) -> dict:
     cash_sti, cash_only = g("cash_st_invest"), g("cash")
     cash = cash_sti if cash_sti is not None else cash_only
     minority, preferred = g("minority_interest"), g("preferred_equity")
-    leases = g("lease_liabilities")
     reported = g("enterprise_value")
     partial = minority is None or preferred is None
     if mcap is None or debt is None or cash is None:
         return {"available": False, "partial": True}
-    calc = mcap + debt + (minority or 0.0) + (preferred or 0.0) + (leases or 0.0) - cash
+    calc = mcap + debt + (minority or 0.0) + (preferred or 0.0) - cash
     gap = (calc / reported - 1.0) if reported and reported > 0 else None
     return {
         "available": True, "partial": partial,
         "market_cap": mcap, "total_debt": debt, "cash": cash,
         "cash_basis": "cash & ST investments" if cash_sti is not None else "cash & equivalents only",
         "minority_interest": minority or 0.0, "preferred_equity": preferred or 0.0,
-        "lease_liabilities": leases,
+        "lease_liabilities": None,
         "calculated_ev": calc, "reported_ev": reported, "gap": gap,
         "mismatch": gap is not None and abs(gap) > 0.05,
     }

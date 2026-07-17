@@ -9,6 +9,7 @@ from src.app import components as ui
 from src.app.context import DEMO_MODE, PLOTLY_CONFIG, get_store
 from src.modeling.assessment import Kpi, build_assessment
 from src.reporting.charts import leverage_chart
+from src.reporting.periods import company_snapshot_context
 
 
 def render(df: pd.DataFrame, company_id: str) -> None:
@@ -30,10 +31,12 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                     "for the applicable framework (P/E, P/B, ROE vs COE, excess returns).")
         return
 
-    ui.section("Leverage Today", f"{currency} millions | TTM basis")
+    ui.section("Leverage Today",
+               f"{company_snapshot_context(store, row)} | {currency}m | leverage and coverage use LTM denominators")
     ui.kpi_grid([
         Kpi("nd", "Net Debt", f"{cs.net_debt:,.0f}" if cs.net_debt is not None else "n/a",
-            f"gross {cs.gross_debt:,.0f} - cash {cs.cash:,.0f}" if cs.gross_debt is not None else "",
+            f"gross {cs.gross_debt:,.0f} - cash & ST investments {cs.cash:,.0f}"
+            if cs.gross_debt is not None and cs.cash is not None else "",
             "n/a"),
         Kpi("lev", "Net Leverage", f"{cs.net_leverage:.1f}x" if cs.net_leverage is not None else "n/a",
             "net debt / EBITDA",
@@ -52,8 +55,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     for turns in sorted(cs.capacity):
         rows.append([f"{turns:.1f}x EBITDA", f"{cs.capacity[turns]:,.0f}",
                      f"{cs.incremental[turns]:+,.0f}"])
-    ui.html_table(["Leverage level", f"Total debt supported ({currency}m)",
-                   "Incremental vs today"], rows, numeric_from=1)
+    ui.html_table(["Leverage level", f"Net debt supported ({currency}m)",
+                   "Incremental net debt vs today"], rows, numeric_from=1)
     ui.kpi_grid([
         Kpi("hl", "Covenant Headroom (Leverage)",
             f"{cs.leverage_headroom:+.1f}x" if cs.leverage_headroom is not None else "n/a",
@@ -63,7 +66,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             f"{cs.coverage_headroom:+.1f}x" if cs.coverage_headroom is not None else "n/a",
             "vs 2.0x interest-coverage floor",
             "green" if (cs.coverage_headroom or -1) > 1 else ("yellow" if (cs.coverage_headroom or -1) > 0 else "red")),
-        Kpi("sp", "Sponsor Debt Capacity",
+        Kpi("sp", "Sponsor Net Debt Capacity",
             f"{cs.sponsor_capacity:,.0f}" if cs.sponsor_capacity is not None else "n/a",
             "incremental to 4.0x EBITDA", "n/a"),
     ], columns=3)
@@ -73,7 +76,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     st.plotly_chart(vch.current_ev_bridge_chart(bridge), use_container_width=True, config=PLOTLY_CONFIG)
     if bridge.get("mismatch"):
         st.warning(f"Calculated EV differs from the reported CapIQ TEV by {bridge['gap']:+.0%} - "
-                   "CapIQ TEV includes items not yet exported (leases, pensions, exact share counts).")
+                   "check as-of dates, pensions, minority interests and exact share counts.")
 
     hist = leverage_history(df, company_id)
     if not hist.empty and "net_debt" in hist.columns:

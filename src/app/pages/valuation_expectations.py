@@ -10,6 +10,7 @@ from src.app.context import DEMO_MODE, PLOTLY_CONFIG, get_store, tone
 from src.modeling.assessment import Kpi, build_assessment
 from src.modeling.scenarios import cases_from_thesis, implied_expectations, run_cases, sensitivity_grid
 from src.reporting.charts import peer_valuation_scatter, valuation_chart
+from src.reporting.periods import company_snapshot_context
 from src.utils import fmt_money, fmt_multiple, fmt_ordinal, fmt_pct, fmt_signed_pct
 
 
@@ -32,7 +33,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     financial = a.business_model == "financial"
     ui.header_band(row, DEMO_MODE)
 
-    ui.section("Valuation Snapshot", "Multiples vs the peer-group median and vs the company's own history")
+    ui.section("Valuation Snapshot",
+               f"{company_snapshot_context(store, row)} | current market values over LTM denominators")
     hc = a.history_context
     cards = [
         Kpi("mc", "Market Cap", fmt_money(row.get("market_cap"), currency), "Equity value"),
@@ -103,26 +105,28 @@ def render(df: pd.DataFrame, company_id: str) -> None:
               "de-rating - sector-driven": "de-rating (sector-driven)",
               "insufficient history": "short history"}
     mrows = []
+    def fmt_change(value):
+        return f"{value:+.0%}" if value is not None else "n/a"
+
     for metric in hist_metrics:
         mom = momentum[metric]
         if not mom.get("available"):
             continue
-        fmt_chg = lambda v: f"{v:+.0%}" if v is not None else "n/a"
         verdict = mom.get("verdict") or "n/a"
         sm = by_metric.get(metric, {})
         mrows.append([
             MULTIPLE_SPECS[metric]["label"],
             f"{mom['current']:.1f}x",
-            fmt_chg(mom["chg"].get(3)), fmt_chg(mom["chg"].get(6)), fmt_chg(mom["chg"].get(12)),
+            fmt_change(mom["chg"].get(3)), fmt_change(mom["chg"].get(6)), fmt_change(mom["chg"].get(12)),
             f"P{mom['percentile'] * 100:.0f}" if mom.get("percentile") is not None else "n/a",
-            fmt_chg(sm.get("premium")),
+            fmt_change(sm.get("premium")),
             _short.get(verdict, verdict),
         ])
     if mrows:
         ui.html_table(["Multiple", "Current", "3M", "6M", "12M", "Own pctile",
                        "vs peers", "Read"], mrows, numeric_from=1)
         ui.footnote("Monthly closes from the valuation-history export (its LTM multiples can "
-                    "differ slightly from the dataset's TTM computation). Own pctile = current vs "
+                    "differ slightly from the dataset's LTM computation). Own pctile = current vs "
                     "own history; 'vs peers' = premium/discount to the adjusted peer median today; "
                     "Read compares the company's 12m multiple move with the peer median's move.")
     else:
@@ -138,8 +142,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     # Scenario engine.
     thesis_scen = a.thesis.scenarios if a.thesis else None
     results = run_cases(row, thesis_scen)
-    ui.section("Scenarios & Sponsor-Style Returns",
-               "Exit value = exit-year profit × exit multiple; IRR vs today's market cap")
+    ui.section("Public-Market Scenario Returns",
+               "Exit value = exit-year profit x exit multiple; annualized equity-value return")
     srows = []
     for res in results:
         srows.append([
@@ -151,7 +155,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             tone(f"{res.irr:+.1%}", res.irr >= 0) if res.valid else "n/a",
             res.case.source,
         ])
-    ui.html_table(["Case", "Rev CAGR", "Exit Margin", "Exit Multiple", "MOIC", f"IRR ({results[0].case.horizon_years}y)", "Source"], srows)
+    ui.html_table(["Case", "Rev CAGR", "Exit Margin", "Exit Multiple", "Value / Current",
+                   f"Annualized Return ({results[0].case.horizon_years}y)", "Source"], srows)
 
     base_case = cases_from_thesis(row, thesis_scen)[1]
     grid = sensitivity_grid(row, base_case)
@@ -159,7 +164,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                  for idx in grid.index]
     g1, g2 = st.columns([1.15, 1.0], gap="medium")
     with g1:
-        ui.section("IRR Sensitivity", "Revenue CAGR (rows) × exit multiple (columns), base-case margin held")
+        ui.section("Annualized Return Sensitivity", "Revenue CAGR (rows) x exit multiple (columns), base-case margin held")
         ui.html_table(["Rev CAGR \\ Exit"] + list(grid.columns), grid_rows)
     with g2:
         fair_mult = a.peer_median.get("pe_ttm") if financial else a.peer_median.get("ev_to_ebitda_ttm")
@@ -176,5 +181,6 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         st.write("")
         ui.memo("Valuation Commentary", val.get("commentary", ""))
 
-    ui.footnote("Scenario model: today's net debt held constant, interim FCF ignored (conservative for cash generators); "
-                "financial institutions run on net income × P/E instead of EBITDA × EV/EBITDA.")
+    ui.footnote("Public-market scenario model: today's net debt is held constant and interim FCF/dividends "
+                "are ignored. This is an implied equity-value CAGR, not a sponsor LBO IRR. Financial "
+                "institutions run on net income x P/E instead of EBITDA x EV/EBITDA.")

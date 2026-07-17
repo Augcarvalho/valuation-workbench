@@ -12,14 +12,24 @@ def _row(**kw):
     return pd.Series(base)
 
 
-def test_beat_miss_math():
+def test_current_fq_comparison_is_not_labeled_beat_miss():
     out = build_consensus_read(_row(revenue=110.0, revenue_consensus=100.0,
                                     ebitda=18.0, ebitda_consensus=20.0))
     by = {r["metric"]: r for r in out.rows}
-    assert by["Revenue"]["status"] == "beat"
+    assert by["Revenue"]["status"] == "above estimate"
     assert by["Revenue"]["delta_pct"] == pytest.approx(0.10)
-    assert by["EBITDA"]["status"] == "miss"
+    assert by["EBITDA"]["status"] == "below estimate"
     assert by["EBITDA"]["delta"] == pytest.approx(-2.0)
+    assert not out.true_surprise
+
+
+def test_matched_pre_report_consensus_enables_beat_miss():
+    out = build_consensus_read(_row(
+        period="2026-03-31", consensus_period="2026-03-31",
+        consensus_basis="pre_report", revenue=110.0, revenue_consensus=100.0,
+    ))
+    assert out.true_surprise
+    assert out.rows[0]["status"] == "beat"
 
 
 def test_revisions_30_90():

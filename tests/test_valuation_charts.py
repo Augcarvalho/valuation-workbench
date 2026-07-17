@@ -13,7 +13,7 @@ from src.reporting import valuation_charts as vch
 def demo_case():
     store = load_store(demo=True)
     df = pd.read_csv(store.dataset_path, parse_dates=["period"])
-    return df, build_valuation_case(df, "TOTS3.SA", store=store)
+    return df, build_valuation_case(df, "GOOGL", store=store)
 
 
 @pytest.fixture(scope="module")
@@ -30,7 +30,7 @@ def test_football_field_ranges(demo_case):
     data = vch.football_field_data(case)
     assert data["current_price"] and data["current_price"] > 0
     labels = [r["label"] for r in data["ranges"]]
-    assert any("DCF" in l for l in labels)
+    assert any("DCF" in label for label in labels)
     for r in data["ranges"]:
         assert r["high"] > r["low"] > 0
         if r.get("mid") is not None:

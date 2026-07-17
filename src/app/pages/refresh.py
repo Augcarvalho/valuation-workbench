@@ -52,7 +52,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                         "Capital IQ add-in open, then rebuild the dataset.")
 
     ui.section("Coverage by Company")
-    cov_headers = ["Ticker", "Company", "Period", "Completeness", "Deep Fields", "Financials"]
+    cov_headers = ["Ticker", "Company", "Financials Through", "LTM Completeness", "Deep Fields", "Financials"]
     cov_rows, cov_cls = [], []
     deep_cols = [c for c in ["sbc", "total_equity", "ar"] if c in df.columns]
     for _, r in latest.sort_values("data_quality_score", ascending=False).iterrows():
@@ -78,7 +78,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         "Deep fields (SBC/equity/AR)": any(pd.notna(row.get(c)) for c in ["sbc", "total_equity", "ar"]),
         "Consensus / estimates": store.has_estimates,
         "Valuation history": store.has_valuation_history,
-        "TTM window complete": bool(row.get("ttm_complete", False)),
+        "LTM window complete (4 consecutive quarters)": bool(row.get("ttm_complete", False)),
     }
     vrows = [[k, ui.cell_pill("Pass" if v else "Missing", "green" if v else "red")] for k, v in checks.items()]
     ui.html_table(["Check", "Status"], vrows)
@@ -109,6 +109,9 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                         ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(script), "-Id", lookup_id],
                         capture_output=True, text=True, timeout=180,
                     )
+                    if proc.returncode != 0:
+                        raise OSError(proc.stderr.strip() or proc.stdout.strip()
+                                      or f"Capital IQ lookup exited with code {proc.returncode}")
                     json_path = PROJECT_ROOT / "data_private" / "capiq_exports" / "company_lookup.json"
                     payload = json_path.read_text(encoding="utf-8-sig") if json_path.exists() else proc.stdout
                     st.session_state["add_company_preview"] = parse_lookup_result(payload).__dict__
@@ -225,12 +228,15 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                                expanded=True) as status:
                     try:
                         st.write("Driving the Excel add-in (single-name workbook, staged output)...")
-                        subprocess.run(
+                        proc = subprocess.run(
                             ["powershell", "-ExecutionPolicy", "Bypass", "-File", str(script),
                              "-Id", fetch["id"], "-Sector", fetch["theme"],
                              "-Currency", fetch["currency"]],
                             capture_output=True, text=True, timeout=900,
                         )
+                        if proc.returncode != 0:
+                            raise OSError(proc.stderr.strip() or proc.stdout.strip()
+                                          or f"Capital IQ export exited with code {proc.returncode}")
                         merged = merge_single_export(fetch["id"])
                         st.write("Merged into the main exports: "
                                  + ", ".join(f"{k.replace('.csv', '')} +{v}"

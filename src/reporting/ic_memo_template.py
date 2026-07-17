@@ -63,7 +63,7 @@ IC_MEMO_TEMPLATE = """<!doctype html>
   <div class="cover">
     <div class="cover-kicker">Investment Committee Memo | {{ memo_date }}</div>
     <h1>{{ company.company_name }}<span class="stage-pill">{{ stage_label }}</span></h1>
-    <div class="cover-sub">{{ company.ticker }} | {{ peer_group }} comps | {{ currency_label }} | As of {{ as_of }}</div>
+    <div class="cover-sub">{{ company.ticker }} | {{ peer_group }} comps | {{ currency_label }} | Financials through {{ as_of }}</div>
     <div class="cover-verdict" style="border-left-color:{{ verdict.color }}">
       <div class="v-kicker">Watchlist Verdict &middot; Attention {{ attention_score }}/100</div>
       <div class="v-label" style="color:{{ verdict.color }}">{{ verdict.label }}</div>
@@ -95,7 +95,7 @@ IC_MEMO_TEMPLATE = """<!doctype html>
   <section>
     <div class="s-head"><div class="s-bar"></div><h2>3 &middot; Business Quality</h2></div>
     <table>
-      <tr><th>Metric</th><th>Current</th><th>Year Ago</th><th>Peer Median</th></tr>
+      <tr><th>Metric (basis in label)</th><th>Current</th><th>Year Ago</th><th>Peer Median (ex-company)</th></tr>
       {% for r in quality_rows %}
       <tr><td>{{ r.label }}</td><td class="num">{{ r.current }}</td><td class="num">{{ r.prior }}</td><td class="num">{{ r.median }}</td></tr>
       {% endfor %}
@@ -121,7 +121,7 @@ IC_MEMO_TEMPLATE = """<!doctype html>
     <div class="s-head"><div class="s-bar"></div><h2>6 &middot; Financial Snapshot</h2>
       <span class="s-note">Last {{ performance_rows|length }} quarters | latest highlighted</span></div>
     <table>
-      <tr><th>Period</th><th>Revenue</th><th>Rev YoY</th><th>{{ profit_label }}</th><th>Margin</th><th>FCF</th></tr>
+      <tr><th>Reported Quarter</th><th>Revenue (Quarter)</th><th>Rev Growth (Quarter YoY)</th><th>{{ profit_label }} (Quarter)</th><th>Margin (Quarter)</th><th>FCF (Quarter)</th></tr>
       {% for r in performance_rows %}
       <tr class="{{ 'anchor' if r.is_latest else '' }}">
         <td>{{ r.period }}</td><td class="num">{{ r.revenue }}</td><td class="num">{{ r.rev_yoy|safe }}</td>
@@ -223,7 +223,7 @@ IC_MEMO_TEMPLATE = """<!doctype html>
       {% if thesis.source_as_of %}Thesis as of {{ thesis.source_as_of }}. {% endif %}
       {% if thesis.source_notes %}{{ thesis.source_notes }}{% endif %}</p>
       {% endif %}
-      <p><b>Data.</b> {{ mode }}. TTM metrics require four reported quarters; partial windows are excluded rather than annualized.
+      <p><b>Data.</b> {{ mode }}. LTM metrics require four reported quarters; partial windows are excluded rather than annualized.
       Peer statistics use the true trading comp set ({{ peer_group }}), separate from the thesis theme. Signals marked N/M are
       not meaningful for the company's business model.</p>
       <p><b>Scenarios.</b> Exit value = exit-year {{ scenario_profit_label }} &times; exit multiple; equity bridged with today's net debt held

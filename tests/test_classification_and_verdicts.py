@@ -131,11 +131,16 @@ def test_verdict_uses_valuation_context():
         "fcf_conversion_ttm_signal": "green",
         "net_debt_to_ebitda_ttm_signal": "green",
         "business_model": "operating",
+        "ev_to_ebitda_ttm": 153.2,
     })
     key, _ = _verdict(strong, premium=-0.30, multiple_name="EV/EBITDA")
     assert key == "do_work"                                 # mispriced quality
     key, _ = _verdict(strong, premium=0.05, multiple_name="EV/EBITDA")
     assert key == "constructive"
+    key, rationale = _verdict(strong, premium=None, multiple_name="EV/EBITDA")
+    assert key == "watch"
+    assert "benchmark is unavailable" in rationale
+    assert "153.2x" in rationale
 
 
 def test_watchlist_summary_ranks_do_work_first():

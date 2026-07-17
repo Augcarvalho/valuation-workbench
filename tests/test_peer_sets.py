@@ -131,7 +131,7 @@ def test_valuation_uses_approved_peer_set(tmp_path, monkeypatch, demo_latest):
     assert a.peer_source == "manual" and a.peer_reviewed
     assert set(a.peers["company_id"]) == {"TOTS3.SA", "LWSA3.SA", "BMOB3.SA", "CSUD3.SA"}
     expected_median = latest[latest["company_id"].isin(
-        ["TOTS3.SA", "LWSA3.SA", "BMOB3.SA", "CSUD3.SA"])]["ebitda_margin_ttm"].median()
+        ["LWSA3.SA", "BMOB3.SA", "CSUD3.SA"])]["ebitda_margin_ttm"].median()
     assert a.peer_median["ebitda_margin_ttm"] == pytest.approx(expected_median)
 
 

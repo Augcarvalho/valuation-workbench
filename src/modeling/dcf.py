@@ -4,12 +4,15 @@ Conventions (stated, sponsor/IB-style — mirrors the Grupo Mateus model):
 
 - **Mid-year discounting** of interim cash flows: DF_t = (1+w)^-(t-0.5).
 - **Terminal value both ways**: exit multiple (terminal EBITDA x multiple) and
-  Gordon perpetuity (UFCF_N x (1+g) / (w-g)); both discounted at (1+w)^-N.
+  Gordon perpetuity using normalized stable-state FCFF. Stable reinvestment is
+  ``g / terminal ROIC``; both terminal values are discounted at the explicit
+  period WACC through year N.
   Cross-checks reported: the perpetuity growth implied by the exit multiple,
   and the exit multiple implied by the perpetuity — the two methods should
   tell the same story or the gap is itself a finding.
-- **Primary EV** = exit-multiple method (comps-anchored), perpetuity shown
-  alongside.
+- In auto cases the exit multiple is the EV/EBITDA expression of the same
+  stable-growth economics. Peer multiples remain a separate market reference;
+  an independent market multiple enters the DCF only as an analyst assumption.
 - **Equity bridge**: EV - net debt - minority interest - preferred = implied
   equity. Upside = implied equity / market cap - 1; target price = current
   price x (1 + upside). Working through equity value rather than dividing by
@@ -34,6 +37,11 @@ class DcfResult:
     wacc: float
     exit_multiple: float
     perpetuity_growth: float
+    terminal_wacc: float
+    terminal_roic: float
+    terminal_reinvestment_rate: float | None
+    terminal_nopat: float
+    terminal_ufcf: float
     pv_explicit: float
     terminal_value_exit: float
     terminal_value_perp: float
@@ -74,6 +82,36 @@ def implied_perpetuity_growth(tv: float, ufcf_n: float, wacc: float) -> float | 
     return (wacc * tv - ufcf_n) / (tv + ufcf_n)
 
 
+def implied_growth_from_fundamentals(
+    tv: float,
+    nopat_n: float,
+    wacc: float,
+    roic: float,
+) -> float | None:
+    """Growth implied by a terminal value with reinvestment tied to ROIC.
+
+    Solves ``TV = NOPAT_n(1+g)(1-g/ROIC)/(WACC-g)`` numerically. The
+    traditional closed-form inversion is not valid once growth has an explicit
+    reinvestment cost.
+    """
+    if tv <= 0 or nopat_n <= 0 or wacc <= -0.04 or roic <= 0:
+        return None
+    upper = min(wacc - 0.0005, roic - 0.0005, 0.12)
+    if upper <= -0.049:
+        return None
+    grid = np.linspace(-0.05, upper, 20_001)
+    values = nopat_n * (1.0 + grid) * (1.0 - grid / roic) / (wacc - grid)
+    valid = np.isfinite(values) & (values > 0)
+    if not valid.any():
+        return None
+    valid_grid = grid[valid]
+    valid_values = values[valid]
+    idx = int(np.argmin(np.abs(np.log(valid_values / tv))))
+    if abs(valid_values[idx] / tv - 1.0) > 0.02:
+        return None
+    return float(valid_grid[idx])
+
+
 def run_dcf(
     row: pd.Series,
     scenario: ScenarioAssumptions,
@@ -84,17 +122,20 @@ def run_dcf(
     notes: list[str] = []
     anchors = assumptions.anchors
 
+    nwc_now = _clean(row.get("operating_nwc"))
+    if nwc_now is None:
+        nwc_now = _clean(row.get("working_capital"))
     forecast = build_forecast(
         revenue_ttm=_clean(row.get("revenue_ttm")),
         scenario=scenario,
         cogs_pct=anchors.get("cogs_pct"),
-        nwc_now=_clean(row.get("working_capital")),
+        nwc_now=nwc_now,
         segments=getattr(assumptions, "segments", None),
     )
     if getattr(assumptions, "segments", None):
         notes.append(f"revenue built from {len(assumptions.segments)} operational "
                      f"segment(s): units x revenue/unit")
-    if _clean(row.get("working_capital")) is None:
+    if nwc_now is None:
         notes.append("current NWC unknown; first-year working-capital delta assumed zero")
 
     n = len(forecast)
@@ -103,17 +144,33 @@ def run_dcf(
     pv_explicit = float((ufcf * dfs).sum())
 
     terminal_ebitda = float(forecast["ebitda"].iloc[-1])
-    ufcf_n = float(ufcf[-1])
     g = assumptions.perpetuity_growth
+    terminal_wacc = float(assumptions.terminal_wacc or wacc)
+    terminal_roic = float(assumptions.terminal_roic)
 
     tv_exit = terminal_ebitda * exit_multiple
-    if wacc <= g:
+    terminal_reinvestment_rate = None
+    terminal_nopat = float("nan")
+    terminal_ufcf = float("nan")
+    terminal_revenue = float(forecast["revenue"].iloc[-1]) * (1.0 + g)
+    terminal_ebitda_margin = float(forecast["ebitda_margin"].iloc[-1])
+    terminal_da_pct = float(forecast["d_and_a"].iloc[-1] / forecast["revenue"].iloc[-1])
+    terminal_ebit = terminal_revenue * (terminal_ebitda_margin - terminal_da_pct)
+    terminal_tax_rate = float(scenario.tax_rate)
+    terminal_nopat = terminal_ebit - max(terminal_ebit, 0.0) * terminal_tax_rate
+
+    if terminal_wacc <= g:
         tv_perp = float("nan")
-        notes.append(f"perpetuity invalid: WACC {wacc:.1%} <= growth {g:.1%}")
+        notes.append(f"perpetuity invalid: terminal WACC {terminal_wacc:.1%} <= growth {g:.1%}")
+    elif terminal_roic <= 0 or terminal_roic <= g:
+        tv_perp = float("nan")
+        notes.append(f"perpetuity invalid: terminal ROIC {terminal_roic:.1%} must exceed growth {g:.1%}")
     else:
-        tv_perp = ufcf_n * (1.0 + g) / (wacc - g) if ufcf_n > 0 else float("nan")
-        if ufcf_n <= 0:
-            notes.append("terminal-year UFCF non-positive; perpetuity method not meaningful")
+        terminal_reinvestment_rate = g / terminal_roic
+        terminal_ufcf = terminal_nopat * (1.0 - terminal_reinvestment_rate)
+        tv_perp = terminal_ufcf / (terminal_wacc - g) if terminal_ufcf > 0 else float("nan")
+        if terminal_ufcf <= 0:
+            notes.append("normalized terminal UFCF non-positive; perpetuity method not meaningful")
 
     df_n = (1.0 + wacc) ** (-n)
     pv_tv_exit = tv_exit * df_n
@@ -122,15 +179,19 @@ def run_dcf(
     ev_exit = pv_explicit + pv_tv_exit
     ev_perp = pv_explicit + pv_tv_perp if not np.isnan(pv_tv_perp) else float("nan")
 
-    implied_g = implied_perpetuity_growth(tv_exit, ufcf_n, wacc)
+    nopat_n = float(forecast["nopat"].iloc[-1])
+    implied_g = implied_growth_from_fundamentals(tv_exit, nopat_n, terminal_wacc, terminal_roic)
     implied_mult = (tv_perp / terminal_ebitda) if (not np.isnan(tv_perp) and terminal_ebitda > 0) else None
 
     # Equity bridge.
     net_debt = _clean(row.get("net_debt"))
     if net_debt is None:
-        debt, cash = _clean(row.get("total_debt")), _clean(row.get("cash"))
+        debt = _clean(row.get("total_debt"))
+        cash = _clean(row.get("cash_st_invest"))
+        if cash is None:
+            cash = _clean(row.get("cash"))
         net_debt = (debt or 0.0) - (cash or 0.0)
-        notes.append("net debt derived from total debt minus cash")
+        notes.append("net debt derived from total debt minus cash and short-term investments")
     minority = _clean(row.get("minority_interest")) or 0.0
     preferred = _clean(row.get("preferred_equity")) or 0.0
     implied_equity = ev_exit - net_debt - minority - preferred
@@ -157,6 +218,11 @@ def run_dcf(
         wacc=wacc,
         exit_multiple=exit_multiple,
         perpetuity_growth=g,
+        terminal_wacc=terminal_wacc,
+        terminal_roic=terminal_roic,
+        terminal_reinvestment_rate=terminal_reinvestment_rate,
+        terminal_nopat=terminal_nopat,
+        terminal_ufcf=terminal_ufcf,
         pv_explicit=pv_explicit,
         terminal_value_exit=tv_exit,
         terminal_value_perp=tv_perp,
@@ -212,9 +278,9 @@ def sensitivity_wacc_multiple(
 ) -> pd.DataFrame:
     """Grid of target price (or upside) over WACC x exit multiple."""
     if wacc_steps is None:
-        wacc_steps = [round(wacc + d, 4) for d in (-0.015, -0.0075, 0.0, 0.0075, 0.015)]
+        wacc_steps = [wacc + d for d in (-0.015, -0.0075, 0.0, 0.0075, 0.015)]
     if multiple_steps is None:
-        multiple_steps = [round(exit_multiple + d, 2) for d in (-2.0, -1.0, 0.0, 1.0, 2.0)]
+        multiple_steps = [exit_multiple + d for d in (-2.0, -1.0, 0.0, 1.0, 2.0)]
         multiple_steps = [m for m in multiple_steps if m > 0] or [exit_multiple]
 
     grid = {}
@@ -224,7 +290,7 @@ def sensitivity_wacc_multiple(
             res = run_dcf(row, scenario, assumptions, w, mult)
             value = res.target_price if output == "target_price" else res.upside
             column.append(value if value is not None else np.nan)
-        grid[f"{mult:g}x"] = column
+        grid[f"{mult:.1f}x"] = column
     index = [f"{w:.2%}" for w in wacc_steps]
     return pd.DataFrame(grid, index=index)
 
@@ -288,7 +354,7 @@ def driver_tornado(
     flexes = [
         ("Exit multiple +/-1.0x",
          price(m=max(exit_multiple - 1.0, 0.5)), price(m=exit_multiple + 1.0),
-         f"{max(exit_multiple - 1.0, 0.5):g}x", f"{exit_multiple + 1.0:g}x"),
+         f"{max(exit_multiple - 1.0, 0.5):.1f}x", f"{exit_multiple + 1.0:.1f}x"),
         ("WACC +/-150bps",
          price(w=wacc + 0.015), price(w=max(wacc - 0.015, 0.01)),
          f"{wacc + 0.015:.1%}", f"{max(wacc - 0.015, 0.01):.1%}"),

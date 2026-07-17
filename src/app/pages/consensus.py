@@ -28,7 +28,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         return "green" if good else "red"
 
     rev = read.revisions
-    ui.section("Consensus Snapshot", "Latest reported quarter vs current consensus | NTM revisions")
+    ui.section("Consensus Snapshot", f"{read.comparison_label} | NTM revisions")
     beat_by = {r["metric"]: r for r in read.rows}
     cards = []
     for metric in ["Revenue", "EBITDA"]:
@@ -48,7 +48,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                      "n/a"))
     ui.kpi_grid(cards, columns=5)
 
-    beat_fig = consensus_beat_chart(read.rows, currency=str(row.get("currency", "")))
+    beat_fig = consensus_beat_chart(read.rows, currency=str(row.get("currency", "")),
+                                    true_surprise=read.true_surprise)
     momentum_fig = revision_momentum_chart(rev)
     if beat_fig is not None or momentum_fig is not None:
         c1, c2 = st.columns(2, gap="medium")
@@ -60,14 +61,18 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                 st.plotly_chart(momentum_fig, use_container_width=True, config=PLOTLY_CONFIG)
 
     if read.rows:
-        ui.section("Actual vs Consensus", "Approximation: consensus is the current-quarter "
-                                          "estimate as of the last refresh")
-        ui.html_table(["Metric", "Actual", "Consensus", "Delta", "Delta %", "Status"],
+        note = ("Point-in-time consensus immediately before the release"
+                if read.true_surprise else
+                "Current IQ_FQ estimate; directional comparison only, not an earnings surprise")
+        ui.section(read.comparison_label, note)
+        estimate_header = "Pre-Report Consensus" if read.true_surprise else "Current IQ_FQ Estimate"
+        ui.html_table(["Metric", "Reported Actual (Latest Q)", estimate_header,
+                       "Absolute Delta", "Delta %", "Status"],
                       [[r["metric"], f"{r['actual']:,.1f}", f"{r['consensus']:,.1f}",
                         f"{r['delta']:+,.1f}", f"{r['delta_pct']:+.1%}",
                         ui.cell_pill(r["status"].upper(),
-                                     "green" if r["status"] == "beat" else
-                                     ("red" if r["status"] == "miss" else "n/a"))]
+                                     "green" if r["delta"] > 0 else
+                                     ("red" if r["delta"] < 0 else "n/a"))]
                        for r in read.rows], numeric_from=1)
 
     ui.section("Revision Momentum", "NTM consensus vs 30 and 90 days ago")

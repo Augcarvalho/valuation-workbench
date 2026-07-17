@@ -1,316 +1,216 @@
-# Valuation Workbench
+# Investment Analysis Platform
 
-**Um sistema de análise de investimentos que transforma dados do Capital IQ em dashboards, valuation cases e memos de comitê de investimento.**
+**Uma plataforma de análise de investimentos que transforma dados financeiros em um processo repetível de screening, diligência, valuation e comunicação para comitê de investimento.**
 
-Este projeto foi construído para demonstrar uma combinação de finanças, dados,
-automação e julgamento de investimento. A ideia é simples: em vez de analisar
-uma empresa manualmente em Excel e PowerPoint do zero, o sistema cria um fluxo
-repetível para monitorar companhias, validar dados, comparar pares, montar
-valuation cases e gerar materiais em formato próximo ao que um time de IB, PE
-ou public equities usaria internamente.
+Construí este projeto para integrar, em um único fluxo, tarefas que normalmente ficam fragmentadas entre Excel, PowerPoint e pesquisas manuais. No ambiente privado, a plataforma recebe exports locais do **S&P Capital IQ Pro**, normaliza os dados, testa sua consistência e aplica o mesmo framework analítico a todas as companhias da cobertura.
 
-O repositório público roda com dados demonstrativos. Os dados reais do Capital IQ,
-as teses privadas e a watchlist real ficam fora do GitHub em `data_private/`.
-Os prints públicos usam Alphabet/Google como empresa de referência, com um peer
-set de mega-cap tech reconhecível, para mostrar o produto sem expor dados
-licenciados ou posições privadas.
+O sistema não tenta substituir o analista ou gerar uma recomendação automática. Ele organiza evidências, explicita premissas, identifica inconsistências e libera tempo para o trabalho que realmente exige julgamento: entender o negócio, revisar peers, questionar o consenso e construir uma tese.
 
-`Python` | `Streamlit` | `Pandas` | `Plotly` | `Capital IQ Excel Add-In` | `DCF` | `Comps` | `IC Memo`
+![Visão geral da watchlist](reports/sample/01_watchlist_overview.png)
 
----
+## Escala da análise
 
-## Visão Geral
+A demonstração pública contém **14 companhias** entre empresas monitoradas e trading comps, com **8 nomes priorizados** na watchlist e cobertura no Brasil e nos Estados Unidos. O modo privado não é limitado a esse universo: qualquer companhia adicionada por meio dos templates de exportação do Capital IQ passa pelo mesmo pipeline de financials, estimates, peers, capital structure, valuation e reporting.
 
-![Watchlist Home](reports/sample/01_watchlist_home.png)
+Na prática, a plataforma permite:
 
-O sistema funciona como uma **workbench de underwriting**:
+- Monitorar várias empresas com o mesmo padrão analítico.
+- Separar empresas da watchlist de companhias utilizadas apenas como comparáveis.
+- Comparar nomes de setores e geografias diferentes sem misturar moedas ou períodos.
+- Criar peer groups revisáveis, excluindo a própria empresa da mediana dos pares.
+- Trocar a companhia selecionada e reconstruir automaticamente todas as análises aplicáveis.
 
-1. Puxa dados financeiros, mercado, estimativas e valuation history via Capital IQ.
-2. Normaliza tudo em uma base única.
-3. Calcula métricas relevantes para análise de investimento.
-4. Compara cada empresa com um grupo de pares revisável.
-5. Mostra alertas de qualidade de dados.
-6. Constrói DCF, WACC, football field e sensibilidades.
-7. Junta a camada quantitativa com uma tese escrita pelo analista.
-8. Exporta materiais em formato de memo/valuation case.
+> **Nota sobre os prints:** as imagens abaixo usam uma base pública demonstrativa e premissas ilustrativas. Dados licenciados do Capital IQ, teses privadas e outputs reais permanecem exclusivamente no ambiente local.
 
-O objetivo não é prever o futuro automaticamente. O objetivo é criar uma
-infraestrutura que ajude o analista a pensar melhor, com dados consistentes,
-premissas rastreáveis e uma narrativa de investimento clara.
+## Da informação à decisão
 
-## Por Que Este Projeto É Relevante
-
-Este não é um dashboard genérico de ações. O projeto tenta responder perguntas
-que aparecem em processos reais de investimento:
-
-- A empresa está barata ou o múltiplo baixo é justificado?
-- O crescimento está acelerando ou desacelerando?
-- As margens são estruturalmente superiores aos pares?
-- O mercado está revisando estimativas para cima ou para baixo?
-- O valuation atual exige premissas agressivas demais?
-- O balanço permite alavancagem ou limita a tese?
-- O peer group faz sentido ou distorce a conclusão?
-- Quais perguntas eu faria para management antes de defender a tese?
-
-## Principais Funcionalidades
-
-### 1. Watchlist e Priorização
-
-Ranking das empresas por atenção analítica: valuation vs histórico, momentum de
-estimativas, performance operacional, qualidade de dados e flags de risco.
-
-### 2. Peer Benchmarking
-
-![Peer Benchmarking](reports/sample/02_peer_benchmarking.png)
-
-Compara a empresa contra pares por crescimento, margens, múltiplos e percentis.
-O sistema separa **tema de investimento** de **trading comps**, evitando que uma
-tese interessante use pares errados.
-
-### 3. Valuation Case
-
-![Valuation Case](reports/sample/03_valuation_case.png)
-
-Gera um case de valuation com:
-
-- Forecast operacional.
-- WACC.
-- DCF.
-- Valor terminal por múltiplo de saída e perpetuidade.
-- Equity bridge.
-- Sensibilidade de WACC x múltiplo.
-- Cenários bear/base/bull.
-- Proveniência das premissas.
-
-### 4. Football Field
-
-![Football Field](reports/sample/04_football_field.png)
-
-Visualiza faixas de preço implícito por DCF, múltiplos de mercado, histórico da
-própria empresa e faixa de negociação.
-
-### 5. Multi-Multiple Scorecard
-
-![Multiples Scorecard](reports/sample/05_multiples_scorecard.png)
-
-O sistema não força todas as empresas no mesmo framework. Dependendo do modelo
-de negócio, múltiplos como EV/EBITDA, EV/Revenue, P/E e P/TBV podem ser
-classificados como primários, secundários, cross-check ou não significativos.
-
-### 6. Data Audit
-
-![Data Audit](reports/sample/06_data_audit.png)
-
-Antes de confiar na análise, o sistema testa a base:
-
-- Erros de unidade ou moeda.
-- Market cap vs preço x ações.
-- Ponte de enterprise value.
-- Sinais incorretos em CFO/capex.
-- TTM incompleto.
-- Dados stale.
-- Outliers em múltiplos.
-- Inconsistência no refresh log.
-
-### 7. Tese do Analista
-
-A parte mais importante do projeto é a separação entre:
-
-**Camada de máquina**
-
-- Dados financeiros.
-- Estimativas.
-- Múltiplos.
-- Peer benchmarking.
-- Data audit.
-- Valuation.
-- Gráficos.
-
-**Camada humana**
-
-- Tese de investimento.
-- Variant perception.
-- Key debate.
-- Investment pillars.
-- SWOT.
-- Catalysts.
-- Risks.
-- Perguntas para management.
-- Journal de decisões.
-
-Essa camada fica em arquivos YAML privados dentro de `data_private/theses/`.
-Assim, o sistema consegue transformar uma tese construída em Excel/PowerPoint em
-um memo estruturado e reutilizável.
-
-## Estrutura Recomendada Do Repositório
-
-Esta é a estrutura que deve aparecer no GitHub:
-
-```text
-portfolio-company-monitoring-dashboard/
-  .github/
-    workflows/
-      tests.yml
-  data/
-    reference/
-    sample/
-      assumptions/
-      public_demo/
-      theses/
-    templates/
-  docs/
-    capital_iq_import_guide.md
-    data_dictionary.md
-    github_portfolio_strategy.md
-    guia_publicacao_github.md
-    methodology.md
-  reports/
-    sample/
-      01_watchlist_home.png
-      02_peer_benchmarking.png
-      03_valuation_case.png
-      04_football_field.png
-      05_multiples_scorecard.png
-      06_data_audit.png
-      ic_memo_GOOGL.html
-      valuation_case_GOOGL.html
-  scripts/
-  src/
-  tests/
-  .gitattributes
-  .gitignore
-  LICENSE
-  README.md
-  pyproject.toml
-  requirements.txt
+```mermaid
+flowchart LR
+    A[Exports locais do Capital IQ] --> B[Ingestão e normalização]
+    B --> C[Data audit e proveniência]
+    C --> D[Financials, consensus e peers]
+    D --> E[Capital structure e valuation]
+    E --> F[Julgamento e tese do analista]
+    F --> G[Dashboard, valuation case e IC memo]
 ```
 
-## O Que Subir Para O GitHub
+O fluxo foi desenhado para responder perguntas de investimento, não apenas para exibir dados:
 
-Suba:
+- Onde vale a pena gastar tempo de diligência agora?
+- O crescimento e as margens estão melhorando ou deteriorando?
+- O valuation atual é sustentado pelos fundamentos e pelo consenso?
+- Quais peers são realmente comparáveis e quais distorcem a mediana?
+- O balanço suporta alavancagem adicional?
+- Quanto do valor estimado depende do terminal value?
+- Qual é a diferença entre o que o modelo calcula e o que o mercado já precifica?
+- Quais riscos, catalisadores e perguntas para management precisam de análise humana?
 
-- `src/`
-- `scripts/`
-- `tests/`
-- `.github/`
-- `data/reference/`
-- `data/sample/`
-- `data/templates/`
-- `docs/`, exceto `docs/archive/`
-- `reports/sample/`
-- `.gitignore`
-- `.gitattributes`
-- `README.md`
-- `LICENSE`
-- `requirements.txt`
-- `pyproject.toml`
+## Visão por companhia
 
-Não suba:
+A tela de situação resume performance, qualidade financeira, leverage, valuation, sinais de atenção e a leitura de investimento. A página financeira preserva a diferença entre **latest quarter**, **LTM**, **NTM** e períodos projetados.
 
-- `data_private/`
-- `data/processed/`
-- `reports/private/`
-- `tmp/`
-- `.venv/`
-- `.pytest_cache/`
-- `.ruff_cache/`
-- `.streamlit/secrets.toml`
-- Arquivos `.xlsb`, exports brutos do Capital IQ ou planilhas privadas.
-- Decks originais com dados do Capital IQ.
-- Screenshots privados com tickers, pares ou números licenciados.
+| Company Situation | Company Financials |
+| --- | --- |
+| ![Company Situation](reports/sample/02_company_situation.png) | ![Company Financials](reports/sample/03_company_financials.png) |
 
-## Como Rodar A Demo Pública
+## Comparação e peer benchmarking
+
+A plataforma permite comparar diferentes empresas lado a lado e, em seguida, aprofundar a análise dentro de um grupo de trading comps. Crescimento trimestral, margens LTM, cash conversion, leverage e múltiplos são identificados pela base temporal correta. A mediana dos peers **não inclui a empresa analisada**.
+
+| Comparação entre companhias | Peer Benchmarking |
+| --- | --- |
+| ![Comparação entre companhias](reports/sample/04_compare_companies.png) | ![Peer Benchmarking](reports/sample/05_peer_benchmarking.png) |
+
+Os peer sets suportam três camadas de governança:
+
+- Sugestão inicial por setor, geografia, porte e modelo de negócio.
+- Aprovação ou rejeição explícita pelo analista.
+- Ajustes manuais documentados, com justificativa e data de revisão.
+
+Múltiplos negativos, denominadores não significativos e outliers extremos são sinalizados antes de entrar nas estatísticas do grupo.
+
+## Consensus e revisão de estimativas
+
+O módulo de expectations separa comparação contra estimativa corrente de um verdadeiro **beat/miss**. Essa linguagem só é utilizada quando existe consenso pré-resultado correspondente ao período reportado. Também são acompanhadas revisões de receita, EBITDA e EPS em 30 e 90 dias, guidance e próxima data de resultado quando os campos estão disponíveis.
+
+![Actual vs Consensus e revisões](reports/sample/06_actual_vs_consensus.png)
+
+## Estrutura de capital e debt capacity
+
+O módulo de crédito reconcilia enterprise value, calcula gross e net leverage, interest coverage e capacidade indicativa de dívida em diferentes níveis de alavancagem. Instituições financeiras são direcionadas para um framework específico de P/E, P/TBV, ROE e métricas de capital, em vez de serem forçadas em uma análise de EBITDA.
+
+![Capital Structure e Debt Capacity](reports/sample/07_capital_structure.png)
+
+Os níveis de 2,0x, 3,0x e 4,0x são cenários analíticos. Eles não são apresentados como covenants reais sem documentação específica da companhia.
+
+## Valuation integrado
+
+O valuation case conecta forecast operacional, WACC, DCF, terminal value, equity bridge, cenários e perguntas de diligência. O sistema mantém separados:
+
+- O valor intrínseco pelo método de perpetuidade.
+- O cross-check por múltiplo de saída.
+- A referência de trading comps.
+- O histórico de negociação da própria companhia.
+- A faixa de preço observada no mercado.
+
+| Valuation Case | Football Field |
+| --- | --- |
+| ![Valuation Case](reports/sample/08_valuation_case.png) | ![Football Field](reports/sample/09_football_field.png) |
+
+O modelo também testa a dependência do terminal value, a coerência entre crescimento terminal, reinvestimento e ROIC, e a distância entre métodos. Divergências relevantes não são escondidas: viram warnings e perguntas para revisão do analista.
+
+## Múltiplos por modelo de negócio
+
+EV/EBITDA não é tratado como resposta universal. A plataforma classifica EV/EBITDA, EV/Revenue, P/E e P/TBV como múltiplos primários, secundários, cross-checks ou não significativos conforme o business model e a qualidade do denominador.
+
+![Multi-Multiple Scorecard](reports/sample/10_multiples_scorecard.png)
+
+Além do snapshot atual, o sistema suporta histórico de múltiplos e comparação entre movimento da empresa e do peer group para distinguir rerating específico de mudança setorial.
+
+## Data audit antes do valuation
+
+O modelo não utiliza um número apenas porque ele existe na base. A camada de qualidade testa, entre outros pontos:
+
+- Moeda e unidade.
+- Market cap versus preço multiplicado por ações.
+- EV bridge: market cap + debt + minority + preferred - cash.
+- Sinais de CFO e capex.
+- Completude do LTM.
+- Períodos desatualizados.
+- Duplicidade de empresa e período.
+- Outliers de múltiplos.
+- Consistência entre dataset e refresh log.
+
+![Data Audit](reports/sample/11_data_audit.png)
+
+Campos ausentes permanecem como ausentes. A plataforma evita preencher artificialmente EPS, guidance, consensus histórico ou bridge items que não tenham sido exportados.
+
+## Camada humana e IC memo
+
+Os cálculos são automatizados; a conclusão de investimento não. O analista mantém uma camada própria com:
+
+- Investment pillars e variant perception.
+- Key debate.
+- Catalisadores e riscos.
+- SWOT.
+- Perguntas para management.
+- Premissas de forecast e valuation.
+- Journal de decisões e mudanças de tese.
+
+Essa combinação gera um memo estruturado para comitê de investimento, reunindo dados, valuation e julgamento em um único documento.
+
+![Prévia do IC Memo](reports/sample/12_ic_memo.png)
+
+Outputs demonstrativos:
+
+- [IC Memo de Alphabet](reports/sample/ic_memo_GOOGL.html)
+- [Valuation Case de Alphabet](reports/sample/valuation_case_GOOGL.html)
+
+## Arquitetura da plataforma
+
+```text
+src/
+  ingestion/      loaders, schemas, universe and Capital IQ import workflow
+  modeling/       metrics, peers, consensus, capital structure, DCF and safeguards
+  app/            Streamlit pages and reusable interface components
+  reporting/      charts, valuation cases, board packs and IC memos
+  pipeline/       normalized dataset build
+data/
+  templates/      import and analyst-input schemas
+  reference/      public reference parameters
+  sample/         offline demonstration data
+tests/            financial logic, data quality, privacy and application tests
+```
+
+Stack principal: **Python, pandas, Streamlit, Plotly, Matplotlib, Jinja, PowerShell, Pytest e S&P Capital IQ Pro Excel Add-In**.
+
+## Capital IQ e confidencialidade
+
+O ambiente privado utiliza exports do Capital IQ para financial statements, market data, estimates, valuation history e peer information. A licença não é usada como material de divulgação: arquivos brutos, dados derivados licenciados, teses e relatórios privados permanecem em `data_private/`, fora do versionamento.
+
+O repositório inclui controles específicos para evitar exposição acidental:
+
+- Regras de `.gitignore` para exports e outputs privados.
+- Testes de confidencialidade e segurança dos samples.
+- Verificação de caminhos locais, marcadores privados e extensões proibidas.
+- Separação explícita entre public demo e private mode.
+
+## Executando a demonstração
+
+<details>
+<summary>Comandos</summary>
 
 ```powershell
 pip install -e .
-
 python -m src.pipeline.build_dataset --source public-demo
 streamlit run src/app/streamlit_app.py -- --demo
+```
 
+Para gerar os outputs demonstrativos:
+
+```powershell
 python -m src.reporting.ic_memo --demo --company GOOGL
 python -m src.reporting.valuation_case --demo --company GOOGL
+python scripts/generate_sample_screenshots.py
+```
+
+Para validar a implementação:
+
+```powershell
 pytest
-```
-
-## Como Rodar Com Capital IQ Local
-
-Este modo exige Excel com o S&P Capital IQ Pro Add-In logado.
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\export_capiq_watchlist.ps1
-
-python -m src.pipeline.build_dataset `
-  --source capiq `
-  --input data_private/capiq_exports `
-  --output data_private/processed/monitoring_dataset.csv
-
-streamlit run src/app/streamlit_app.py
-```
-
-Os dados licenciados ficam somente em:
-
-```text
-data_private/
-```
-
-## Segurança E Confidencialidade
-
-Este projeto foi estruturado para ser demonstrável sem expor dados privados.
-
-Antes de publicar:
-
-```powershell
-git status --short
-git check-ignore data_private/theses/exemplo.yaml
-git check-ignore data_private/reports/exemplo.html
 python scripts/check_git_hygiene.py
-pytest tests/test_confidentiality.py tests/test_sample_outputs_safety.py
 ```
 
-O repositório público deve mostrar o sistema, a metodologia e a demo. Ele não
-deve mostrar sua watchlist real, teses completas de empresas reais, exports do
-Capital IQ ou relatórios privados.
+</details>
 
-## Stack Técnica
+## Limitações
 
-- Python
-- Pandas
-- Streamlit
-- Plotly
-- Jinja
-- PowerShell
-- S&P Capital IQ Excel Add-In
-- Pytest
+- A demo pública não representa consenso de mercado nem recomendação de investimento.
+- A qualidade de uma análise de comps depende da revisão humana do peer set.
+- Debt capacity não substitui análise de documentação, covenants, ratings e condições de mercado.
+- DCF e múltiplos são ferramentas de decisão; a plataforma não elimina o risco de premissas incorretas.
+- O modo completo depende de acesso autorizado ao Capital IQ e dos campos incluídos no export local.
 
-## O Que Este Projeto Demonstra
+---
 
-Para recrutamento em Private Equity, Investment Banking ou public equities, este
-projeto demonstra que eu consigo:
-
-- Trabalhar com dados financeiros institucionais.
-- Automatizar processos manuais de análise.
-- Construir análises de valuation com DCF e comps.
-- Separar dados, premissas e julgamento humano.
-- Tratar confidencialidade de dados licenciados.
-- Criar materiais parecidos com outputs reais de investimento.
-- Comunicar uma tese em formato de memo.
-
-## Como Eu Descreveria No CV
-
-> Desenvolvi uma valuation workbench em Python integrada ao Capital IQ, capaz de
-> transformar exports financeiros, peer sets, estimativas e teses escritas pelo
-> analista em dashboards de monitoramento, análises de comps, DCF, football
-> field, data audit e memos de comitê de investimento. O projeto inclui demo
-> pública sem dados licenciados e arquitetura privada para proteger informações
-> do Capital IQ.
-
-## Status
-
-- Demo pública funcional.
-- Fluxo privado com Capital IQ local.
-- Testes automatizados.
-- Sample reports e screenshots públicos.
-- Camada privada para teses e premissas por empresa.
-
-Este projeto é apenas uma demonstração educacional e de portfólio. Não é
-recomendação de investimento.
+Projeto desenvolvido como demonstração de análise financeira, valuation, automação e julgamento de investimento. Não constitui recomendação de compra ou venda de valores mobiliários.

@@ -82,10 +82,11 @@ def check_unit_sanity(latest: pd.DataFrame) -> list[dict]:
                                      f"tables likely disagree (currency or millions-vs-units)",
                                      round(ratio, 2)))
         ev, ebitda = _clean(row.get("enterprise_value")), _clean(row.get("ebitda_ttm"))
-        if ev and ebitda and ebitda > 0 and ev / ebitda > 500:
+        margin = _clean(row.get("ebitda_margin_ttm"))
+        if ev and ebitda and ebitda > 0 and ev / ebitda > 500 and margin and margin > 0.05:
             issues.append(_issue(row, "unit_sanity", "high", "market_data vs financials",
-                                 f"EV/EBITDA = {ev / ebitda:,.0f}x with positive EBITDA - unit mismatch "
-                                 f"far more likely than a real multiple", round(ev / ebitda, 1)))
+                                 f"EV/EBITDA = {ev / ebitda:,.0f}x despite a {margin:.1%} EBITDA margin - "
+                                 f"units likely disagree", round(ev / ebitda, 1)))
     return issues
 
 
@@ -176,7 +177,7 @@ def check_ttm_completeness(df: pd.DataFrame, latest: pd.DataFrame) -> list[dict]
             issues.append(_issue(row, "ttm_completeness", "high", "financials",
                                  f"only {n_q} quarter(s) of history - TTM metrics not computable", n_q))
             continue
-        if "ttm_complete" in row.index and row.get("ttm_complete") is False:
+        if "ttm_complete" in row.index and not bool(row.get("ttm_complete")):
             issues.append(_issue(row, "ttm_completeness", "medium", "derived",
                                  "ttm_complete = False (gaps inside the 4-quarter window)"))
         core = ["revenue_ttm", "net_income_ttm"] + ([] if is_financial else ["ebitda_ttm", "cfo_ttm"])
@@ -198,7 +199,10 @@ def check_stale_periods(latest: pd.DataFrame) -> list[dict]:
     universe_latest = periods.max()
     for (_, row), period in zip(latest.iterrows(), periods):
         lag_days = (universe_latest - period).days
-        if lag_days <= 45:
+        # A company with a March fiscal quarter is not stale merely because a
+        # May fiscal quarter normalizes into the next calendar quarter. Only
+        # flag names at least roughly two fiscal quarters behind the universe.
+        if lag_days <= 135:
             continue
         quarters_stale = int(round(lag_days / 91.25))
         sev = "medium" if quarters_stale <= 1 else "high"
@@ -249,18 +253,21 @@ def check_refresh_consistency(latest: pd.DataFrame, exports: dict[str, pd.DataFr
 def check_deep_fields(latest: pd.DataFrame) -> list[dict]:
     issues = []
     for _, row in latest.iterrows():
-        is_financial = str(row.get("business_model")) == "financial"
-        crit_missing = [f for f in DEEP_FIELDS_CRITICAL
+        is_financial = str(row.get("business_model")) in ("financial", "insurer")
+        strict_review = str(row.get("coverage_role", "watchlist")) == "watchlist"
+        critical_fields = DEEP_FIELDS_CRITICAL if strict_review else \
+            (["total_equity"] if is_financial else [])
+        crit_missing = [f for f in critical_fields
                         if f not in row.index or _clean(row.get(f)) is None]
         if crit_missing:
             issues.append(_issue(row, "deep_fields", "medium", "financials",
                                  f"missing valuation-critical fields: {', '.join(crit_missing)}"))
         nice_missing = [f for f in DEEP_FIELDS_NICE
-                        if f not in row.index or _clean(row.get(f)) is None]
+                        if f not in row.index or _clean(row.get(f)) is None] if strict_review else []
         if nice_missing:
             issues.append(_issue(row, "deep_fields", "info", "exports",
                                  f"nice-to-have fields absent: {', '.join(nice_missing)}"))
-        if is_financial:
+        if is_financial and strict_review:
             fin_missing = [f for f in FIN_DEEP_FIELDS
                            if f not in row.index or _clean(row.get(f)) is None]
             if fin_missing:

@@ -10,6 +10,7 @@ import streamlit as st
 from src.app import components as ui
 from src.app.context import DEMO_MODE, PLOTLY_CONFIG, get_store
 from src.modeling.assessment import Kpi, build_assessment
+from src.reporting.periods import company_snapshot_context
 from src.utils import fmt_money
 
 
@@ -61,7 +62,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                 roe_tone = ("green" if (fv.roe or 0) > w.cost_of_equity
                             else ("red" if fv.roe is not None else "n/a"))
                 ui.kpi_grid([
-                    Kpi("pe", "P/E (TTM)", f"{fv.pe:.1f}x" if fv.pe else "n/m",
+                    Kpi("pe", "P/E (LTM)", f"{fv.pe:.1f}x" if fv.pe else "n/m",
                         "negative earnings" if fv.pe is None else "", "n/a"),
                     Kpi("pb", fv.pb_label, f"{fv.pb:.2f}x" if fv.pb else "n/a",
                         f"book source: {fv.book_source}", "n/a"),
@@ -88,7 +89,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                             f"cross-check - both collapse to book value when ROE = COE.")
             for wmsg in fv.warnings:
                 ui.footnote(wmsg)
-            ui.footnote("Limitations: TTM ROE (not normalized through the credit cycle), "
+            ui.footnote("Limitations: LTM ROE (not normalized through the credit cycle), "
                         "growth is an assumption, and dividend-discount needs payout data "
                         "(dividends_paid exported but sparse). This is calibration, not a rating.")
         else:
@@ -110,6 +111,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     row = a.row
     currency = row.get("currency", "USD")
     base = case.base
+    ui.footnote(company_snapshot_context(store, row)
+                + " | Current valuation uses LTM denominators; forecast years are forward estimates.")
 
     # --- Status card (prominent, its own block) ---------------------------------
     status_key, status_label = vch.assumptions_status(case)
@@ -118,9 +121,9 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     if status_key != "final":
         from src.modeling.valuation_assumptions import assumptions_filename
         target_file = assumptions_filename(company_id)
-        folder_name = Path(str(store.assumptions_dir)).name if store.assumptions_dir else "assumptions"
+        folder_name = "data/sample/assumptions" if DEMO_MODE else "data_private/assumptions"
         detail = {
-            "auto": (f"Every driver was derived mechanically from TTM data - no analyst file exists. "
+            "auto": (f"Every driver was derived mechanically from LTM data - no analyst file exists. "
                      f"Create <code>{folder_name}/{target_file}</code> from the template to set a real view."),
             "illustrative": "The analyst assumptions behind this case are labeled placeholders pending diligence.",
             "draft": "Analyst assumptions are in draft; numbers are directional.",
@@ -139,13 +142,15 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     rec_color = {"BUY": PALETTE["green"], "SELL": PALETTE["red"], "HOLD": PALETTE["gold"],
                  "INDICATIVE": PALETTE["muted_2"]}.get(case.recommendation.stance, PALETTE["muted_2"])
     target_txt = f" - target {base.target_price:,.2f} vs {base.current_price:,.2f}" if base.target_price else ""
+    recommendation_label = ("Indicative calibration" if case.recommendation.stance == "INDICATIVE"
+                            else case.recommendation.stance)
     st.markdown(
         f"""
         <div class="pe-verdict">
           <div class="pe-verdict-flag" style="background:{rec_color}"></div>
           <div class="pe-verdict-body">
-            <div class="pe-verdict-kicker">DCF {'Calibration' if status_key == 'auto' else 'Recommendation'} | WACC {case.wacc.wacc:.1%} | Exit {case.exit_multiple:g}x ({case.exit_multiple_source})</div>
-            <div class="pe-verdict-label" style="color:{rec_color}">Indicative: {case.recommendation.stance}{target_txt}</div>
+            <div class="pe-verdict-kicker">DCF {'Calibration' if status_key == 'auto' else 'Recommendation'} | WACC {case.wacc.wacc:.1%} | Exit {case.exit_multiple:.1f}x ({case.exit_multiple_source})</div>
+            <div class="pe-verdict-label" style="color:{rec_color}">{recommendation_label}{target_txt}</div>
             <div class="pe-verdict-rationale">{case.recommendation.headline} {case.recommendation.reconciliation}</div>
           </div>
         </div>
@@ -232,28 +237,38 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     # --- Row 6: PE lens - LBO returns -------------------------------------------------------
     from src.modeling.lbo import lbo_from_case
 
-    ui.section("PE Lens - LBO Returns",
-               "Levered IRR/MOIC on the same operating forecast | entry is negotiated, not the screen price")
+    ui.section("Sponsor Feasibility - LBO Returns",
+               "Levered IRR/MOIC on the same operating forecast | debt sized on EBITDA, not percent of EV")
     row_lbo = case.assessment.row
     own_mult = row_lbo.get("ev_to_ebitda_ttm")
     default_entry = float(own_mult) if pd.notna(own_mult) and own_mult > 0 else float(case.exit_multiple)
+    input_max = max(40.0, round(default_entry + 10.0, 0), round(float(case.exit_multiple) + 10.0, 0))
     kd_default = float(case.wacc.cost_of_debt_pretax or 0.08)
     lc1, lc2, lc3, lc4 = st.columns(4)
     with lc1:
-        entry_m = st.number_input("Entry EV/EBITDA (x)", min_value=2.0, max_value=40.0,
+        entry_m = st.number_input("Entry EV/EBITDA (x)", min_value=2.0, max_value=input_max,
                                   value=round(default_entry, 1), step=0.5)
     with lc2:
-        exit_m = st.number_input("Exit EV/EBITDA (x)", min_value=2.0, max_value=40.0,
-                                 value=round(default_entry, 1), step=0.5)
+        exit_m = st.number_input("Exit EV/EBITDA (x)", min_value=2.0, max_value=input_max,
+                                 value=round(float(case.exit_multiple), 1), step=0.5)
     with lc3:
-        debt_pct = st.slider("Debt at entry (% of EV)", 0, 80, 50, 5) / 100.0
+        entry_leverage = st.slider("Entry debt / EBITDA (x)", 0.0, 6.0, 3.0, 0.25)
     with lc4:
         kd_in = st.number_input("Pre-tax cost of debt (%)", min_value=1.0, max_value=25.0,
                                 value=round(kd_default * 100, 1), step=0.5) / 100.0
 
     lbo = lbo_from_case(case, entry_multiple=entry_m, exit_multiple=exit_m,
-                        debt_pct=debt_pct, cost_of_debt=kd_in)
+                        entry_leverage=entry_leverage, cost_of_debt=kd_in)
     if lbo.valid:
+        entry_leverage = lbo.entry_debt / lbo.entry_ebitda if lbo.entry_ebitda > 0 else None
+        if entry_m > 30.0:
+            st.warning(f"Entry valuation is {entry_m:.1f}x EBITDA. This is outside a conventional "
+                       "sponsor underwriting range; the return case should be read as a feasibility "
+                       "screen, not as an executable take-private proposal.")
+        if entry_leverage is not None and entry_leverage > 4.0:
+            st.warning(f"Entry leverage is {entry_leverage:.1f}x EBITDA, above the dashboard's "
+                       "illustrative 4.0x senior-capacity reference. Treat the return case as "
+                       "unfinanceable until debt terms are underwritten.")
         moic_tone = "green" if (lbo.moic or 0) >= 2.0 else ("yellow" if (lbo.moic or 0) >= 1.5 else "red")
         exit_lev = (lbo.exit_debt / lbo.exit_ebitda) if lbo.exit_ebitda > 0 else None
         ui.kpi_grid([
@@ -267,7 +282,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                 f"{(lbo.entry_debt / lbo.entry_ebitda):.1f}x -> {exit_lev:.1f}x" if exit_lev is not None else "n/a",
                 "debt / EBITDA", "n/a"),
             Kpi("xeq", "Exit Equity", f"{lbo.exit_equity:,.0f}",
-                f"exit EV {lbo.exit_ev:,.0f} - debt {lbo.exit_debt:,.0f}", "n/a"),
+                f"EV {lbo.exit_ev:,.0f} - debt {lbo.exit_debt:,.0f} + cash {lbo.excess_cash:,.0f}", "n/a"),
         ], columns=5)
         c1, c2 = st.columns(2, gap="medium")
         with c1:
@@ -276,8 +291,9 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             st.plotly_chart(vch.debt_paydown_chart(lbo), use_container_width=True, config=PLOTLY_CONFIG)
         for note in lbo.notes:
             ui.footnote(note)
-        ui.footnote("Simple-LBO conventions: 100% cash sweep, no interim dividends, fees 2% of EV, "
-                    "UFCF as pre-interest free cash flow. Base-scenario forecast; flex the assumptions "
+        ui.footnote("Simple-LBO conventions: entry debt sized as debt / LTM EBITDA, 100% cash sweep, "
+                    "after-tax cash interest, no interim "
+                    "dividends, excess cash retained, fees 2% of EV. Base-scenario forecast; flex the assumptions "
                     "file for segment-driven builds.")
     else:
         st.info(lbo.notes[0] if lbo.notes else "LBO not applicable for this name.")
@@ -307,11 +323,11 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     # --- Provenance --------------------------------------------------------------------------
     ui.section("Assumptions Provenance", "Every input classified - no black box")
     prov = vch.assumptions_provenance(case)
-    pill = {"analyst": ("Analyst", "yellow"), "anchored": ("Anchored TTM", "green"), "default": ("Default", "red")}
+    pill = {"analyst": ("Analyst", "yellow"), "anchored": ("Anchored LTM", "green"), "default": ("Default", "red")}
     rows = [[r["item"], r["value"], ui.cell_pill(*pill.get(r["source"], (r["source"], "na")))]
             for _, r in prov.iterrows()]
     ui.html_table(["Input", "Value", "Source"], rows, numeric_from=99)
-    ui.footnote("Analyst = set in the assumptions YAML. Anchored = derived from the company's own TTM data "
+    ui.footnote("Analyst = set in the assumptions YAML. Anchored = derived from the company's own LTM data "
                 "or the peer group. Default = generic fallback pending better data - treat with caution."
                 + (f" File: <code>{Path(str(case.assumptions.path)).name}</code>" if case.assumptions.from_file else ""))
 
@@ -336,10 +352,24 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             ui.footnote(" | ".join(w.notes))
 
     # --- Export -----------------------------------------------------------------------------------
-    ui.section("Export")
-    with st.spinner("Rendering valuation case (with charts)..."):
-        path = generate_valuation_case(demo=DEMO_MODE, company_id=company_id)
-    st.download_button("Download Valuation Case (HTML)", data=Path(path).read_bytes(),
-                       file_name=Path(path).name, mime="text/html", use_container_width=False)
-    ui.footnote(f"Written to <code>{Path(path).parent.name}/</code>"
-                + (" - private outputs never enter version control." if not DEMO_MODE else "."))
+    ui.section("Export", "Generated only on request so opening the page stays fast and silent")
+    export_state_key = f"valuation_case_export::{DEMO_MODE}::{company_id}"
+    if st.button("Generate / Refresh Valuation Case (HTML)",
+                 key=f"generate_valuation_case::{DEMO_MODE}::{company_id}"):
+        with st.spinner("Rendering valuation case and chart images..."):
+            generated_path = generate_valuation_case(demo=DEMO_MODE, company_id=company_id)
+        if generated_path is not None:
+            st.session_state[export_state_key] = str(generated_path)
+            st.success("Valuation case ready for download.")
+        else:
+            st.error("The valuation case could not be generated for this company.")
+
+    saved_path = st.session_state.get(export_state_key)
+    if saved_path and Path(saved_path).exists():
+        path = Path(saved_path)
+        st.download_button("Download Valuation Case (HTML)", data=path.read_bytes(),
+                           file_name=path.name, mime="text/html", use_container_width=False)
+        ui.footnote(f"Written to <code>{path.parent.name}/</code>"
+                    + (" - private outputs never enter version control." if not DEMO_MODE else "."))
+    else:
+        ui.footnote("The interactive dashboard is ready. Generate the standalone HTML only when you need it.")

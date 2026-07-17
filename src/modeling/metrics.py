@@ -25,9 +25,10 @@ TTM_COLUMNS = [
     "buybacks",
 ]
 
-# Assumed cash tax rate for the NOPAT proxy in ROIC. Kept explicit and simple;
-# refine per jurisdiction when tax detail is exported.
-ASSUMED_TAX_RATE = 0.25
+# Fallback cash-tax assumptions for the NOPAT proxy. Company-level effective
+# tax rates should supersede these when exported.
+DEFAULT_TAX_RATE = 0.25
+BRL_TAX_RATE = 0.34
 
 HIGHER_IS_BETTER = [
     "revenue_yoy_growth",
@@ -127,7 +128,9 @@ def prepare_monitoring_dataset(inputs: dict[str, pd.DataFrame]) -> pd.DataFrame:
             df[column] = np.nan
 
     df["fcf"] = df["fcf"].fillna(df["cfo"] - df["capex"])
-    df["net_debt"] = df["net_debt"].fillna(df["total_debt"] - df["cash"])
+    cash_for_net_debt = df["cash_st_invest"].where(df["cash_st_invest"].notna(), df["cash"]) \
+        if "cash_st_invest" in df.columns else df["cash"]
+    df["net_debt"] = df["net_debt"].fillna(df["total_debt"] - cash_for_net_debt)
     df["market_cap"] = df["market_cap"].fillna(
         safe_divide(df.get("share_price", np.nan) * df.get("shares_outstanding", np.nan), 1_000_000)
     )
@@ -138,19 +141,33 @@ def prepare_monitoring_dataset(inputs: dict[str, pd.DataFrame]) -> pd.DataFrame:
     df = df.sort_values(["company_id", "period"]).reset_index(drop=True)
     grouped = df.groupby("company_id", group_keys=False)
 
-    # TTM values require a full four-quarter window. Partial windows used to be
-    # summed silently (min_periods=1), which produced fake "TTM" readings for
-    # the first quarters of each company's history.
+    # TTM values require four consecutive fiscal quarters. A simple row count
+    # is insufficient because a missing quarter would otherwise be summed into
+    # a mislabeled trailing-twelve-month result.
     df["quarters_reported"] = grouped.cumcount() + 1
-    df["ttm_complete"] = df["quarters_reported"] >= 4
+    quarter_ordinal = df["period"].dt.to_period("Q").astype("int64")
+    df["_quarter_ordinal"] = quarter_ordinal
+    df["ttm_complete"] = grouped["_quarter_ordinal"].transform(
+        lambda series: series.rolling(4, min_periods=4).apply(
+            lambda values: float(np.all(np.diff(values) == 1)), raw=True
+        )
+    ).fillna(0).astype(bool)
     for column in TTM_COLUMNS:
         if column in df.columns:
             df[f"{column}_ttm"] = grouped[column].transform(
                 lambda series: series.rolling(4, min_periods=4).sum()
-            )
+            ).where(df["ttm_complete"])
 
-    df["revenue_yoy_growth"] = grouped["revenue"].pct_change(4, fill_method=None)
-    df["ebitda_yoy_growth"] = grouped["ebitda"].pct_change(4, fill_method=None)
+    yoy_complete = grouped["_quarter_ordinal"].diff(4).eq(4)
+    df["revenue_yoy_growth"] = grouped["revenue"].pct_change(4, fill_method=None).where(yoy_complete)
+    df["ebitda_yoy_growth"] = grouped["ebitda"].pct_change(4, fill_method=None).where(yoy_complete)
+    df = df.drop(columns="_quarter_ordinal")
+
+    if {"ar", "ap"}.issubset(df.columns):
+        inventory = df["inventory"].fillna(0.0) if "inventory" in df.columns else 0.0
+        df["operating_nwc"] = df["ar"] + inventory - df["ap"]
+    else:
+        df["operating_nwc"] = np.nan
     df["gross_margin"] = safe_divide(df["gross_profit"], df["revenue"])
     df["ebitda_margin"] = safe_divide(df["ebitda"], df["revenue"])
     df["ebit_margin"] = safe_divide(df["ebit"], df["revenue"])
@@ -160,7 +177,8 @@ def prepare_monitoring_dataset(inputs: dict[str, pd.DataFrame]) -> pd.DataFrame:
     df["net_income_margin_ttm"] = safe_divide(df["net_income_ttm"], df["revenue_ttm"])
     df["fcf_conversion_ttm"] = safe_divide_positive_denominator(df["fcf_ttm"], df["ebitda_ttm"])
     df["capex_intensity_ttm"] = safe_divide_positive_denominator(df["capex_ttm"], df["revenue_ttm"])
-    df["working_capital_days"] = safe_divide(df["working_capital"], df["revenue_ttm"]) * 365
+    wc_base = df["operating_nwc"].where(df["operating_nwc"].notna(), df["working_capital"])
+    df["working_capital_days"] = safe_divide(wc_base, df["revenue_ttm"]) * 365
     df["net_debt_to_ebitda_ttm"] = safe_divide_positive_denominator(df["net_debt"], df["ebitda_ttm"])
     df["interest_coverage_ttm"] = safe_divide_positive_denominator(df["ebitda_ttm"], df["interest_expense_ttm"])
     df["ev_to_revenue_ttm"] = safe_divide_positive_denominator(df["enterprise_value"], df["revenue_ttm"])
@@ -187,19 +205,47 @@ def add_capital_and_quality_metrics(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
 
     has = out.columns.__contains__
+    grouped = out.sort_values(["company_id", "period"]).groupby("company_id", group_keys=False)
 
     # Returns on capital.
     if has("total_equity"):
-        nopat = out.get("ebit_ttm", pd.Series(np.nan, index=out.index)) * (1 - ASSUMED_TAX_RATE)
-        invested_capital = out.get("total_debt", np.nan) + out["total_equity"] - out.get("cash", np.nan)
+        tax_rate = pd.Series(DEFAULT_TAX_RATE, index=out.index)
+        if has("currency"):
+            tax_rate = tax_rate.where(out["currency"].astype(str).str.upper() != "BRL", BRL_TAX_RATE)
+        nopat = out.get("ebit_ttm", pd.Series(np.nan, index=out.index)) * (1 - tax_rate)
+        cash_only = out.get("cash", pd.Series(np.nan, index=out.index))
+        cash_sti = out.get("cash_st_invest", pd.Series(np.nan, index=out.index))
+        cash = cash_sti.where(cash_sti.notna(), cash_only)
+        debt = out.get("total_debt", pd.Series(np.nan, index=out.index))
+        prior_debt = debt.groupby(out["company_id"]).shift(4)
+        out["average_total_debt"] = ((debt + prior_debt) / 2.0).where(prior_debt.notna(), debt)
+        current_ic = debt + out["total_equity"] - cash
+        prior_ic = prior_debt \
+            + out["total_equity"].groupby(out["company_id"]).shift(4) \
+            - cash.groupby(out["company_id"]).shift(4)
+        invested_capital = ((current_ic + prior_ic) / 2.0).where(prior_ic.notna(), current_ic)
+        prior_equity = grouped["total_equity"].shift(4)
+        average_equity = ((out["total_equity"] + prior_equity) / 2.0).where(
+            prior_equity.notna(), out["total_equity"]
+        )
         out["roic_ttm"] = safe_divide_positive_denominator(nopat, invested_capital)
-        out["roe_ttm"] = safe_divide_positive_denominator(out.get("net_income_ttm", np.nan), out["total_equity"])
-        if has("goodwill"):
+        out["roe_ttm"] = safe_divide_positive_denominator(out.get("net_income_ttm", np.nan), average_equity)
+        if has("tangible_common_equity"):
+            tangible_book = out["tangible_common_equity"]
+            out["p_tbv"] = safe_divide_positive_denominator(out.get("market_cap", np.nan), tangible_book)
+        elif has("goodwill"):
             tangible_book = out["total_equity"] - out["goodwill"].fillna(0)
             out["p_tbv"] = safe_divide_positive_denominator(out.get("market_cap", np.nan), tangible_book)
     else:
         out["roic_ttm"] = np.nan
         out["roe_ttm"] = np.nan
+
+    for balance_col in ("tangible_common_equity", "book_value"):
+        if has(balance_col):
+            prior_balance = grouped[balance_col].shift(4)
+            out[f"average_{balance_col}"] = ((out[balance_col] + prior_balance) / 2.0).where(
+                prior_balance.notna(), out[balance_col]
+            )
 
     # Earnings quality: stock-based comp against cash generation.
     if has("sbc_ttm"):
@@ -224,16 +270,13 @@ def add_capital_and_quality_metrics(df: pd.DataFrame) -> pd.DataFrame:
         daily_cogs = cogs_ttm / 365.0
         out["dso"] = safe_divide_positive_denominator(out["ar"], daily_revenue)
         out["dpo"] = safe_divide_positive_denominator(out["ap"], daily_cogs)
-        if has("inventory"):
-            out["dio"] = safe_divide_positive_denominator(out["inventory"], daily_cogs)
-            out["cash_conversion_cycle"] = out["dso"] + out["dio"] - out["dpo"]
-        else:
-            out["cash_conversion_cycle"] = out["dso"] - out["dpo"]
+        inventory = out["inventory"].fillna(0.0) if has("inventory") else pd.Series(0.0, index=out.index)
+        out["dio"] = safe_divide_positive_denominator(inventory, daily_cogs)
+        out["cash_conversion_cycle"] = out["dso"] + out["dio"] - out["dpo"]
 
     # Per-share compounding and dilution.
     if has("shares_diluted"):
         out["revenue_per_share_ttm"] = safe_divide_positive_denominator(out.get("revenue_ttm", np.nan), out["shares_diluted"])
-        grouped = out.sort_values(["company_id", "period"]).groupby("company_id", group_keys=False)
         out["share_count_yoy"] = grouped["shares_diluted"].pct_change(4, fill_method=None)
 
     return out

@@ -132,7 +132,7 @@ HTML_TEMPLATE = """<!doctype html>
       <div class="v-label" style="color:{{ verdict.color }}">{{ verdict.label }}</div>
       <div class="v-rationale">{{ verdict.rationale }}</div>
     </div>
-    <div class="cover-foot"><span>Quarterly Board Pack</span><span>As of {{ as_of }}</span><span>{{ mode }}</span></div>
+    <div class="cover-foot"><span>Quarterly Board Pack</span><span>Financials through {{ as_of }}</span><span>{{ mode }}</span></div>
   </div>
 
   <section>
@@ -166,7 +166,7 @@ HTML_TEMPLATE = """<!doctype html>
     <div class="s-head"><div class="s-bar"></div><h2>Quarterly Performance Review</h2>
       <span class="s-note">Last {{ performance_rows|length }} quarters | latest highlighted</span></div>
     <table>
-      <tr><th>Period</th><th>Revenue</th><th>Rev YoY</th><th>EBITDA</th><th>EBITDA mgn</th><th>FCF</th><th>FCF conv</th></tr>
+      <tr><th>Reported Quarter</th><th>Revenue (Quarter)</th><th>Rev Growth (Quarter YoY)</th><th>EBITDA (Quarter)</th><th>EBITDA Margin (Quarter)</th><th>FCF (Quarter)</th><th>FCF Conv. (LTM)</th></tr>
       {% for r in performance_rows %}
       <tr class="{{ 'anchor' if r.is_latest else '' }}">
         <td>{{ r.period }}</td><td class="num">{{ r.revenue }}</td><td class="num">{{ r.rev_yoy|safe }}</td>
@@ -181,7 +181,7 @@ HTML_TEMPLATE = """<!doctype html>
     <div class="s-head"><div class="s-bar"></div><h2>Peer Benchmarking</h2>
       <span class="s-note">{{ company.peer_group or company.sector }} comps | anchor &amp; peer median highlighted</span></div>
     <table>
-      <tr><th>Ticker</th><th>Company</th><th>Growth</th><th>EBITDA mgn</th><th>FCF conv</th><th>ND/EBITDA</th><th>EV/Rev</th><th>EV/EBITDA</th></tr>
+      <tr><th>Ticker</th><th>Company</th><th>Rev Growth (Latest Q YoY)</th><th>EBITDA Margin (LTM)</th><th>FCF Conv. (LTM)</th><th>ND/EBITDA (LTM)</th><th>EV/Rev (LTM)</th><th>EV/EBITDA (LTM)</th></tr>
       {% for p in peers %}
       <tr class="{{ p.cls }}">
         <td>{{ p.ticker }}</td><td>{{ p.name }}</td><td class="num">{{ p.growth|safe }}</td>
@@ -242,7 +242,7 @@ HTML_TEMPLATE = """<!doctype html>
     <div class="s-head"><div class="s-bar"></div><h2>Methodology Appendix</h2></div>
     <div class="memo"><div class="appendix">
       <p><b>Scope.</b> Public-company financials and market data are normalized into one quarterly investment monitoring schema.
-      TTM metrics aggregate the trailing four reported quarters; YoY compares to the same quarter one year prior.</p>
+      LTM metrics aggregate the trailing four reported quarters; YoY compares to the same quarter one year prior.</p>
       <p><b>KPI thresholds (traffic lights).</b> Thresholds are profiled by business model. Operating companies:
       revenue growth green &gt;=10% / amber &gt;=2%; EBITDA margin green &gt;=22% / amber &gt;=12%; FCF conversion green
       &gt;=60% / amber &gt;=30%; net debt/EBITDA green &lt;=2.0x / amber &lt;=3.5x; EV/EBITDA green &lt;=10x / amber &lt;=16x.

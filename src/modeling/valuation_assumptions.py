@@ -130,10 +130,15 @@ def derive_anchors(row: pd.Series, params: dict) -> dict:
         notes.append("EBITDA margin anchor missing/non-positive; defaulted to 15%")
 
     revenue = _clean(row.get("revenue_ttm"))
+    reported_d_and_a = _clean(row.get("d_and_a_ttm"))
     ebitda = _clean(row.get("ebitda_ttm"))
     ebit = _clean(row.get("ebit_ttm"))
-    if revenue and ebitda is not None and ebit is not None and revenue > 0:
+    if revenue and reported_d_and_a is not None and reported_d_and_a >= 0 and revenue > 0:
+        d_and_a_pct = reported_d_and_a / revenue
+        notes.append("D&A anchor uses the reported TTM field")
+    elif revenue and ebitda is not None and ebit is not None and revenue > 0:
         d_and_a_pct = max((ebitda - ebit) / revenue, 0.0)
+        notes.append("reported D&A unavailable; proxy uses EBITDA minus EBIT")
     else:
         d_and_a_pct = 0.03
         notes.append("D&A anchor derived unavailable; defaulted to 3% of revenue")
@@ -148,7 +153,12 @@ def derive_anchors(row: pd.Series, params: dict) -> dict:
 
     dso, dih, dpo = _clean(row.get("dso")), _clean(row.get("dio")), _clean(row.get("dpo"))
     nwc_pct = None
-    wc, rev = _clean(row.get("working_capital")), revenue
+    wc = _clean(row.get("operating_nwc"))
+    if wc is None:
+        wc = _clean(row.get("working_capital"))
+        if wc is not None:
+            notes.append("operating NWC unavailable; using current assets minus current liabilities")
+    rev = revenue
     if wc is not None and rev and rev > 0:
         nwc_pct = wc / rev
     days_available = all(v is not None for v in (dso, dih, dpo)) and cogs_pct is not None
@@ -203,6 +213,8 @@ class ValuationAssumptions:
     scenarios: dict[str, ScenarioAssumptions]
     exit_multiple: float | None        # None -> resolve from peer median at run time
     perpetuity_growth: float
+    terminal_roic: float
+    terminal_wacc: float | None
     beta: float | None                 # None -> default at WACC build
     pretax_cost_of_debt: float | None
     wacc_override: float | None
@@ -211,6 +223,8 @@ class ValuationAssumptions:
     # Disclosure: auto (no file) | illustrative | draft | final.
     status: str = "auto"
     perpetuity_source: str = "anchored"   # analyst | anchored (currency default)
+    terminal_roic_source: str = "anchored"
+    terminal_wacc_source: str = "pending"
     # Tier-2 operational drivers (units x revenue/unit segment build); None = Tier-1.
     segments: list[dict] | None = None
 
@@ -345,7 +359,16 @@ def load_valuation_assumptions(
             except yaml.YAMLError:
                 raw = {}
 
-    horizon = int(raw.get("horizon_years", 5))
+    if path is None:
+        own_multiple = _clean(row.get("ev_to_ebitda_ttm")) or 0.0
+        high_growth = anchors["revenue_growth"] > 0.10 or own_multiple > 15.0
+        horizon = 10 if high_growth else 5
+        if high_growth:
+            anchors.setdefault("notes", []).append(
+                "auto horizon extended to 10 years because growth or valuation has not reached a stable state"
+            )
+    else:
+        horizon = int(raw.get("horizon_years", 5))
     status_raw = str(raw.get("status", "")).strip().lower()
     if path is None:
         status = "auto"
@@ -361,6 +384,33 @@ def load_valuation_assumptions(
         perpetuity_growth, perpetuity_source = float(pg), "analyst"
     em = terminal.get("exit_multiple")
     exit_multiple = None if em is None or (isinstance(em, str) and em.lower() == "auto") else float(em)
+    terminal_roic_raw = terminal.get("roic")
+    current_roic = _clean(row.get("roic_ttm"))
+    if terminal_roic_raw is None or (
+        isinstance(terminal_roic_raw, str) and terminal_roic_raw.lower() == "auto"
+    ):
+        fallback_roic = max(
+            params["risk_free_rate"] + params["equity_risk_premium"]
+            + params["country_risk_premium"],
+            0.10,
+        )
+        terminal_roic = float(np.clip(current_roic or fallback_roic, 0.06, 0.30))
+        terminal_roic = max(terminal_roic, perpetuity_growth + 0.02)
+        terminal_roic_source = "anchored"
+        anchors.setdefault("notes", []).append(
+            f"terminal ROIC anchored at {terminal_roic:.1%}; stable reinvestment equals g / ROIC"
+        )
+    else:
+        terminal_roic = float(terminal_roic_raw)
+        terminal_roic_source = "analyst"
+
+    terminal_wacc_raw = terminal.get("wacc")
+    terminal_wacc = (
+        None
+        if terminal_wacc_raw is None
+        or (isinstance(terminal_wacc_raw, str) and terminal_wacc_raw.lower() == "auto")
+        else float(terminal_wacc_raw)
+    )
 
     scenario_specs = raw.get("scenarios") or {}
     auto_specs = _auto_scenario_specs(anchors, perpetuity_growth)
@@ -394,6 +444,8 @@ def load_valuation_assumptions(
         scenarios=scenarios,
         exit_multiple=exit_multiple,
         perpetuity_growth=perpetuity_growth,
+        terminal_roic=terminal_roic,
+        terminal_wacc=terminal_wacc,
         beta=_opt("beta"),
         pretax_cost_of_debt=_opt("pretax_cost_of_debt"),
         wacc_override=_opt("wacc_override"),
@@ -401,5 +453,7 @@ def load_valuation_assumptions(
         path=path,
         status=status,
         perpetuity_source=perpetuity_source,
+        terminal_roic_source=terminal_roic_source,
+        terminal_wacc_source="analyst" if terminal_wacc is not None else "pending",
         segments=segments,
     )

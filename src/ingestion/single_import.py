@@ -11,8 +11,11 @@ never corrupt the good exports.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
+from uuid import uuid4
 
 import pandas as pd
 
@@ -55,13 +58,19 @@ def _read_staging_result(staging: Path) -> dict:
     return json.loads(result_path.read_text(encoding="utf-8-sig"))
 
 
-def validate_staging(company_id: str, staging: Path) -> dict:
+def validate_staging(company_id: str, staging: Path, max_age_minutes: int = 30) -> dict:
     """Raise ValueError unless the staging folder holds a usable export."""
     result = _read_staging_result(staging)
     if not result.get("ok"):
         raise ValueError(f"Export script reported failure: {result.get('error', 'unknown error')}")
     if result.get("company_id") != company_id:
         raise ValueError(f"Staging folder holds {result.get('company_id')}, expected {company_id}.")
+    exported_at = pd.to_datetime(result.get("exported_at"), errors="coerce")
+    if pd.isna(exported_at):
+        raise ValueError("Staging result has no valid exported_at timestamp.")
+    age_minutes = (pd.Timestamp.now() - exported_at).total_seconds() / 60.0
+    if age_minutes < -5 or age_minutes > max_age_minutes:
+        raise ValueError(f"Staging result is stale ({age_minutes:.0f} minutes old); run the export again.")
 
     for name, min_rows in TABLES.items():
         path = staging / name
@@ -91,6 +100,8 @@ def merge_single_export(
     result = validate_staging(company_id, staging)
 
     merged = MergeResult(company_id=company_id, company_name=result.get("company_name", ""))
+    token = uuid4().hex
+    prepared: dict[Path, Path] = {}
     for name in TABLES:
         staged = pd.read_csv(staging / name)
         main_path = exports / name
@@ -103,6 +114,26 @@ def merge_single_export(
             combined = combined[ordered]
         else:
             combined = staged
-        combined.to_csv(main_path, index=False)
+        temp_path = exports / f".{name}.{token}.tmp"
+        combined.to_csv(temp_path, index=False)
+        prepared[main_path] = temp_path
         merged.rows_merged[name] = len(staged)
+
+    backups: dict[Path, Path] = {}
+    try:
+        for main_path in prepared:
+            if main_path.exists():
+                backup = exports / f".{main_path.name}.{token}.bak"
+                shutil.copy2(main_path, backup)
+                backups[main_path] = backup
+        for main_path, temp_path in prepared.items():
+            os.replace(temp_path, main_path)
+    except Exception:
+        for main_path, backup in backups.items():
+            if backup.exists():
+                os.replace(backup, main_path)
+        raise
+    finally:
+        for path in list(prepared.values()) + list(backups.values()):
+            path.unlink(missing_ok=True)
     return merged

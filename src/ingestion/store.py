@@ -18,6 +18,7 @@ import pandas as pd
 
 from src.config import (
     DEFAULT_PROCESSED_DATASET,
+    DEFAULT_SOURCE_LOG,
     DEMO_ASSUMPTIONS_DIR,
     DEMO_ESTIMATES,
     DEMO_THESES_DIR,
@@ -25,6 +26,7 @@ from src.config import (
     PRIVATE_ASSUMPTIONS_DIR,
     PRIVATE_ESTIMATES,
     PRIVATE_PROCESSED_DATASET,
+    PRIVATE_SOURCE_LOG,
     PRIVATE_REFRESH_LOG,
     PRIVATE_THESES_DIR,
     PRIVATE_VALUATION_HISTORY,
@@ -39,6 +41,7 @@ class WatchlistStore:
     valuation_history: pd.DataFrame = field(default_factory=pd.DataFrame)
     estimates: pd.DataFrame = field(default_factory=pd.DataFrame)
     refresh_log: pd.DataFrame = field(default_factory=pd.DataFrame)
+    source_log: pd.DataFrame = field(default_factory=pd.DataFrame)
     theses_dir: Path | None = None
     assumptions_dir: Path | None = None
 
@@ -91,6 +94,11 @@ def load_refresh_log(demo: bool) -> pd.DataFrame:
     return _read_csv(PRIVATE_REFRESH_LOG, parse_dates=["refreshed_at"])
 
 
+def load_source_log(demo: bool) -> pd.DataFrame:
+    path = DEFAULT_SOURCE_LOG if demo else PRIVATE_SOURCE_LOG
+    return _read_csv(path, parse_dates=["retrieved_at"])
+
+
 def theses_dir(demo: bool) -> Path:
     return DEMO_THESES_DIR if demo else PRIVATE_THESES_DIR
 
@@ -107,6 +115,7 @@ def load_store(demo: bool) -> WatchlistStore:
         valuation_history=load_valuation_history(demo),
         estimates=load_estimates(demo),
         refresh_log=load_refresh_log(demo),
+        source_log=load_source_log(demo),
         theses_dir=theses_dir(demo),
         assumptions_dir=assumptions_dir(demo),
     )

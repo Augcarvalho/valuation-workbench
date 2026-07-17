@@ -18,11 +18,11 @@ from src.modeling.outliers import adjusted_stats, multiple_outlier_reason
 
 # metric key -> (display label, valuation_history column, peer NTM column)
 MULTIPLE_SPECS: dict[str, dict] = {
-    "ev_to_revenue_ttm": {"label": "EV / Revenue", "hist_col": "ev_to_revenue_ltm",
+    "ev_to_revenue_ttm": {"label": "EV / Revenue (LTM)", "hist_col": "ev_to_revenue_ltm",
                           "ntm_col": "ev_to_revenue_ntm"},
-    "ev_to_ebitda_ttm": {"label": "EV / EBITDA", "hist_col": "ev_to_ebitda_ltm",
+    "ev_to_ebitda_ttm": {"label": "EV / EBITDA (LTM)", "hist_col": "ev_to_ebitda_ltm",
                          "ntm_col": "ev_to_ebitda_ntm"},
-    "pe_ttm": {"label": "P / E", "hist_col": "pe_ltm", "ntm_col": "pe_ntm"},
+    "pe_ttm": {"label": "P / E (LTM)", "hist_col": "pe_ltm", "ntm_col": "pe_ntm"},
     "p_tbv": {"label": "P / TBV", "hist_col": None, "ntm_col": None},
 }
 

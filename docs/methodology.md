@@ -13,7 +13,9 @@ The dashboard is built around the questions a PE investment team would ask after
 
 ## Formula Summary
 
-All financial statement values are stored in BRL millions unless noted otherwise.
+Financial statement values are stored in each company's reporting currency,
+in millions unless noted otherwise. Cross-currency size comparisons use the
+explicit USD normalization fields; ratios and multiples remain unitless.
 
 | Metric | Formula |
 | --- | --- |
@@ -22,12 +24,31 @@ All financial statement values are stored in BRL millions unless noted otherwise
 | EBITDA margin | EBITDA / revenue |
 | FCF conversion | Free cash flow / EBITDA |
 | Capex intensity | Capex / revenue |
-| Working capital days | Working capital / TTM revenue * 365 |
-| Net debt / EBITDA | Net debt / TTM EBITDA |
-| Interest coverage | TTM EBITDA / TTM interest expense |
-| EV / Revenue | Enterprise value / TTM revenue |
-| EV / EBITDA | Enterprise value / TTM EBITDA |
-| P/E | Market capitalization / TTM net income |
+| Working capital days | Operating working capital / LTM revenue * 365 |
+| Net debt / EBITDA | Net debt / LTM EBITDA |
+| Interest coverage | LTM EBITDA / LTM interest expense |
+| EV / Revenue | Enterprise value / LTM revenue |
+| EV / EBITDA | Enterprise value / LTM EBITDA |
+| P/E | Market capitalization / LTM net income |
+
+## Period And Market-Date Convention
+
+The presentation separates the three clocks that coexist in public-company analysis:
+
+- **Latest quarter** means the standalone reported fiscal quarter. Revenue growth is
+  compared with the same quarter one year earlier.
+- **LTM** means the four consecutive reported quarters ending on each company's latest
+  financial period. Margins, cash conversion, returns, leverage denominators, and
+  trailing valuation multiples use this basis.
+- **NTM / FY1 / FY2** means forward consensus estimates as labeled.
+- **Market snapshot** means the price, market capitalization, and enterprise value
+  retrieved from the market-data source. Its retrieval date is displayed separately
+  from the financials-through date.
+
+Peers can have different financials-through dates because fiscal calendars and filing
+dates differ. The selected company remains visible in tables and charts but is excluded
+from peer medians, quartiles, and percentile statistics. Flagged multiple outliers are
+also excluded from adjusted peer statistics and remain visible with disclosure.
 
 ## Traffic-Light Logic
 
@@ -95,7 +116,7 @@ Each company gets a headline verdict in `src/modeling/assessment.py`, combining 
 | **Watch** | Mixed signals, one isolated red, or incomplete valuation context - no forced action |
 | **Avoid / Pass** | Deteriorating KPIs without valuation support |
 
-TTM metrics require a full four-quarter window (`ttm_complete` flags partial history rather than annualizing it silently). Premiums beyond +/-500% are treated as broken inputs (e.g. currency-unit mismatches on cross-listed names) and degrade to "valuation context incomplete" instead of polluting the verdict.
+LTM metrics require four consecutive reported quarters (`ttm_complete` flags partial history rather than annualizing it silently). Extreme premiums remain visible; the Data Audit and outlier rules determine whether the underlying multiple is reliable rather than suppressing a valuation observation solely because the premium is large.
 
 The same assessment object also produces the executive commentary, investment view, key positives, key concerns, management questions, and the valuation premium/discount narrative. This keeps the dashboard and the exported board pack perfectly consistent because both consume one judgment layer.
 
@@ -116,7 +137,7 @@ market-cap bridge (price x shares vs cap; 5/15/30% tiers), EV bridge
 (cap + debt + minority + preferred - cash vs reported TEV; cash means cash &
 ST investments - CapIQ's TEV basis - when exported, plain cash & equivalents
 otherwise; partial bridges labeled), cross-table unit sanity, CFO/capex/FCF sign conventions (flagged,
-never silently flipped), TTM completeness, stale periods (real dates),
+never silently flipped), LTM completeness, stale periods (real dates),
 refresh-log consistency, missing deep fields (critical vs nice-to-have),
 and outlier metrics. Per-company audit score: 100 - 15/high - 5/medium - 1/low.
 
@@ -167,8 +188,35 @@ Multiples are excluded from the ADJUSTED median when: EBITDA or earnings are
 negative, EV/EBITDA > 75x, P/E > 100x, EV/Revenue > 50x. Raw medians remain
 displayed; excluded names are listed with reasons. Softer flags (never
 excluded): FCF conversion outside [-100%, 200%], leverage outside [-5x, 8x],
-revenue growth > 100%, EBITDA margin outside [-50%, 80%]. The DCF exit
-multiple uses the adjusted median (FY1 preferred, then NTM, then LTM).
+revenue growth > 100%, EBITDA margin outside [-50%, 80%]. Peer FY1/NTM/LTM
+medians are market references; they do not automatically become terminal
+multiples in the intrinsic DCF.
+
+## DCF terminal-value consistency
+
+The explicit forecast uses company-specific WACC and operating drivers. Auto
+cases extend to ten years when current growth exceeds 10% or current
+EV/EBITDA exceeds 15x; otherwise the horizon is five years. The stable period
+then normalizes three linked inputs:
+
+- terminal beta converges to 1.0 and debt weight to the peer median;
+- terminal ROIC converges to the peer median when at least three valid peers
+  exist (otherwise the capped company anchor is used);
+- stable reinvestment rate = perpetuity growth / terminal ROIC.
+
+The Gordon terminal cash flow is therefore:
+
+`FCFF(n+1) = NOPAT(n+1) x (1 - g / terminal ROIC)`
+
+and terminal value is `FCFF(n+1) / (terminal WACC - g)`. This prevents current
+capex spikes, D&A above capex, or zero reinvestment from being carried into
+perpetuity without an economic link to growth.
+
+In auto mode, the displayed DCF exit multiple is the EV/EBITDA expression of
+the same stable-growth economics. The independent adjusted peer multiple is
+shown separately as **Market Reference**. It enters the DCF only through an
+explicit analyst assumption in the company YAML; this avoids silently mixing
+relative valuation with intrinsic valuation.
 
 ## Peer review workflow
 

@@ -166,24 +166,48 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         {"label": f"After-tax cost of debt (t={w.tax_rate:.0%})", "value": f"{w.cost_of_debt_aftertax:.2%}"},
         {"label": "Equity / debt weights", "value": f"{w.equity_weight:.0%} / {w.debt_weight:.0%}"},
         {"label": "WACC" + (" (override)" if w.overridden else ""), "value": f"{w.wacc:.2%}"},
+        {"label": f"Terminal WACC ({case.assumptions.terminal_wacc_source})",
+         "value": f"{base.terminal_wacc:.2%}"},
+        {"label": f"Terminal ROIC ({case.assumptions.terminal_roic_source})",
+         "value": f"{base.terminal_roic:.2%}"},
+        {"label": "Stable reinvestment (g / ROIC)",
+         "value": f"{base.terminal_reinvestment_rate:.2%}"
+         if base.terminal_reinvestment_rate is not None else "n/m"},
     ]
 
+    market_tv = (
+        float(f["ebitda"].iloc[-1]) * case.market_reference_multiple
+        if case.market_reference_multiple is not None else np.nan
+    )
+    market_pv = (
+        base.pv_terminal_exit * case.market_reference_multiple / base.exit_multiple
+        if case.market_reference_multiple is not None and base.exit_multiple > 0 else np.nan
+    )
+    market_ev = base.pv_explicit + market_pv if not np.isnan(market_pv) else np.nan
     tv_rows = [
         {"label": "Terminal value", "exit": money(base.terminal_value_exit),
-         "perp": money(base.terminal_value_perp) if not np.isnan(base.terminal_value_perp) else "n/m"},
+         "perp": money(base.terminal_value_perp) if not np.isnan(base.terminal_value_perp) else "n/m",
+         "market": money(market_tv) if not np.isnan(market_tv) else "n/a"},
         {"label": "PV of terminal value", "exit": money(base.pv_terminal_exit),
-         "perp": money(base.pv_terminal_perp) if not np.isnan(base.pv_terminal_perp) else "n/m"},
+         "perp": money(base.pv_terminal_perp) if not np.isnan(base.pv_terminal_perp) else "n/m",
+         "market": money(market_pv) if not np.isnan(market_pv) else "n/a"},
         {"label": "Enterprise value", "exit": money(base.enterprise_value),
-         "perp": money(base.enterprise_value_perp) if not np.isnan(base.enterprise_value_perp) else "n/m"},
+         "perp": money(base.enterprise_value_perp) if not np.isnan(base.enterprise_value_perp) else "n/m",
+         "market": money(market_ev) if not np.isnan(market_ev) else "n/a"},
     ]
     cross_bits = []
     if base.implied_terminal_growth is not None:
         cross_bits.append(
-            f"The {case.exit_multiple:g}x exit implies {base.implied_terminal_growth:+.1%} perpetual FCF growth "
+            f"The {case.exit_multiple:.1f}x exit implies {base.implied_terminal_growth:+.1%} perpetual FCF growth "
             f"versus the {case.assumptions.perpetuity_growth:.1%} perpetuity anchor"
         )
     if base.implied_exit_multiple is not None:
         cross_bits.append(f"the perpetuity implies a {base.implied_exit_multiple:.1f}x exit multiple")
+    if case.market_reference_multiple is not None:
+        cross_bits.append(
+            f"the independent market reference is {case.market_reference_multiple:.1f}x "
+            f"({case.market_reference_source})"
+        )
     tv_crosscheck = ("; ".join(cross_bits) + ".") if cross_bits else "Cross-checks unavailable for this scenario."
 
     scenario_rows = []
@@ -207,7 +231,7 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
     provenance = (
         f"{analyst_count} of 3 scenarios analyst-specified"
         + (f" (file: {Path(str(case.assumptions.path)).name})" if case.assumptions.from_file else "")
-        + f"; remaining drivers anchored on TTM data. "
+        + "; remaining drivers anchored on LTM data. "
         + ("Notes: " + "; ".join(case.notes) + "." if case.notes else "")
     )
 
@@ -228,8 +252,12 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         "bear_upside": _pct(case.scenarios["bear"].upside, 0),
         "bull_upside": _pct(case.scenarios["bull"].upside, 0),
         "wacc_pct": f"{w.wacc:.1%}",
-        "exit_multiple": f"{case.exit_multiple:g}x",
+        "exit_multiple": f"{case.exit_multiple:.1f}x",
         "exit_multiple_source": case.exit_multiple_source,
+        "market_reference_multiple": (
+            f"{case.market_reference_multiple:.1f}x" if case.market_reference_multiple is not None else "n/a"
+        ),
+        "market_reference_source": case.market_reference_source,
         "overview": overview,
         "analyst_thesis": {
             "status": thesis.analyst_status if thesis else "",
@@ -315,7 +343,9 @@ def generate_valuation_case(
     context = build_case_context(case, demo, df=df)
     ticker = str(context["company"].get("ticker", company_id)).replace(".SA", "").replace(":", "_")
     output_path = Path(output_dir) / f"valuation_case_{ticker}.html"
-    output_path.write_text(Template(VALUATION_CASE_TEMPLATE).render(**context), encoding="utf-8")
+    rendered = Template(VALUATION_CASE_TEMPLATE).render(**context)
+    rendered = "\n".join(line.rstrip() for line in rendered.splitlines()) + "\n"
+    output_path.write_text(rendered, encoding="utf-8")
     return output_path
 
 

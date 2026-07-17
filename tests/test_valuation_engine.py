@@ -17,7 +17,7 @@ from src.modeling.valuation_assumptions import (
     load_wacc_params,
     resolve_glidepath,
 )
-from src.modeling.wacc import build_wacc, relever_beta, unlever_beta
+from src.modeling.wacc import build_terminal_wacc, build_wacc, relever_beta, unlever_beta
 from src.modeling.working_capital import nwc_from_days, project_nwc
 
 
@@ -85,13 +85,16 @@ def test_assumptions_yaml_and_auto_scenarios(tmp_path):
         "scenarios:\n"
         "  base: { revenue_growth: {start: 0.2, end: 0.05}, ebitda_margin: 0.30 }\n"
         "wacc: { beta: 0.8 }\n"
-        "terminal: { exit_multiple: 9.0, perpetuity_growth: 0.03 }\n",
+        "terminal: { exit_multiple: 9.0, perpetuity_growth: 0.03, roic: 0.14, wacc: 0.09 }\n",
         encoding="utf-8",
     )
     row = _row()
     a = load_valuation_assumptions(row, tmp_path)
     assert a.from_file and a.horizon_years == 4
     assert a.exit_multiple == 9.0 and a.perpetuity_growth == 0.03 and a.beta == 0.8
+    assert a.terminal_roic == pytest.approx(0.14)
+    assert a.terminal_wacc == pytest.approx(0.09)
+    assert a.terminal_roic_source == "analyst"
     assert a.scenarios["base"].source == "analyst"
     assert a.scenarios["base"].ebitda_margin == [0.30] * 4
     # bear/bull not in the file -> auto-derived around anchors
@@ -103,6 +106,19 @@ def test_assumptions_yaml_and_auto_scenarios(tmp_path):
     assert not b.from_file
     assert b.scenarios["base"].revenue_growth[0] == pytest.approx(0.10)  # clipped anchor
     assert b.anchors["nwc_mode"] == "days"
+
+    high_growth = load_valuation_assumptions(
+        _row(revenue_yoy_growth=0.18), tmp_path / "nowhere"
+    )
+    assert high_growth.horizon_years == 10
+    assert any("extended to 10 years" in n for n in high_growth.anchors["notes"])
+
+
+def test_reported_d_and_a_is_preferred_over_ebitda_minus_ebit(tmp_path):
+    row = _row(d_and_a_ttm=50.0, ebitda_ttm=300.0, ebit_ttm=200.0)
+    assumptions = load_valuation_assumptions(row, tmp_path / "none")
+    assert assumptions.anchors["d_and_a_pct"] == pytest.approx(0.05)
+    assert any("reported TTM" in note for note in assumptions.anchors["notes"])
 
 
 def test_wacc_params_currency_fallback():
@@ -141,6 +157,27 @@ def test_wacc_override_and_analyst_beta():
     w = build_wacc(row, params, beta_override=0.9, wacc_override=0.10)
     assert w.beta == 0.9 and w.beta_source == "analyst"
     assert w.wacc == 0.10 and w.overridden
+
+
+def test_extreme_two_year_beta_falls_back_instead_of_driving_wacc():
+    params = load_wacc_params("USD")
+    w = build_wacc(_row(beta_2y=0.30), params)
+    assert w.beta == 1.0
+    assert w.beta_source == "default"
+    assert any("outside 0.50-2.00" in note for note in w.notes)
+
+
+def test_terminal_wacc_converges_to_stable_beta_and_peer_leverage():
+    params = load_wacc_params("USD")
+    current = build_wacc(_row(beta_2y=1.8), params)
+    peers = pd.DataFrame({
+        "market_cap": [900.0, 800.0, 700.0],
+        "total_debt": [100.0, 200.0, 300.0],
+    })
+    terminal, source = build_terminal_wacc(current, params, peers=peers)
+    assert "stable beta 1.0" in source
+    assert terminal < current.wacc
+    assert terminal > params["risk_free_rate"]
 
 
 # --- working capital ----------------------------------------------------------------------
@@ -220,11 +257,20 @@ def test_dual_terminal_value_cross_checks(tmp_path):
     scen = _flat_scenario(n=5, mode="pct")
     res = run_dcf(row, scen, a, wacc=0.10, exit_multiple=8.0)
 
-    # implied g from exit TV satisfies TV = UFCF_N (1+g)/(w-g)
-    g = res.implied_terminal_growth
-    ufcf_n = res.forecast["ufcf"].iloc[-1]
-    assert res.terminal_value_exit == pytest.approx(ufcf_n * (1 + g) / (0.10 - g), rel=1e-6)
-    # implied multiple from perpetuity TV = TV_perp / terminal EBITDA
+    # Stable reinvestment is paid for: g = reinvestment rate x terminal ROIC.
+    assert res.terminal_reinvestment_rate == pytest.approx(
+        res.perpetuity_growth / res.terminal_roic
+    )
+    assert res.terminal_ufcf == pytest.approx(
+        res.terminal_nopat * (1 - res.terminal_reinvestment_rate)
+    )
+    assert res.terminal_value_perp == pytest.approx(
+        res.terminal_ufcf / (res.terminal_wacc - res.perpetuity_growth)
+    )
+    # With ROIC = WACC the fundamental TV is growth-neutral; an incompatible
+    # market multiple therefore has no economically valid implied g.
+    assert res.implied_terminal_growth is None
+    # Implied multiple from perpetuity TV = TV_perp / terminal EBITDA.
     assert res.implied_exit_multiple == pytest.approx(res.terminal_value_perp / res.forecast["ebitda"].iloc[-1])
 
 
@@ -293,10 +339,10 @@ def test_full_valuation_case_on_demo_data(tmp_path):
 
     store = load_store(demo=True)
     df = pd.read_csv(store.dataset_path, parse_dates=["period"])
-    case = build_valuation_case(df, "TOTS3.SA", store=store)
+    case = build_valuation_case(df, "GOOGL", store=store)
 
     assert case.assumptions.from_file            # demo sample YAML picked up
-    assert case.recommendation.stance in {"BUY", "HOLD", "SELL"}
+    assert case.recommendation.stance == "INDICATIVE"
     assert case.base.enterprise_value > 0
     assert case.base.upside is not None
     assert case.sens_wacc_multiple.shape == (5, 5)
@@ -307,9 +353,15 @@ def test_full_valuation_case_on_demo_data(tmp_path):
     assert not auto.assumptions.from_file
     assert auto.base.enterprise_value > 0
     assert any("no analyst assumptions file" in n for n in auto.notes)
+    assert auto.market_reference_multiple is not None
+    # Auto cases express stable-growth economics as a multiple; the independent
+    # peer multiple remains a separate market cross-check.
+    assert "Gordon-consistent" in auto.exit_multiple_source
+    assert auto.exit_multiple == pytest.approx(auto.base.implied_exit_multiple)
+    assert auto.base.enterprise_value == pytest.approx(auto.base.enterprise_value_perp)
 
     # HTML export renders to a custom directory (keeps repo outputs untouched).
-    path = generate_valuation_case(demo=True, company_id="TOTS3.SA", output_dir=tmp_path)
+    path = generate_valuation_case(demo=True, company_id="GOOGL", output_dir=tmp_path)
     html = path.read_text(encoding="utf-8")
     assert len(html) > 10_000
     for section in ["WACC Build", "Equity Value Bridge", "Sensitivity", "Methodology Appendix"]:
@@ -343,7 +395,7 @@ def test_implied_growth_grid_and_tornado():
 
     store = load_store(demo=True)
     df = pd.read_csv(store.dataset_path, parse_dates=["period"])
-    case = build_valuation_case(df, "TOTS3.SA", store=store)
+    case = build_valuation_case(df, "GOOGL", store=store)
     ig = case.sens_implied_growth
     assert not ig.empty and ig.shape[0] >= 3
     center = ig.iloc[len(ig.index) // 2, len(ig.columns) // 2]

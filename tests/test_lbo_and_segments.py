@@ -15,7 +15,8 @@ def _flat_forecast(ebitda: float, ufcf: float, years: int = 5) -> pd.DataFrame:
 def test_lbo_hand_math_flat_no_growth():
     """Entry 100 EBITDA at 8x, 50% debt, kd 10%, UFCF 60/yr, exit 8x flat EBITDA.
 
-    Year 1: interest 40, sweep 20 -> debt 380 ... geometric-ish paydown checked
+    Year 1: interest 40, tax shield 10, sweep 30 -> debt 370. The after-tax
+    interest schedule is checked
     at the endpoints; bridge must sum exactly."""
     fc = _flat_forecast(ebitda=100.0, ufcf=60.0, years=5)
     lbo = run_lbo(fc, entry_ebitda=100.0, entry_multiple=8.0, exit_multiple=8.0,
@@ -24,24 +25,41 @@ def test_lbo_hand_math_flat_no_growth():
     assert lbo.entry_debt == pytest.approx(400.0)
     assert lbo.equity_check == pytest.approx(400.0)
 
-    # Debt path: d' = d - (60 - 0.1 d) = 1.1 d - 60 applied... careful:
-    # paydown = 60 - 0.1*d; d' = d - paydown = 1.1*d - 60? No: d' = d - (60 - 0.1 d)
-    # = 1.1 d - 60. d0=400 -> 380, 358, 333.8, 307.18, 277.898
-    expected = [380.0, 358.0, 333.8, 307.18, 277.898]
+    # After-tax interest is 7.5% of opening debt: d' = 1.075*d - 60.
+    expected = [370.0, 337.75, 303.081, 265.812, 225.748]
     assert list(lbo.schedule["debt_end"].round(3)) == expected
     assert lbo.exit_ev == pytest.approx(800.0)
-    assert lbo.exit_equity == pytest.approx(800.0 - 277.898, abs=1e-3)
-    assert lbo.moic == pytest.approx(522.102 / 400.0, abs=1e-4)
-    assert lbo.irr == pytest.approx((522.102 / 400.0) ** 0.2 - 1.0, abs=1e-6)
+    assert lbo.exit_equity == pytest.approx(800.0 - 225.748, abs=1e-3)
+    assert lbo.moic == pytest.approx(574.252 / 400.0, abs=1e-4)
+    assert lbo.irr == pytest.approx((574.252 / 400.0) ** 0.2 - 1.0, abs=1e-6)
 
     # Bridge reconciles exactly: check + parts = exit equity.
     b = lbo.bridge
     total = (b["equity_check"] + b["ebitda_growth"] + b["multiple_change"]
-             + b["deleveraging"] + b["fees"])
+             + b["deleveraging"] + b["excess_cash"] + b["fees"])
     assert total == pytest.approx(b["exit_equity"], abs=1e-6)
     assert b["ebitda_growth"] == pytest.approx(0.0)      # flat EBITDA
     assert b["multiple_change"] == pytest.approx(0.0)    # exit at entry
-    assert b["deleveraging"] == pytest.approx(400.0 - 277.898, abs=1e-3)
+    assert b["deleveraging"] == pytest.approx(400.0 - 225.748, abs=1e-3)
+
+
+def test_lbo_retains_cash_after_debt_is_repaid():
+    fc = _flat_forecast(100.0, 300.0, 2)
+    lbo = run_lbo(fc, entry_ebitda=100.0, entry_multiple=4.0, exit_multiple=4.0,
+                  debt_pct=0.25, cost_of_debt=0.0, fees_pct_ev=0.0)
+    assert lbo.exit_debt == 0.0
+    assert lbo.excess_cash == pytest.approx(500.0)
+    assert lbo.exit_equity == pytest.approx(900.0)
+
+
+def test_lbo_can_size_entry_debt_on_ebitda():
+    fc = _flat_forecast(100.0, 50.0, 5)
+    lbo = run_lbo(fc, entry_ebitda=100.0, entry_multiple=20.0,
+                  entry_leverage=3.0, debt_pct=0.5, cost_of_debt=0.08)
+    assert lbo.entry_ev == pytest.approx(2_000.0)
+    assert lbo.entry_debt == pytest.approx(300.0)
+    assert lbo.debt_pct == pytest.approx(0.15)
+    assert lbo.equity_check == pytest.approx(1_740.0)  # EV - debt + 2% fees
 
 
 def test_lbo_guards():

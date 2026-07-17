@@ -92,8 +92,8 @@ def build_memo_context(df: pd.DataFrame, company_id: str, store: WatchlistStore)
     if financial:
         quality_rows = [
             q_row("Revenue growth (YoY)", "revenue_yoy_growth", fmt_pct),
-            q_row("Net income margin (TTM)", "net_income_margin_ttm", fmt_pct),
-            {"label": "ROE (TTM)", "current": fmt_pct(row.get("roe_ttm")),
+            q_row("Net income margin (LTM)", "net_income_margin_ttm", fmt_pct),
+            {"label": "ROE (LTM)", "current": fmt_pct(row.get("roe_ttm")),
              "prior": fmt_pct(prior.get("roe_ttm")) if prior is not None else "n/a", "median": "n/a"},
             {"label": "P/TBV", "current": fmt_multiple(row.get("p_tbv")), "prior": "n/a", "median": "n/a"},
         ]
@@ -101,14 +101,14 @@ def build_memo_context(df: pd.DataFrame, company_id: str, store: WatchlistStore)
     else:
         quality_rows = [
             q_row("Revenue growth (YoY)", "revenue_yoy_growth", fmt_pct),
-            q_row("EBITDA margin (TTM)", "ebitda_margin_ttm", fmt_pct),
-            q_row("FCF conversion (TTM)", "fcf_conversion_ttm", fmt_pct),
-            {"label": "ROIC (TTM)", "current": fmt_pct(row.get("roic_ttm")),
+            q_row("EBITDA margin (LTM)", "ebitda_margin_ttm", fmt_pct),
+            q_row("FCF conversion (LTM)", "fcf_conversion_ttm", fmt_pct),
+            {"label": "ROIC (LTM)", "current": fmt_pct(row.get("roic_ttm")),
              "prior": fmt_pct(prior.get("roic_ttm")) if prior is not None else "n/a", "median": "n/a"},
             q_row("Net debt / EBITDA", "net_debt_to_ebitda_ttm", fmt_multiple),
         ]
         if pd.notna(row.get("sbc_pct_of_fcf_ttm")):
-            quality_rows.append({"label": "SBC as % of FCF (TTM)", "current": fmt_pct(row.get("sbc_pct_of_fcf_ttm")),
+            quality_rows.append({"label": "SBC as % of FCF (LTM)", "current": fmt_pct(row.get("sbc_pct_of_fcf_ttm")),
                                  "prior": "n/a", "median": "n/a"})
         if pd.notna(row.get("cash_conversion_cycle")):
             quality_rows.append({"label": "Cash conversion cycle (days)",
@@ -139,8 +139,8 @@ def build_memo_context(df: pd.DataFrame, company_id: str, store: WatchlistStore)
     valuation_rows = [
         {"label": "Market cap", "value": fmt_money(row.get("market_cap"), currency), "context": ""},
         {"label": "Enterprise value", "value": fmt_money(row.get("enterprise_value"), currency), "context": ""},
-        {"label": "EV / EBITDA", "value": val["ev_to_ebitda"], "context": f"median {val['ev_to_ebitda_median']}"},
-        {"label": "EV / Revenue", "value": val["ev_to_revenue"], "context": f"median {val['ev_to_revenue_median']}"},
+        {"label": "EV / EBITDA (LTM)", "value": val["ev_to_ebitda"], "context": f"peer median ex-company {val['ev_to_ebitda_median']}"},
+        {"label": "EV / Revenue (LTM)", "value": val["ev_to_revenue"], "context": f"peer median ex-company {val['ev_to_revenue_median']}"},
         {"label": "P / E", "value": val["pe"], "context": f"median {val['pe_median']}"},
     ]
     if hc.get("available"):

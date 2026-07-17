@@ -42,11 +42,10 @@ def test_missing_or_negative_anchors_block_dcf():
     assert not ok and "EBITDA" in reason
 
 
-def test_insurers_remain_applicable_with_warning(demo_df):
-    # Insurers are allowed (street practice) but flagged - see case_warnings test below.
+def test_insurers_use_financials_framework_not_ebitda_dcf(demo_df):
     row = pd.Series({"business_model": "insurer", "revenue_ttm": 1000.0, "ebitda_ttm": 80.0})
     ok, _, _ = dcf_applicability(row)
-    assert ok
+    assert not ok
 
 
 def test_build_case_raises_clean_error_for_financials(demo_df):
@@ -69,11 +68,12 @@ def test_auto_case_never_shows_formal_recommendation(demo_df):
     assert case.recommendation.stance not in {"BUY", "HOLD", "SELL"}
 
 
-def test_analyst_file_keeps_formal_recommendation(demo_df):
+def test_illustrative_file_does_not_issue_formal_recommendation(demo_df):
     df, store = demo_df
-    case = build_valuation_case(df, "TOTS3.SA", store=store)   # demo sample YAML
+    case = build_valuation_case(df, "GOOGL", store=store)   # demo sample YAML
     assert case.assumptions.from_file
-    assert case.recommendation.stance in {"BUY", "HOLD", "SELL"}
+    assert case.assumptions.status == "illustrative"
+    assert case.recommendation.stance == "INDICATIVE"
 
 
 # --- warnings engine ------------------------------------------------------------------------
@@ -89,7 +89,7 @@ def test_case_warnings_flag_default_beta_and_fallbacks(demo_df):
 
 def test_case_warnings_terminal_value_thresholds(demo_df):
     df, store = demo_df
-    case = build_valuation_case(df, "TOTS3.SA", store=store)
+    case = build_valuation_case(df, "GOOGL", store=store)
     tv_pct = case.base.terminal_pct_of_ev
     texts = " | ".join(w["text"] for w in case_warnings(case))
     if tv_pct > 0.85:

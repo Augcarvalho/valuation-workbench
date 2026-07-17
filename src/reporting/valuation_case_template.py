@@ -78,7 +78,7 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
   <div class="cover">
     <div class="cover-kicker">Valuation Case | DCF &amp; Trading Comparables | {{ case_date }}</div>
     <h1>{{ company.company_name }}<span class="status-pill status-{{ status_key }}">{{ status_label }}</span></h1>
-    <div class="cover-sub">{{ company.ticker }} | {{ peer_group }} comps | {{ currency_label }} | As of {{ as_of }}</div>
+    <div class="cover-sub">{{ company.ticker }} | {{ peer_group }} comps | {{ currency_label }} | Financials through {{ as_of }}</div>
     <div class="rec-band">
       <span class="rec-pill rec-{{ rec.stance }}">INDICATIVE {{ rec.stance }}</span>
       <div>
@@ -125,8 +125,8 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
     <div class="s-head"><div class="s-bar"></div><h2>1 &middot; Company Snapshot</h2></div>
     <div class="memo"><p>{{ overview }}</p></div>
     <div class="kv" style="margin-top:12px">
-      <div class="cell"><div class="l">TTM Revenue</div><div class="v">{{ snapshot.revenue }}</div><div class="s">{{ snapshot.growth }} YoY</div></div>
-      <div class="cell"><div class="l">EBITDA Margin (TTM)</div><div class="v">{{ snapshot.margin }}</div><div class="s">{{ snapshot.ebitda }} EBITDA</div></div>
+      <div class="cell"><div class="l">LTM Revenue</div><div class="v">{{ snapshot.revenue }}</div><div class="s">{{ snapshot.growth }} latest-quarter YoY</div></div>
+      <div class="cell"><div class="l">EBITDA Margin (LTM)</div><div class="v">{{ snapshot.margin }}</div><div class="s">{{ snapshot.ebitda }} LTM EBITDA</div></div>
       <div class="cell"><div class="l">Enterprise Value</div><div class="v">{{ snapshot.ev }}</div><div class="s">Mkt cap {{ snapshot.market_cap }}</div></div>
       <div class="cell"><div class="l">Current Multiple</div><div class="v">{{ snapshot.multiple }}</div><div class="s">LTM EV/EBITDA</div></div>
     </div>
@@ -174,9 +174,9 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
 
   <section>
     <div class="s-head"><div class="s-bar"></div><h2>2 &middot; Trading Comparables</h2>
-      <span class="s-note">{{ peer_group }} | NTM forwards where consensus exists | anchor highlighted</span></div>
+      <span class="s-note">Latest-Q growth | LTM actuals | NTM consensus | anchor shown but excluded from peer statistics</span></div>
     <table>
-      <tr><th>Company</th><th>Mkt Cap</th><th>EV</th><th>Growth</th><th>EBITDA mgn</th><th>EV/Rev LTM</th><th>EV/EBITDA LTM</th><th>EV/EBITDA NTM</th><th>P/E LTM</th></tr>
+      <tr><th>Company</th><th>Market Cap (Current)</th><th>EV (Current)</th><th>Rev Growth (Latest Q YoY)</th><th>EBITDA Margin (LTM)</th><th>EV/Rev LTM</th><th>EV/EBITDA LTM</th><th>EV/EBITDA NTM</th><th>P/E LTM</th></tr>
       {% for p in spread_rows %}
       <tr class="{{ 'anchor' if p.is_anchor else '' }}">
         <td>{{ p.name }}</td><td class="num">{{ p.market_cap }}</td><td class="num">{{ p.ev }}</td>
@@ -192,7 +192,7 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
         <td class="num">{{ s.ev_ebitda_ntm }}</td><td class="num">{{ s.pe }}</td></tr>
       {% endfor %}
     </table>
-    <div class="s-note" style="margin-top:6px">Exit multiple used in the DCF: <b>{{ exit_multiple }}</b> ({{ exit_multiple_source }}).</div>
+    <div class="s-note" style="margin-top:6px">Exit multiple used in the DCF: <b>{{ exit_multiple }}</b> ({{ exit_multiple_source }}). Market reference: <b>{{ market_reference_multiple }}</b> ({{ market_reference_source }}).</div>
   </section>
 
   <section>
@@ -227,9 +227,9 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
       <div>
         <div class="s-head"><div class="s-bar"></div><h2>5 &middot; Terminal Value</h2></div>
         <table>
-          <tr><th></th><th>Exit Multiple</th><th>Perpetuity</th></tr>
+          <tr><th></th><th>DCF Multiple</th><th>Perpetuity</th><th>Market Reference</th></tr>
           {% for r in tv_rows %}
-          <tr><td>{{ r.label }}</td><td class="num">{{ r.exit }}</td><td class="num">{{ r.perp }}</td></tr>
+          <tr><td>{{ r.label }}</td><td class="num">{{ r.exit }}</td><td class="num">{{ r.perp }}</td><td class="num">{{ r.market }}</td></tr>
           {% endfor %}
         </table>
         <div class="memo" style="margin-top:10px"><h4>Cross-check</h4><p>{{ tv_crosscheck }}</p></div>
@@ -330,7 +330,7 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
     <div class="s-head"><div class="s-bar"></div><h2>11 &middot; Methodology Appendix</h2></div>
     <div class="memo"><div class="appendix">
       <p><b>Forecast.</b> Tier-1 driver model: revenue growth, EBITDA margin, D&amp;A %, capex %, and working-capital
-      glidepaths, anchored on the company's own TTM data; analyst YAML overrides where present (labeled).
+      glidepaths, anchored on the company's own LTM data; analyst YAML overrides where present (labeled).
       Taxes at {{ tax_rate }} on positive EBIT.</p>
       <p><b>DCF.</b> Mid-year discounting of interim UFCF; terminal value computed both by exit multiple
       ({{ exit_multiple }} EV/EBITDA, {{ exit_multiple_source }}) and Gordon perpetuity ({{ perp_growth }} growth),

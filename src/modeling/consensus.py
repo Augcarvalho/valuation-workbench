@@ -1,12 +1,10 @@
-"""Actual vs consensus: beats/misses, revision momentum, guidance framing.
+"""Actual vs consensus, revision momentum, and guidance framing.
 
 Works with whatever the estimate export provides and degrades gracefully -
 missing fields become None with an explicit availability map, never faked.
 
-Caveat disclosed in the UI: the exported ``*_consensus`` fields are the
-CURRENT-quarter consensus as of the refresh date; comparing them to the latest
-REPORTED quarter is an approximation until as-reported consensus history is
-exported.
+Current-quarter estimates are never labeled beats or misses. That language is
+reserved for a point-in-time pre-report consensus matched to the actual period.
 """
 
 from __future__ import annotations
@@ -25,6 +23,8 @@ class ConsensusRead:
     guidance: dict = field(default_factory=dict)            # low/high/midpoint/vs_consensus
     next_earnings: str | None = None
     num_analysts: float | None = None
+    true_surprise: bool = False
+    comparison_label: str = "Current FQ estimate comparison"
     missing: list[str] = field(default_factory=list)
 
 
@@ -38,13 +38,16 @@ def _clean(v):
     return None if np.isnan(f) or np.isinf(f) else f
 
 
-def _beat(actual: float | None, consensus: float | None) -> dict | None:
+def _comparison(actual: float | None, consensus: float | None, true_surprise: bool) -> dict | None:
     if actual is None or consensus is None or consensus == 0:
         return None
     delta = actual - consensus
+    if true_surprise:
+        status = "beat" if delta > 0 else ("miss" if delta < 0 else "in line")
+    else:
+        status = "above estimate" if delta > 0 else ("below estimate" if delta < 0 else "in line")
     return {"actual": actual, "consensus": consensus, "delta": delta,
-            "delta_pct": delta / abs(consensus),
-            "status": "beat" if delta > 0 else ("miss" if delta < 0 else "in line")}
+            "delta_pct": delta / abs(consensus), "status": status}
 
 
 def _revision(now: float | None, ago: float | None) -> float | None:
@@ -57,13 +60,24 @@ def build_consensus_read(row: pd.Series) -> ConsensusRead:
     """Latest-row consensus analytics for one company."""
     out = ConsensusRead(company_id=str(row.get("company_id")))
 
+    actual_period = pd.to_datetime(row.get("period"), errors="coerce")
+    consensus_period = pd.to_datetime(row.get("consensus_period"), errors="coerce")
+    basis = str(row.get("consensus_basis", "")).strip().lower()
+    period_match = pd.notna(actual_period) and pd.notna(consensus_period) \
+        and actual_period.to_period("Q") == consensus_period.to_period("Q")
+    out.true_surprise = basis in {"pre_report", "pre-report", "as_reported"} and period_match
+    if out.true_surprise:
+        out.comparison_label = "Actual vs pre-report consensus"
+    else:
+        out.missing.append("matched pre-report consensus (current IQ_FQ is not a beat/miss series)")
+
     pairs = [
         ("Revenue", _clean(row.get("revenue")), _clean(row.get("revenue_consensus"))),
         ("EBITDA", _clean(row.get("ebitda")), _clean(row.get("ebitda_consensus"))),
         ("EPS", None, _clean(row.get("eps_consensus"))),   # reported EPS not exported yet
     ]
     for name, actual, consensus in pairs:
-        b = _beat(actual, consensus)
+        b = _comparison(actual, consensus, out.true_surprise)
         if b is not None:
             out.rows.append({"metric": name, **b})
         elif consensus is None:

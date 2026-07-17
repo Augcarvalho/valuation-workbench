@@ -66,7 +66,7 @@ def header_band(row: pd.Series, demo: bool) -> None:
         ("Listing", f"{escape(exchange)} | {geo}"),
         ("Reporting Period", quarter_label(period)),
         ("Currency", f"{currency} millions"),
-        ("As Of", pd.Timestamp(period).strftime("%d %b %Y")),
+        ("Financials Through", pd.Timestamp(period).strftime("%d %b %Y")),
     ]
     meta_html = "".join(
         f'<div class="pe-meta-item"><div class="pe-meta-label">{escape(k)}</div>'
@@ -203,7 +203,7 @@ def footnote(text: str) -> None:
 # --- dense HTML tables ------------------------------------------------------
 
 def html_table(headers: list[str], rows: list[list[str]], row_classes: list[str] | None = None,
-               numeric_from: int = 1, wrap: bool = False) -> None:
+               numeric_from: int = 1, wrap: bool = False, dense: bool = False) -> None:
     """Render a compact board-pack table. ``rows`` cells may contain safe HTML.
 
     ``wrap=True`` lets long text cells wrap instead of forcing one line
@@ -218,7 +218,12 @@ def html_table(headers: list[str], rows: list[list[str]], row_classes: list[str]
             num = " class='num'" if i >= numeric_from else ""
             tds.append(f"<td{num}>{c}</td>")
         body.append(f'<tr class="{cls}">' + "".join(tds) + "</tr>")
-    table_cls = "pe-table wrap" if wrap else "pe-table"
+    classes = ["pe-table"]
+    if wrap:
+        classes.append("wrap")
+    if dense:
+        classes.append("dense")
+    table_cls = " ".join(classes)
     st.markdown(
         f'<div class="pe-table-wrap"><table class="{table_cls}"><thead><tr>{thead}</tr></thead>'
         f'<tbody>{"".join(body)}</tbody></table></div>',

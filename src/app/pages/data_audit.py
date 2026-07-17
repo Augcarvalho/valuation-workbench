@@ -141,7 +141,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             "signal currency or millions-vs-units mismatches.\n"
             "- **Sign conventions**: pipeline stores capex as positive outflow, FCF = CFO - capex. "
             "Violations are FLAGGED, never silently flipped.\n"
-            "- **TTM completeness**: 4 reported quarters required; financials are exempt from "
+            "- **LTM completeness**: 4 consecutive reported quarters required; financials are exempt from "
             "EBITDA-frame fields by design.\n"
             "- **Stale periods**: real dates vs the universe's latest period; 1 quarter medium, "
             "2+ high.\n"

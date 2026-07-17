@@ -97,9 +97,8 @@ def company_exists(universe: pd.DataFrame, company_id: str, ticker: str | None =
     cid = company_id.strip().upper()
     if (universe["id"].astype(str).str.upper() == cid).any():
         return True
-    if ticker:
-        if (universe["ticker"].astype(str).str.upper() == ticker.strip().upper()).any():
-            return True
+    # Tickers are not globally unique across exchanges. The Capital IQ
+    # exchange-qualified identifier is the canonical duplicate key.
     return False
 
 
@@ -153,7 +152,7 @@ def add_company(
 
     universe = ensure_universe(universe_path, bootstrap_source)
     if company_exists(universe, company_id, ticker):
-        raise ValueError(f"{company_id} (or ticker {ticker}) is already in the universe")
+        raise ValueError(f"{company_id} is already in the universe")
 
     new_row = pd.DataFrame([{
         "id": company_id, "ticker": ticker, "sector": theme.strip(), "currency": currency.strip().upper(),

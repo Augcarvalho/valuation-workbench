@@ -13,8 +13,17 @@ import plotly.graph_objects as go
 from src.branding import FONT_SANS, FONT_SERIF, PALETTE, signal_hex
 from src.modeling.outliers import EV_EBITDA_MAX, adjusted_stats, multiple_outlier_reason
 
-COLOR_BLUE = PALETTE["blue"]
-COLOR_BLUE_2 = PALETTE["blue_2"]
+COLOR_REVENUE = PALETTE["series_revenue"]
+COLOR_EBITDA = PALETTE["series_ebitda"]
+COLOR_CASH = PALETTE["series_cash"]
+COLOR_MARGIN = PALETTE["series_margin"]
+COLOR_SECONDARY = PALETTE["series_secondary"]
+COLOR_DEBT = PALETTE["series_debt"]
+COLOR_ANCHOR = PALETTE["anchor"]
+COLOR_PEER = PALETTE["peer"]
+# Generic paired bars outside the operating-history charts.
+COLOR_BLUE = COLOR_REVENUE
+COLOR_BLUE_2 = COLOR_EBITDA
 COLOR_GREEN = PALETTE["green"]
 COLOR_AMBER = PALETTE["amber"]
 COLOR_RED = PALETTE["red"]
@@ -122,29 +131,30 @@ def revenue_ebitda_chart(df: pd.DataFrame, company_id: str, height: int = 390) -
     history = company_history(df, company_id).tail(MAX_QUARTERS)
     x = _q_labels(history)
     fig = go.Figure()
-    fig.add_bar(x=x, y=history["revenue"], name="Revenue", marker_color=COLOR_BLUE,
+    fig.add_bar(x=x, y=history["revenue"], name="Revenue (quarter)", marker_color=COLOR_REVENUE,
                 marker_line_width=0, opacity=0.95,
                 hovertemplate="Revenue: %{y:,.0f}<extra></extra>")
-    fig.add_bar(x=x, y=history["ebitda"], name="EBITDA", marker_color=COLOR_BLUE_2,
+    fig.add_bar(x=x, y=history["ebitda"], name="EBITDA (quarter)", marker_color=COLOR_EBITDA,
                 marker_line_width=0, opacity=0.9,
                 hovertemplate="EBITDA: %{y:,.0f}<extra></extra>")
     fig.add_scatter(x=x, y=history["ebitda_margin"], name="EBITDA margin", mode="lines+markers",
-                    line=dict(color=COLOR_GOLD, width=2.6), marker=dict(size=6),
+                    line=dict(color=COLOR_MARGIN, width=2.6), marker=dict(size=6),
                     yaxis="y2", hovertemplate="Margin: %{y:.1%}<extra></extra>")
-    fig = _style(fig, "Quarterly Revenue &amp; EBITDA", f"Bars in {_currency_label(history)}; line shows EBITDA margin (RHS)", height)
+    fig = _style(fig, "Reported Quarterly Revenue &amp; EBITDA",
+                 f"Standalone quarters in {_currency_label(history)} | line = quarterly EBITDA margin (RHS)", height)
     fig.update_layout(
         barmode="group", bargap=0.32, bargroupgap=0.08,
         yaxis=dict(title=_currency_label(history), **_AXIS),
         yaxis2=dict(title="EBITDA margin", overlaying="y", side="right", tickformat=".0%",
                     showgrid=False, zeroline=False, linecolor=PALETTE["line"],
-                    tickfont=dict(size=11, color=PALETTE["gold"]),
-                    title_font=dict(size=11, color=PALETTE["gold"])),
+                    tickfont=dict(size=11, color=COLOR_MARGIN),
+                    title_font=dict(size=11, color=COLOR_MARGIN)),
     )
     # Annotate the latest margin reading.
     if len(history) and pd.notna(history["ebitda_margin"].iloc[-1]):
         fig.add_annotation(x=x[-1], y=history["ebitda_margin"].iloc[-1], yref="y2",
                            text=f"{history['ebitda_margin'].iloc[-1]:.1%}", showarrow=False,
-                           yshift=14, font=dict(size=11, color=PALETTE["gold"]))
+                           yshift=14, font=dict(size=11, color=COLOR_MARGIN))
     period_label = _quarter_range_label(x)
     if period_label:
         fig = stamp_period(fig, period_label)
@@ -156,12 +166,13 @@ def margin_trend_chart(df: pd.DataFrame, company_id: str, height: int = 320) -> 
     x = _q_labels(history)
     fig = go.Figure()
     fig.add_scatter(x=x, y=history["gross_margin"], name="Gross margin", mode="lines+markers",
-                    line=dict(color=COLOR_BLUE_2, width=2.4), marker=dict(size=6),
+                    line=dict(color=COLOR_SECONDARY, width=2.4), marker=dict(size=6),
                     hovertemplate="Gross: %{y:.1%}<extra></extra>")
     fig.add_scatter(x=x, y=history["ebitda_margin"], name="EBITDA margin", mode="lines+markers",
-                    line=dict(color=COLOR_GREEN, width=2.8), marker=dict(size=6),
+                    line=dict(color=COLOR_ANCHOR, width=2.8), marker=dict(size=6),
                     hovertemplate="EBITDA: %{y:.1%}<extra></extra>")
-    fig = _style(fig, "Margin Profile", "Gross and EBITDA margin by quarter", height)
+    fig = _style(fig, "Reported Quarterly Margin Profile",
+                 "Standalone-quarter gross margin and EBITDA margin", height)
     fig.update_yaxes(tickformat=".0%")
     period_label = _quarter_range_label(x)
     if period_label:
@@ -173,19 +184,20 @@ def cash_conversion_chart(df: pd.DataFrame, company_id: str, height: int = 360) 
     history = company_history(df, company_id).tail(MAX_QUARTERS)
     x = _q_labels(history)
     fig = go.Figure()
-    fig.add_bar(x=x, y=history["cfo_ttm"], name="CFO (TTM)", marker_color=COLOR_BLUE, opacity=0.95)
-    fig.add_bar(x=x, y=history["fcf_ttm"], name="FCF (TTM)", marker_color=COLOR_GREEN, opacity=0.95)
+    fig.add_bar(x=x, y=history["cfo_ttm"], name="CFO (LTM)", marker_color=COLOR_REVENUE, opacity=0.95)
+    fig.add_bar(x=x, y=history["fcf_ttm"], name="FCF (LTM)", marker_color=COLOR_CASH, opacity=0.95)
     fig.add_scatter(x=x, y=history["fcf_conversion_ttm"], name="FCF conversion", mode="lines+markers",
-                    line=dict(color=COLOR_GOLD, width=2.6), marker=dict(size=6), yaxis="y2",
+                    line=dict(color=COLOR_MARGIN, width=2.6), marker=dict(size=6), yaxis="y2",
                     hovertemplate="Conversion: %{y:.0%}<extra></extra>")
-    fig = _style(fig, "Cash Conversion", f"TTM cash flows ({_currency_label(history)}); line shows FCF / EBITDA (RHS)", height)
+    fig = _style(fig, "LTM Cash Conversion",
+                 f"Rolling four-quarter cash flows in {_currency_label(history)} | line = LTM FCF / EBITDA (RHS)", height)
     fig.update_layout(
         barmode="group", bargap=0.3,
         yaxis=dict(title=_currency_label(history), **_AXIS),
         yaxis2=dict(title="FCF / EBITDA", overlaying="y", side="right", tickformat=".0%",
                     showgrid=False, zeroline=False, range=[0, 1.2],
-                    tickfont=dict(size=11, color=PALETTE["gold"]),
-                    title_font=dict(size=11, color=PALETTE["gold"])),
+                    tickfont=dict(size=11, color=COLOR_MARGIN),
+                    title_font=dict(size=11, color=COLOR_MARGIN)),
     )
     period_label = _quarter_range_label(x)
     if period_label:
@@ -201,22 +213,22 @@ def leverage_chart(df: pd.DataFrame, company_id: str, height: int = 360) -> go.F
     fig.add_hrect(y0=0, y1=2.0, line_width=0, fillcolor=PALETTE["green_soft"], opacity=0.5, layer="below")
     fig.add_hrect(y0=2.0, y1=3.5, line_width=0, fillcolor=PALETTE["amber_soft"], opacity=0.5, layer="below")
     fig.add_scatter(x=x, y=history["net_debt_to_ebitda_ttm"], name="Net debt / EBITDA (LHS)", mode="lines+markers",
-                    line=dict(color=COLOR_RED, width=2.8), marker=dict(size=6),
+                    line=dict(color=COLOR_DEBT, width=2.8), marker=dict(size=6),
                     hovertemplate="ND/EBITDA: %{y:.1f}x<extra></extra>")
     # Coverage lives on its own right-hand axis: 1-3x leverage and 10-40x
     # coverage cannot share a scale without flattening one of them.
     fig.add_scatter(x=x, y=history["interest_coverage_ttm"], name="Interest coverage (RHS)", mode="lines+markers",
-                    line=dict(color=COLOR_GREEN, width=2.4), marker=dict(size=6), yaxis="y2",
+                    line=dict(color=COLOR_CASH, width=2.4), marker=dict(size=6), yaxis="y2",
                     hovertemplate="Coverage: %{y:.1f}x<extra></extra>")
-    fig = _style(fig, "Leverage &amp; Interest Coverage",
-                 "Bands (LHS): ≤2.0x comfortable, 2.0–3.5x watch | coverage on RHS", height)
+    fig = _style(fig, "LTM Leverage &amp; Interest Coverage",
+                 "Rolling four-quarter basis | bands (LHS): <=2.0x comfortable, 2.0-3.5x watch | coverage on RHS", height)
     fig.update_layout(
         yaxis=dict(title="Net debt / EBITDA", ticksuffix="x", **_AXIS),
         yaxis2=dict(title="EBITDA / interest", overlaying="y", side="right", ticksuffix="x",
                     showgrid=False, zeroline=False, rangemode="tozero",
                     linecolor=PALETTE["line"],
-                    tickfont=dict(size=11, color=COLOR_GREEN),
-                    title_font=dict(size=11, color=COLOR_GREEN)),
+                    tickfont=dict(size=11, color=COLOR_CASH),
+                    title_font=dict(size=11, color=COLOR_CASH)),
     )
     period_label = _quarter_range_label(x)
     if period_label:
@@ -269,8 +281,9 @@ def _scatter_label_text(latest: pd.DataFrame, xcol: str, ycol: str, company_id: 
 
 def peer_scatter(df: pd.DataFrame, period, company_id: str, height: int = 440, peer_ids: list | None = None) -> go.Figure:
     latest = _peer_frame(df, period, company_id, peer_ids)
-    med_x = latest["revenue_yoy_growth"].median(skipna=True)
-    med_y = latest["ebitda_margin_ttm"].median(skipna=True)
+    peer_reference = latest.loc[latest["company_id"].astype(str) != str(company_id)]
+    med_x = peer_reference["revenue_yoy_growth"].median(skipna=True)
+    med_y = peer_reference["ebitda_margin_ttm"].median(skipna=True)
     labels = _scatter_label_text(latest, "revenue_yoy_growth", "ebitda_margin_ttm", company_id)
 
     fig = go.Figure()
@@ -280,7 +293,7 @@ def peer_scatter(df: pd.DataFrame, period, company_id: str, height: int = 440, p
             text=labels.loc[sub.index], textposition="top center",
             textfont=dict(size=10, color=PALETTE["slate"]),
             customdata=[t.replace(".SA", "") for t in sub["ticker"]],
-            marker=dict(size=(18 if is_anchor else 13), color=(COLOR_GREEN if is_anchor else COLOR_BLUE),
+            marker=dict(size=(18 if is_anchor else 13), color=(COLOR_ANCHOR if is_anchor else COLOR_PEER),
                         line=dict(width=(1.6 if is_anchor else 0.6), color="#ffffff"),
                         opacity=0.95),
             name=("Anchor" if is_anchor else "Peers"),
@@ -290,10 +303,10 @@ def peer_scatter(df: pd.DataFrame, period, company_id: str, height: int = 440, p
         fig.add_vline(x=med_x, line=dict(color=PALETTE["muted_2"], width=1, dash="dash"))
     if pd.notna(med_y):
         fig.add_hline(y=med_y, line=dict(color=PALETTE["muted_2"], width=1, dash="dash"))
-    fig = _style(fig, "Peer Positioning — Growth vs Margin",
-                 "Anchor + outliers labeled, all names on hover; dashed lines = peer median", height)
-    fig.update_xaxes(title="Revenue growth (YoY)", tickformat=".0%")
-    fig.update_yaxes(title="EBITDA margin (TTM)", tickformat=".0%")
+    fig = _style(fig, "Peer Positioning - Growth vs Margin",
+                 "Latest-quarter growth vs LTM margin | selected company highlighted | dashed lines = peer medians (ex-company)", height)
+    fig.update_xaxes(title="Revenue growth (latest quarter YoY)", tickformat=".0%")
+    fig.update_yaxes(title="EBITDA margin (LTM)", tickformat=".0%")
     return fig
 
 
@@ -306,8 +319,9 @@ def peer_valuation_scatter(df: pd.DataFrame, period, company_id: str, height: in
         lambda v: multiple_outlier_reason("ev_to_ebitda_ttm", v) is not None)
     excluded = latest[extreme & ~latest["company_id"].eq(company_id)]
     latest = latest[~extreme | latest["company_id"].eq(company_id)]
-    med_x = latest["revenue_yoy_growth"].median(skipna=True)
-    med_y = latest["ev_to_ebitda_ttm"].median(skipna=True)
+    peer_reference = latest.loc[latest["company_id"].astype(str) != str(company_id)]
+    med_x = peer_reference["revenue_yoy_growth"].median(skipna=True)
+    med_y = peer_reference["ev_to_ebitda_ttm"].median(skipna=True)
     labels = _scatter_label_text(latest, "revenue_yoy_growth", "ev_to_ebitda_ttm", company_id)
     fig = go.Figure()
     for is_anchor, sub in latest.groupby(latest["company_id"].eq(company_id)):
@@ -316,7 +330,7 @@ def peer_valuation_scatter(df: pd.DataFrame, period, company_id: str, height: in
             text=labels.loc[sub.index], textposition="top center",
             textfont=dict(size=10, color=PALETTE["slate"]),
             customdata=[t.replace(".SA", "") for t in sub["ticker"]],
-            marker=dict(size=(18 if is_anchor else 13), color=(COLOR_GREEN if is_anchor else COLOR_BLUE),
+            marker=dict(size=(18 if is_anchor else 13), color=(COLOR_ANCHOR if is_anchor else COLOR_PEER),
                         line=dict(width=(1.6 if is_anchor else 0.6), color="#ffffff"), opacity=0.95),
             name=("Anchor" if is_anchor else "Peers"),
             hovertemplate="%{customdata}<br>Growth %{x:.1%}<br>EV/EBITDA %{y:.1f}x<extra></extra>",
@@ -329,16 +343,17 @@ def peer_valuation_scatter(df: pd.DataFrame, period, company_id: str, height: in
         names = ", ".join(t.replace(".SA", "") for t in excluded["ticker"].head(4))
         subtitle = f"Off-scale outliers excluded: {names} (see peer benchmark bars)"
     else:
-        subtitle = "Upper-right = paying up for growth; lower-left = cheap & slow"
+        subtitle = "Latest-quarter growth vs LTM valuation | upper-right = paying up for growth"
     fig = _style(fig, "Valuation vs Growth", subtitle, height)
-    fig.update_xaxes(title="Revenue growth (YoY)", tickformat=".0%")
-    fig.update_yaxes(title="EV / EBITDA (TTM)", ticksuffix="x")
+    fig.update_xaxes(title="Revenue growth (latest quarter YoY)", tickformat=".0%")
+    fig.update_yaxes(title="EV / EBITDA (LTM)", ticksuffix="x")
     return fig
 
 
 def valuation_chart(df: pd.DataFrame, period, company_id: str, height: int = 400, peer_ids: list | None = None) -> go.Figure:
     latest = _peer_frame(df, period, company_id, peer_ids).dropna(subset=["ev_to_ebitda_ttm"]).sort_values("ev_to_ebitda_ttm")
-    stats = adjusted_stats(latest, "ev_to_ebitda_ttm")
+    peer_reference = latest.loc[latest["company_id"].astype(str) != str(company_id)]
+    stats = adjusted_stats(peer_reference if not peer_reference.empty else latest, "ev_to_ebitda_ttm")
 
     # Negative-EBITDA names cannot be drawn on a multiple axis; drop + disclose.
     negative = latest[latest["ev_to_ebitda_ttm"] < 0]
@@ -348,7 +363,7 @@ def valuation_chart(df: pd.DataFrame, period, company_id: str, height: int = 400
     tickers = [t.replace(".SA", "") for t in latest["ticker"]]
     capped = values > EV_EBITDA_MAX
     shown = values.clip(upper=EV_EBITDA_MAX)
-    colors = [COLOR_GREEN if cid == company_id else (PALETTE["copper"] if is_cap else COLOR_BLUE)
+    colors = [COLOR_ANCHOR if cid == company_id else (PALETTE["copper"] if is_cap else COLOR_PEER)
               for cid, is_cap in zip(latest["company_id"], capped)]
     fig = go.Figure(go.Bar(
         x=tickers, y=shown, marker_color=colors, marker_line_width=0,
@@ -363,12 +378,12 @@ def valuation_chart(df: pd.DataFrame, period, company_id: str, height: int = 400
                       annotation_text=f"Adj. median {adj_med:.1f}x", annotation_position="top left",
                       annotation_yshift=8,
                       annotation_font=dict(size=10.5, color=PALETTE["gold"]))
-    subtitle = "Anchor highlighted; dashed line = peer median excl. flagged outliers"
+    subtitle = "Company highlighted; dashed line = peer median excluding company and flagged outliers"
     if pd.notna(adj_med) and pd.notna(raw_med) and abs(raw_med - adj_med) > 0.05:
         subtitle = (f"Anchor highlighted | median excl. outliers {adj_med:.1f}x "
                     f"(raw incl. outliers {raw_med:.1f}x)")
-    fig = _style(fig, "EV / EBITDA — Peer Benchmark", subtitle, height)
-    fig.update_yaxes(title="EV / EBITDA (TTM)", ticksuffix="x",
+    fig = _style(fig, "EV / EBITDA (LTM) - Peer Benchmark", subtitle, height)
+    fig.update_yaxes(title="EV / EBITDA (LTM)", ticksuffix="x",
                      range=[0, EV_EBITDA_MAX * 1.14] if capped.any() else None)
 
     # Outlier disclosure sits in the bottom margin, clear of the tick labels.
@@ -390,7 +405,8 @@ def valuation_chart(df: pd.DataFrame, period, company_id: str, height: int = 400
 
 # --- Actual vs Consensus charts ----------------------------------------------
 
-def consensus_beat_chart(rows: list[dict], currency: str = "", height: int = 340) -> go.Figure | None:
+def consensus_beat_chart(rows: list[dict], currency: str = "", height: int = 340,
+                         true_surprise: bool = False) -> go.Figure | None:
     """Grouped actual-vs-consensus bars for the currency metrics (Revenue/EBITDA)."""
     usable = [r for r in rows if r["metric"] in ("Revenue", "EBITDA")
               and r.get("actual") is not None and r.get("consensus") is not None]
@@ -398,10 +414,11 @@ def consensus_beat_chart(rows: list[dict], currency: str = "", height: int = 340
         return None
     metrics = [r["metric"] for r in usable]
     fig = go.Figure()
-    fig.add_bar(x=metrics, y=[r["consensus"] for r in usable], name="Consensus",
+    estimate_name = "Pre-report consensus" if true_surprise else "Current IQ_FQ estimate"
+    fig.add_bar(x=metrics, y=[r["consensus"] for r in usable], name=estimate_name,
                 marker_color=COLOR_GRAY, marker_line_width=0, opacity=0.75,
                 hovertemplate="Consensus: %{y:,.0f}<extra></extra>")
-    fig.add_bar(x=metrics, y=[r["actual"] for r in usable], name="Actual",
+    fig.add_bar(x=metrics, y=[r["actual"] for r in usable], name="Reported actual (latest Q)",
                 marker_color=[COLOR_GREEN if r["status"] == "beat" else
                               (COLOR_RED if r["status"] == "miss" else COLOR_BLUE)
                               for r in usable],
@@ -409,8 +426,10 @@ def consensus_beat_chart(rows: list[dict], currency: str = "", height: int = 340
                 text=[f"{r['delta_pct']:+.1%}" for r in usable], textposition="outside",
                 textfont=dict(size=11.5, color=PALETTE["slate"]), cliponaxis=False,
                 hovertemplate="Actual: %{y:,.0f}<extra></extra>")
-    fig = _style(fig, "Actual vs Consensus",
-                 f"Latest reported quarter ({currency}m); label = beat/miss delta", height)
+    comparison = ("True earnings surprise vs point-in-time pre-report consensus"
+                  if true_surprise else "Directional comparison vs current estimate - not a historical earnings surprise")
+    fig = _style(fig, "Latest Reported Quarter vs Estimate",
+                 f"{comparison} | {currency}m", height)
     fig.update_layout(barmode="group", bargap=0.4, bargroupgap=0.12)
     fig.update_yaxes(title=f"{currency}m" if currency else "")
     fig.update_xaxes(showgrid=False)

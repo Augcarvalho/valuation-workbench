@@ -92,7 +92,7 @@ def sidebar(df: pd.DataFrame) -> tuple[str, str]:
     mode = "Public Demo" if DEMO_MODE else "Capital IQ - Private"
     st.sidebar.markdown(
         f'<div class="sb-sub">Data mode<br><b style="color:#fff">{mode}</b></div>'
-        f'<div class="sb-sub" style="margin-top:10px">As of {ui.as_of_label(row["period"])}</div>'
+        f'<div class="sb-sub" style="margin-top:10px">Financials through {ui.as_of_label(row["period"])}</div>'
         f'<div class="sb-sub" style="margin-top:14px;color:#7f96ad;font-size:10.5px;line-height:1.5">'
         f'Illustrative watchlist artifact. Not investment advice. '
         f'Licensed Capital IQ exports stay in <code>data_private/</code>.</div>',

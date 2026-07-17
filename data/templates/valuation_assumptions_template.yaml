@@ -38,6 +38,8 @@ wacc:
 terminal:
   exit_multiple: auto           # else peer-group median EV/EBITDA
   perpetuity_growth: auto       # else currency default from wacc_params.csv
+  roic: auto                    # stable ROIC; reinvestment rate = perpetuity growth / ROIC
+  wacc: auto                    # stable-state WACC; auto converges beta/capital structure
 
 # --- Tier-2 operational drivers (optional) -------------------------------------
 # When present, REVENUE is built from physical drivers per segment

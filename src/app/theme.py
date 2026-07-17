@@ -291,6 +291,13 @@ table.pe-table.wrap th, table.pe-table.wrap td { white-space: normal; }
 table.pe-table.wrap td { line-height: 1.45; max-width: 520px; }
 /* Prose columns read left-aligned; wrap tables carry text, not figures. */
 table.pe-table.wrap td:not(.num), table.pe-table.wrap th { text-align: left; }
+table.pe-table.dense { table-layout: fixed; font-size: 11.3px; }
+table.pe-table.dense th, table.pe-table.dense td {
+  padding: 7px 6px; white-space: normal; overflow-wrap: anywhere; line-height: 1.3;
+}
+table.pe-table.dense th { font-size: 9.2px; letter-spacing: .035em; text-align: right; }
+table.pe-table.dense th:nth-child(1), table.pe-table.dense td:nth-child(1) { width: 8%; text-align: left; }
+table.pe-table.dense th:nth-child(2), table.pe-table.dense td:nth-child(2) { width: 22%; text-align: left; }
 table.pe-table tr.anchor td { background: var(--sage-soft); font-weight: 750; color: var(--navy); }
 table.pe-table tr.median td { background: #f3eadb; font-style: italic; color: var(--slate); }
 table.pe-table td .cell-pill { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 3px; }

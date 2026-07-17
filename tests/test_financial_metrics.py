@@ -107,3 +107,27 @@ def test_monitoring_dataset_adds_peer_percentiles_and_signals():
     assert "ev_to_ebitda_ttm_peer_pct" in latest.columns
     assert "revenue_yoy_growth_signal" in latest.columns
     assert latest["data_quality_score"].min() == 1.0
+
+
+def test_ttm_requires_four_consecutive_quarters():
+    inputs = _inputs()
+    fin = inputs["financials"]
+    market = inputs["market_data"]
+    missing_period = "2023-09-30"
+    inputs["financials"] = fin[~((fin["company_id"] == "A") & (fin["period"] == missing_period))]
+    inputs["market_data"] = market[~((market["company_id"] == "A") & (market["period"] == missing_period))]
+    df = prepare_monitoring_dataset(inputs)
+    latest = df[df["company_id"] == "A"].sort_values("period").iloc[-1]
+    assert not bool(latest["ttm_complete"])
+    assert pd.isna(latest["revenue_ttm"])
+
+
+def test_operating_nwc_excludes_non_operating_current_items():
+    inputs = _inputs()
+    inputs["financials"]["ar"] = 40.0
+    inputs["financials"]["inventory"] = 10.0
+    inputs["financials"]["ap"] = 25.0
+    df = prepare_monitoring_dataset(inputs)
+    latest = df[df["company_id"] == "A"].sort_values("period").iloc[-1]
+    assert latest["operating_nwc"] == 25.0
+    assert latest["working_capital"] == 35.0

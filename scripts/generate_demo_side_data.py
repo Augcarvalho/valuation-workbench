@@ -13,6 +13,7 @@ mode without pretending to be real analyst data.
 from __future__ import annotations
 
 import sys
+import hashlib
 from pathlib import Path
 
 import numpy as np
@@ -69,7 +70,8 @@ def build_estimates(fin: pd.DataFrame) -> pd.DataFrame:
     )
     rows = []
     for company_id, g in fin.groupby("company_id"):
-        rng = np.random.default_rng(abs(hash(company_id)) % (2**32))  # deterministic per company
+        seed = int.from_bytes(hashlib.sha256(str(company_id).encode("utf-8")).digest()[:4], "big")
+        rng = np.random.default_rng(seed)
         for _, r in g.iterrows():
             beat = rng.normal(0.0, 0.02)
             growth = rng.normal(0.06, 0.02)

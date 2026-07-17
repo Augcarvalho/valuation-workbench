@@ -31,6 +31,7 @@ import pandas as pd
 from src.modeling.attention import compute_attention
 from src.modeling.expectations import revision_momentum, valuation_vs_history
 from src.modeling.metrics import latest_rows
+from src.modeling.outliers import adjusted_stats
 from src.modeling.peer_sets import resolve_peers
 from src.modeling.red_flags import generate_red_flags
 from src.modeling.thesis import Thesis, load_thesis
@@ -121,9 +122,14 @@ def _company_history(df: pd.DataFrame, company_id: str) -> pd.DataFrame:
 
 
 def _prior_year_row(history: pd.DataFrame) -> pd.Series | None:
-    """The reading from four quarters before the latest, if available."""
-    if len(history) >= 5:
-        return history.iloc[-5]
+    """The same fiscal quarter one year earlier, if available."""
+    if history.empty or "period" not in history.columns:
+        return None
+    latest_quarter = pd.Timestamp(history.iloc[-1]["period"]).to_period("Q")
+    periods = pd.to_datetime(history["period"]).dt.to_period("Q")
+    match = history.loc[periods == latest_quarter - 4]
+    if not match.empty:
+        return match.iloc[-1]
     return None
 
 
@@ -166,17 +172,13 @@ def _valuation_premium(row: pd.Series, peer_median: dict) -> tuple[float | None,
     Operating/insurer names are read on EV/EBITDA; financials on P/E.
     Returns (premium, multiple_name).
     """
-    if _business_model(row) == "financial":
+    if _business_model(row) in ("financial", "insurer"):
         value, med, name = row.get("pe_ttm"), peer_median.get("pe_ttm"), "P/E"
     else:
         value, med, name = row.get("ev_to_ebitda_ttm"), peer_median.get("ev_to_ebitda_ttm"), "EV/EBITDA"
     if pd.isna(value) or med is None or pd.isna(med) or med <= 0:
         return None, name
     premium = float(value) / float(med) - 1
-    # Sanity guard: premiums beyond +/-500% almost always mean broken inputs
-    # (e.g. currency-unit mismatches on cross-listed names), not information.
-    if abs(premium) > 5:
-        return None, name
     return premium, name
 
 
@@ -187,9 +189,9 @@ def _revenue_kpi(row: pd.Series, currency: str) -> Kpi:
     pctile = row.get("revenue_yoy_growth_peer_pct")
     return Kpi(
         key="revenue_ttm",
-        label="TTM Revenue",
+        label="LTM Revenue",
         value=fmt_money(row.get("revenue_ttm"), currency),
-        context=f"Trailing twelve months · {fmt_signed_pct(g)} YoY" if pd.notna(g) else "Trailing twelve months",
+        context=f"Latest Q YoY {fmt_signed_pct(g)}" if pd.notna(g) else "Last 4 quarters",
         signal=str(row.get("revenue_yoy_growth_signal", "n/a")),
         delta=fmt_signed_pct(g) if pd.notna(g) else None,
         delta_dir="up" if (pd.notna(g) and g > 0) else ("down" if pd.notna(g) else "flat"),
@@ -209,7 +211,7 @@ def _margin_kpi(row: pd.Series, prior: pd.Series | None, metric: str, label: str
         key=metric,
         label=label,
         value=fmt_pct(m),
-        context=f"TTM · {fmt_bps(bps)} YoY" if bps is not None else "TTM margin",
+        context=f"LTM margin | {fmt_bps(bps)} YoY" if bps is not None else "LTM margin",
         signal=str(row.get(f"{metric}_signal", "n/a")),
         delta=fmt_bps(bps) if bps is not None else None,
         delta_dir=mdir,
@@ -238,7 +240,7 @@ def _build_kpis_operating(row: pd.Series, prior: pd.Series | None, peer_median: 
         key="fcf_conversion_ttm",
         label="FCF Conversion",
         value=fmt_pct(fc),
-        context="FCF / EBITDA (TTM)",
+        context="LTM FCF / LTM EBITDA",
         signal=str(row.get("fcf_conversion_ttm_signal", "n/a")),
         delta=fmt_signed_pct(fc - fc_prior) if (pd.notna(fc) and fc_prior is not None) else None,
         delta_dir=fdir,
@@ -255,7 +257,7 @@ def _build_kpis_operating(row: pd.Series, prior: pd.Series | None, peer_median: 
         key="net_debt_to_ebitda_ttm",
         label="Net Debt / EBITDA",
         value=fmt_multiple(nd),
-        context="Leverage vs TTM EBITDA",
+        context="Net debt / LTM EBITDA",
         signal=str(row.get("net_debt_to_ebitda_ttm_signal", "n/a")),
         delta=(f"{nd - nd_prior:+.1f}x" if (pd.notna(nd) and nd_prior is not None) else None),
         delta_dir=ndir,
@@ -272,7 +274,8 @@ def _build_kpis_operating(row: pd.Series, prior: pd.Series | None, peer_median: 
         key="ev_to_ebitda_ttm",
         label="EV / EBITDA",
         value=fmt_multiple(ev),
-        context=(f"vs {fmt_multiple(ev_med)} peer median" if ev_med and pd.notna(ev_med) else "TTM"),
+        context=(f"Current EV / LTM EBITDA | vs {fmt_multiple(ev_med)} peer median"
+                 if ev_med and pd.notna(ev_med) else "Current EV / LTM EBITDA"),
         signal=str(row.get("ev_to_ebitda_ttm_signal", "n/a")),
         delta=(f"{fmt_signed_pct(prem)} vs peers" if prem is not None else None),
         delta_dir=("up" if (prem is not None and prem > 0) else ("down" if prem is not None else "flat")),
@@ -287,7 +290,8 @@ def _build_kpis_operating(row: pd.Series, prior: pd.Series | None, peer_median: 
         key="ev_to_revenue_ttm",
         label="EV / Revenue",
         value=fmt_multiple(evr),
-        context=(f"vs {fmt_multiple(evr_med)} peer median" if evr_med and pd.notna(evr_med) else "TTM"),
+        context=(f"Current EV / LTM revenue | vs {fmt_multiple(evr_med)} peer median"
+                 if evr_med and pd.notna(evr_med) else "Current EV / LTM revenue"),
         signal="n/a",
     ))
     return kpis
@@ -301,9 +305,9 @@ def _build_kpis_financial(row: pd.Series, prior: pd.Series | None, peer_median: 
     ni = row.get("net_income_ttm")
     kpis.append(Kpi(
         key="net_income_ttm",
-        label="TTM Net Income",
+        label="LTM Net Income",
         value=fmt_money(ni, currency),
-        context="Bottom line (TTM)",
+        context="Last 4 quarters",
         signal="n/a",
     ))
 
@@ -317,7 +321,8 @@ def _build_kpis_financial(row: pd.Series, prior: pd.Series | None, peer_median: 
         key="pe_ttm",
         label="P / E",
         value=fmt_multiple(pe),
-        context=(f"vs {fmt_multiple(pe_med)} peer median" if pe_med and pd.notna(pe_med) else "TTM earnings"),
+        context=(f"Current price / LTM EPS | vs {fmt_multiple(pe_med)} peer median"
+                 if pe_med and pd.notna(pe_med) else "Current price / LTM EPS"),
         signal=str(row.get("pe_ttm_signal", "n/a")),
         delta=(f"{fmt_signed_pct(prem)} vs peers" if prem is not None else None),
         delta_dir=("up" if (prem is not None and prem > 0) else ("down" if prem is not None else "flat")),
@@ -358,7 +363,7 @@ def _build_positives(row: pd.Series, prior: pd.Series | None, peer_median: dict)
     if pd.notna(m) and pd.notna(m_prior) and (m - m_prior) >= 0.005:
         out.append(f"{margin_name.capitalize()} expanding {fmt_bps(m - m_prior)} YoY to {fmt_pct(m)}.")
     elif pd.notna(m) and str(row.get(f"{margin_metric}_signal", "")) == "green":
-        out.append(f"Healthy {fmt_pct(m)} TTM {margin_name}, in the upper band for the peer group.")
+        out.append(f"Healthy {fmt_pct(m)} LTM {margin_name}, in the upper band for the peer group.")
 
     if not financial:
         fc = row.get("fcf_conversion_ttm")
@@ -391,7 +396,7 @@ def _build_concerns(row: pd.Series, prior: pd.Series | None) -> list[str]:
     if pd.notna(m) and pd.notna(m_prior) and (m - m_prior) <= -0.01:
         out.append(f"{margin_name.capitalize()} compressed {fmt_bps(m - m_prior)} YoY to {fmt_pct(m)}.")
     if pd.notna(m) and str(row.get(f"{margin_metric}_signal", "")) == "red":
-        out.append(f"Thin profitability at {fmt_pct(m)} TTM {margin_name}.")
+        out.append(f"Thin profitability at {fmt_pct(m)} LTM {margin_name}.")
 
     if not financial:
         fc = row.get("fcf_conversion_ttm")
@@ -485,6 +490,17 @@ def _verdict(row: pd.Series, premium: float | None, multiple_name: str) -> tuple
                 f"On track across {_join(greens)}, but the multiple already pays for it ({prem_txt}). "
                 f"Own the story, don't chase it."
             )
+        if premium is None:
+            if _business_model(row) in ("financial", "insurer"):
+                current = row.get("pe_ttm")
+            else:
+                current = row.get("ev_to_ebitda_ttm")
+            current_text = f" (current {multiple_name}: {float(current):.1f}x)" if pd.notna(current) else ""
+            return "watch", (
+                f"Operating profile is on track ({_join(greens)}), but the peer valuation "
+                f"benchmark is unavailable or not reliable{current_text}. Keep at Watch until "
+                f"the comp set supports a defensible valuation conclusion."
+            )
         return "constructive", f"On track across {_join(greens)}; valuation is not a blocker."
 
     if len(reds) == 1:
@@ -509,7 +525,7 @@ def _commentary(row: pd.Series, prior: pd.Series | None) -> str:
     parts: list[str] = []
     if pd.notna(g):
         trend = "growth" if g >= 0 else "a contraction"
-        parts.append(f"{name} posted {fmt_pct(g)} TTM revenue {trend} versus the prior-year quarter")
+        parts.append(f"{name} posted {fmt_pct(g)} latest-quarter revenue {trend} versus the prior-year quarter")
     else:
         parts.append(f"{name} reported the latest quarter")
     if pd.notna(m):
@@ -654,20 +670,18 @@ def build_assessment(df: pd.DataFrame, company_id: str, store=None) -> Assessmen
     prior = _prior_year_row(history)
     resolution = resolve_peers(latest_rows(df), row)
     peers = resolution.peers
+    peer_reference = peers.loc[peers["company_id"].astype(str) != str(company_id)].copy()
+    if peer_reference.empty:
+        peer_reference = peers.copy()
 
-    peer_median = {
-        col: _median(peers, col)
-        for col in [
-            "revenue_yoy_growth",
-            "ebitda_margin_ttm",
-            "net_income_margin_ttm",
-            "fcf_conversion_ttm",
-            "net_debt_to_ebitda_ttm",
-            "ev_to_ebitda_ttm",
-            "ev_to_revenue_ttm",
-            "pe_ttm",
-        ]
-    }
+    operating_metrics = [
+        "revenue_yoy_growth", "ebitda_margin_ttm", "net_income_margin_ttm",
+        "fcf_conversion_ttm", "net_debt_to_ebitda_ttm",
+    ]
+    peer_median = {col: _median(peer_reference, col) for col in operating_metrics}
+    for col in ["ev_to_ebitda_ttm", "ev_to_revenue_ttm", "pe_ttm", "p_tbv"]:
+        stats = adjusted_stats(peer_reference, col)
+        peer_median[col] = stats["adjusted_median"]
 
     premium, multiple_name = _valuation_premium(row, peer_median)
 

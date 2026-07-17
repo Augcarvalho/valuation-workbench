@@ -8,6 +8,7 @@ import streamlit as st
 from src.app import components as ui
 from src.app.context import DEMO_MODE, get_store, load_summary, tone, verdict_pill
 from src.modeling.assessment import Kpi
+from src.reporting.periods import source_as_of
 from src.utils import fmt_multiple, fmt_ordinal, fmt_pct, fmt_signed_pct
 
 
@@ -25,6 +26,9 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     side_note = []
     side_note.append("valuation history ✓" if store.has_valuation_history else "valuation history —")
     side_note.append("consensus ✓" if store.has_estimates else "consensus —")
+    market_date = source_as_of(store.source_log, "market_data")
+    market_note = (f"Market snapshot retrieved {market_date}" if market_date
+                   else "Market snapshot date unavailable")
 
     st.markdown(
         f"""
@@ -42,7 +46,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             <div class="pe-meta-item"><div class="pe-meta-label">Coverage</div>
               <div class="pe-meta-value">{summary['peer_group'].nunique()} peer groups | {' · '.join(side_note)}</div></div>
             <div class="pe-meta-item"><div class="pe-meta-label">Freshness</div>
-              <div class="pe-meta-value">{as_of_note}</div></div>
+              <div class="pe-meta-value">{market_note} | Financials: {as_of_note}</div></div>
           </div>
         </div>
         """,
@@ -64,7 +68,9 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     group_pick = st.selectbox("Filter by peer group", groups, label_visibility="collapsed")
     view = summary if group_pick == "All peer groups" else summary[summary["peer_group"] == group_pick]
 
-    headers = ["#", "Attn", "Ticker", "Company", "Peer Group", "Verdict", "Stage", "Rev YoY", "Profit.", "Multiple", "vs Peers", "vs Hist", "Revisions", "Flags", "As Of"]
+    headers = ["#", "Attn", "Ticker", "Company", "Peer Group", "Verdict", "Stage",
+               "Rev Growth (Latest Q YoY)", "Profitability (LTM)", "Current Multiple (LTM)",
+               "vs Peer Median", "vs Own History", "NTM Revisions", "Flags", "Financials Through"]
     rows, classes = [], []
     for _, r in view.iterrows():
         g = r["revenue_yoy_growth"]
@@ -97,9 +103,10 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     ui.footnote(
         "Attention score (0–100) weighs valuation dislocation (vs peers and vs the company's own multiple history), "
         "estimate revision momentum, operating inflection, and open red flags. "
-        "Profitability = TTM EBITDA margin (operating) or TTM net income margin (financials). "
+        "Profitability = LTM EBITDA margin (operating) or LTM net income margin (financials). "
+        "Current multiple uses the latest market snapshot over an LTM denominator. "
         "vs Hist = current multiple's percentile within its own history (low = cheap vs itself). "
-        "Per-name as-of dates differ because fiscal calendars differ."
+        "Financials-through dates differ because fiscal calendars differ."
     )
 
     picks = summary.head(5)

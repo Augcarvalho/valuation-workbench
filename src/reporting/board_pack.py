@@ -139,7 +139,7 @@ def _peer_chart(df: pd.DataFrame, company_id: str) -> bytes:
         ax.axhline(med_y, color=PALETTE["muted_2"], linestyle="--", linewidth=1)
     ax.set_title("Peer Positioning — Growth vs Margin", fontsize=12, weight="bold", color=PALETTE["navy"], loc="left")
     ax.set_xlabel("Revenue YoY growth")
-    ax.set_ylabel("TTM EBITDA margin")
+    ax.set_ylabel("LTM EBITDA margin")
     ax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
     ax.yaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
     ax.grid(True, alpha=0.18)
@@ -220,9 +220,9 @@ def build_context(df: pd.DataFrame, company_id: str | None = None) -> dict:
     })
 
     cashflow_rows = [
-        {"label": "CFO (TTM)", "value": fmt_money(row.get("cfo_ttm"), currency)},
-        {"label": "Capex (TTM)", "value": fmt_money(row.get("capex_ttm"), currency)},
-        {"label": "Free cash flow (TTM)", "value": fmt_money(row.get("fcf_ttm"), currency)},
+        {"label": "CFO (LTM)", "value": fmt_money(row.get("cfo_ttm"), currency)},
+        {"label": "Capex (LTM)", "value": fmt_money(row.get("capex_ttm"), currency)},
+        {"label": "Free cash flow (LTM)", "value": fmt_money(row.get("fcf_ttm"), currency)},
         {"label": "FCF conversion", "value": fmt_pct(row.get("fcf_conversion_ttm"))},
         {"label": "Capex intensity", "value": fmt_pct(row.get("capex_intensity_ttm"))},
         {"label": "Net debt", "value": fmt_money(row.get("net_debt"), currency)},

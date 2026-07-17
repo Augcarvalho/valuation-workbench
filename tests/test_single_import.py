@@ -15,6 +15,7 @@ def _write_staging(root, company_id=NEW_ID, ok=True, revenue=100.0, name="Grupo 
     staging.mkdir(parents=True, exist_ok=True)
     (staging / "staging_result.json").write_text(json.dumps({
         "ok": ok, "company_id": company_id, "company_name": name,
+        "exported_at": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
         "financial_rows": 2, "error": None if ok else "boom",
     }), encoding="utf-8")
     pd.DataFrame([{"company_id": company_id, "ticker": "GMAT3", "company_name": name,
@@ -113,4 +114,14 @@ def test_missing_result_json_blocks_merge(tmp_path):
     staging = _write_staging(staging_root)
     (staging / "staging_result.json").unlink()
     with pytest.raises(ValueError, match="staging result"):
+        validate_staging(NEW_ID, staging)
+
+
+def test_stale_staging_is_rejected(tmp_path):
+    staging = _write_staging(tmp_path / "staging")
+    result_path = staging / "staging_result.json"
+    result = json.loads(result_path.read_text())
+    result["exported_at"] = "2020-01-01 00:00:00"
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+    with pytest.raises(ValueError, match="stale"):
         validate_staging(NEW_ID, staging)

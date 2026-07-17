@@ -154,7 +154,7 @@ def _first_available(df: pd.DataFrame, labels: list[str], date: pd.Timestamp) ->
     return None
 
 
-def _to_brl_m(value: float | None) -> float | None:
+def _to_millions(value: float | None) -> float | None:
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return None
     return value / 1_000_000
@@ -183,7 +183,7 @@ def _company_rows(company: dict[str, str]) -> tuple[list[dict], list[dict]]:
     cashflow = ticker.quarterly_cashflow
     info = ticker.info
     history = ticker.history(period="5y", auto_adjust=False)
-    shares = info.get("sharesOutstanding")
+    current_shares = info.get("sharesOutstanding")
 
     financial_rows: list[dict] = []
     market_rows: list[dict] = []
@@ -191,24 +191,34 @@ def _company_rows(company: dict[str, str]) -> tuple[list[dict], list[dict]]:
 
     for raw_date in dates:
         period = pd.Timestamp(raw_date).to_period("Q").to_timestamp("Q")
-        revenue = _to_brl_m(_first_available(income, ["Total Revenue", "Operating Revenue"], raw_date))
-        gross_profit = _to_brl_m(_first_available(income, ["Gross Profit"], raw_date))
-        ebitda = _to_brl_m(_first_available(income, ["EBITDA", "Normalized EBITDA"], raw_date))
-        ebit = _to_brl_m(_first_available(income, ["EBIT", "Operating Income"], raw_date))
-        net_income = _to_brl_m(_first_available(income, ["Net Income"], raw_date))
-        cfo = _to_brl_m(_first_available(cashflow, ["Operating Cash Flow"], raw_date))
-        capex = _to_brl_m(_positive_outflow(_first_available(cashflow, ["Capital Expenditure"], raw_date)))
-        cash = _to_brl_m(
+        revenue = _to_millions(_first_available(income, ["Total Revenue", "Operating Revenue"], raw_date))
+        gross_profit = _to_millions(_first_available(income, ["Gross Profit"], raw_date))
+        operating_income = _to_millions(_first_available(income, ["Operating Income"], raw_date))
+        d_and_a = _to_millions(_first_available(
+            cashflow,
+            ["Depreciation And Amortization", "Depreciation Amortization Depletion", "Depreciation"],
+            raw_date,
+        ))
+        if operating_income is not None:
+            ebit = operating_income
+            ebitda = operating_income + (d_and_a or 0.0)
+        else:
+            ebit = _to_millions(_first_available(income, ["EBIT"], raw_date))
+            ebitda = _to_millions(_first_available(income, ["Normalized EBITDA", "EBITDA"], raw_date))
+        net_income = _to_millions(_first_available(income, ["Net Income"], raw_date))
+        cfo = _to_millions(_first_available(cashflow, ["Operating Cash Flow"], raw_date))
+        capex = _to_millions(_positive_outflow(_first_available(cashflow, ["Capital Expenditure"], raw_date)))
+        cash = _to_millions(
             _first_available(
                 balance,
                 ["Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents"],
                 raw_date,
             )
         )
-        total_debt = _to_brl_m(_first_available(balance, ["Total Debt"], raw_date))
-        net_debt = _to_brl_m(_first_available(balance, ["Net Debt"], raw_date))
-        working_capital = _to_brl_m(_first_available(balance, ["Working Capital"], raw_date))
-        interest_expense = _to_brl_m(
+        total_debt = _to_millions(_first_available(balance, ["Total Debt"], raw_date))
+        net_debt = _to_millions(_first_available(balance, ["Net Debt"], raw_date))
+        working_capital = _to_millions(_first_available(balance, ["Working Capital"], raw_date))
+        interest_expense = _to_millions(
             _positive_outflow(
                 _first_available(
                     income,
@@ -223,6 +233,8 @@ def _company_rows(company: dict[str, str]) -> tuple[list[dict], list[dict]]:
             continue
 
         price = _price_asof(history, period)
+        period_shares = _first_available(income, ["Diluted Average Shares", "Basic Average Shares"], raw_date)
+        shares = period_shares if period_shares is not None else current_shares
         market_cap = None if price is None or shares is None else price * shares / 1_000_000
         enterprise_value = None if market_cap is None or net_debt is None else market_cap + net_debt
 
@@ -234,6 +246,7 @@ def _company_rows(company: dict[str, str]) -> tuple[list[dict], list[dict]]:
                 "gross_profit": gross_profit,
                 "ebitda": ebitda,
                 "ebit": ebit,
+                "d_and_a": d_and_a,
                 "net_income": net_income,
                 "cfo": cfo,
                 "capex": capex,
@@ -310,10 +323,10 @@ def main() -> None:
             },
             {
                 "table_name": "estimates",
-                "source_name": "Capital IQ template",
+                "source_name": "Synthetic demo estimates",
                 "source_url": "data/templates/estimates_template.csv",
                 "retrieved_at": datetime.now(timezone.utc).date().isoformat(),
-                "notes": "Public demo intentionally leaves consensus/guidance blank unless supplied locally.",
+                "notes": "Generated deterministically from public-demo actuals for UI testing; not analyst consensus.",
             },
         ]
     )

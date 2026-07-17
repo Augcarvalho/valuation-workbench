@@ -223,6 +223,10 @@ def load_peer_sets(path: Path = PEER_SETS_PATH) -> pd.DataFrame:
     for col in PEER_SET_COLUMNS:
         if col not in df.columns:
             df[col] = pd.NA
+    for col in ["peer_set_id", "peer_set_name", "anchor_company_id", "peer_company_id",
+                "source", "rationale", "created_at", "inclusion_status",
+                "reviewed_at", "reviewer_note", "updated_at"]:
+        df[col] = df[col].astype("object")
     return df[PEER_SET_COLUMNS]
 
 
@@ -315,7 +319,11 @@ def save_peer_set(
     existing = load_peer_sets(path)
     # Replace: drop prior sets for this anchor.
     existing = existing[existing["anchor_company_id"] != anchor_company_id]
-    combined = pd.concat([existing, rows], ignore_index=True)
+    if existing.empty:
+        combined = rows
+    else:
+        records = existing.to_dict(orient="records") + rows.to_dict(orient="records")
+        combined = pd.DataFrame.from_records(records, columns=PEER_SET_COLUMNS)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(path, index=False)
     return set_id
