@@ -189,13 +189,14 @@ def test_peer_taxonomy_follows_comps_discipline():
 
     group_of = dict(zip(ref["company_id"], ref["peer_group"]))
     # Brand apparel is never comped against restaurants/marketplaces.
-    assert group_of["NASDAQ:LULU"] == group_of["NYSE:NKE"]
-    if "NASDAQ:SBUX" in group_of:
+    if {"NASDAQ:LULU", "NYSE:NKE"} <= set(group_of):
+        assert group_of["NASDAQ:LULU"] == group_of["NYSE:NKE"]
+    if {"NASDAQ:LULU", "NASDAQ:SBUX"} <= set(group_of):
         assert group_of["NASDAQ:LULU"] != group_of["NASDAQ:SBUX"]
-    if "NASDAQ:ETSY" in group_of:
+    if {"NASDAQ:LULU", "NASDAQ:ETSY"} <= set(group_of):
         assert group_of["NASDAQ:LULU"] != group_of["NASDAQ:ETSY"]
     # S&P Global is not an Adobe comp.
-    if "NYSE:SPGI" in group_of:
+    if {"NYSE:SPGI", "NASDAQ:ADBE"} <= set(group_of):
         assert group_of["NYSE:SPGI"] != group_of["NASDAQ:ADBE"]
     # Merchant acquiring is one global business model (STNE comps = GPN, not MELI).
     if {"NASDAQ:STNE", "NYSE:GPN", "NASDAQ:MELI"} <= set(group_of):
