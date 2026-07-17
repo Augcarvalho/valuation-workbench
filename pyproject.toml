@@ -16,6 +16,7 @@ dependencies = [
   "pandas>=2.0",
   "plotly>=5.20",
   "PyMuPDF>=1.23",
+  "PyYAML>=6.0",
   "pytest>=8.0",
   "requests>=2.31",
   "streamlit>=1.35",
