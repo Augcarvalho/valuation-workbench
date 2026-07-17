@@ -52,7 +52,7 @@ def multiple_history_chart(hist: dict, label: str, height: int = 420) -> go.Figu
         fig.add_scatter(x=peers["date"], y=peers["q3"], mode="lines",
                         line=dict(width=0), hoverinfo="skip", showlegend=False)
         fig.add_scatter(x=peers["date"], y=peers["q1"], mode="lines", line=dict(width=0),
-                        fill="tonexty", fillcolor="rgba(122,138,115,0.16)",
+                        fill="tonexty", fillcolor="rgba(32,178,170,0.14)",
                         name="Peer 25th-75th pct", hoverinfo="skip")
         fig.add_scatter(x=peers["date"], y=peers["median"], mode="lines",
                         line=dict(color=GRAPHITE, width=1.8, dash="dash"), name="Peer median (ex-company)",
@@ -110,7 +110,7 @@ def momentum_heatmap(momentum: dict[str, dict], height: int | None = None) -> go
     height = height or (150 + 62 * len(rows))
     fig = go.Figure(go.Heatmap(
         z=z, x=[f"{p}M" for p in periods], y=labels,
-        colorscale=[[0.0, COPPER], [0.5, PALETTE["cream"]], [1.0, GREEN]],
+        colorscale=[[0.0, PALETTE["navy_3"]], [0.5, PALETTE["cream"]], [1.0, PALETTE["teal"]]],
         zmid=0.0, xgap=5, ygap=8, showscale=False,
         text=text, texttemplate="%{text}", textfont=dict(size=10.5, family=FONT_SANS),
         hovertemplate="%{y} | %{x}<br>vs peers %{z:+.1%}<extra></extra>",
@@ -150,7 +150,7 @@ def peer_distribution_panels(spread: pd.DataFrame, metrics: list[str], company_i
         if not np.isnan(stats["q1"]) and not np.isnan(stats["q3"]):
             fig.add_shape(type="rect", x0=stats["q1"], x1=stats["q3"], y0=-0.32, y1=0.32,
                           line=dict(color=SAGE, width=1.2),
-                          fillcolor="rgba(122,138,115,0.16)", row=i, col=1)
+                          fillcolor="rgba(32,178,170,0.14)", row=i, col=1)
         if not np.isnan(stats["adjusted_median"]):
             fig.add_shape(type="line", x0=stats["adjusted_median"], x1=stats["adjusted_median"],
                           y0=-0.42, y1=0.42, line=dict(color=GRAPHITE, width=2.4), row=i, col=1)

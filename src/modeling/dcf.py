@@ -125,12 +125,21 @@ def run_dcf(
     nwc_now = _clean(row.get("operating_nwc"))
     if nwc_now is None:
         nwc_now = _clean(row.get("working_capital"))
+    segment_growth_delta = None
+    if getattr(assumptions, "segments", None):
+        baseline = assumptions.scenarios.get(scenario.name)
+        if baseline is not None:
+            segment_growth_delta = [
+                float(current) - float(anchor)
+                for current, anchor in zip(scenario.revenue_growth, baseline.revenue_growth)
+            ]
     forecast = build_forecast(
         revenue_ttm=_clean(row.get("revenue_ttm")),
         scenario=scenario,
         cogs_pct=anchors.get("cogs_pct"),
         nwc_now=nwc_now,
         segments=getattr(assumptions, "segments", None),
+        segment_growth_delta=segment_growth_delta,
     )
     if getattr(assumptions, "segments", None):
         notes.append(f"revenue built from {len(assumptions.segments)} operational "
@@ -310,17 +319,25 @@ def sensitivity_implied_growth(
     cell answers "what growth-forever does this multiple embed?" - benchmark
     against the long-run inflation/GDP anchor before trusting the target.
     """
+    terminal_center = float(assumptions.terminal_wacc or wacc)
     if wacc_steps is None:
-        wacc_steps = [round(wacc + d, 4) for d in (-0.015, -0.0075, 0.0, 0.0075, 0.015)]
+        wacc_steps = [round(terminal_center + d, 4) for d in (-0.015, -0.0075, 0.0, 0.0075, 0.015)]
     if multiple_steps is None:
         multiple_steps = [round(exit_multiple + d, 2) for d in (-2.0, -1.0, 0.0, 1.0, 2.0)]
         multiple_steps = [m for m in multiple_steps if m > 0] or [exit_multiple]
 
+    from dataclasses import replace
+
     grid = {}
     for mult in multiple_steps:
         column = []
-        for w in wacc_steps:
-            res = run_dcf(row, scenario, assumptions, w, mult)
+        for terminal_wacc in wacc_steps:
+            # This grid explicitly flexes terminal WACC. Keeping a fixed
+            # analyst terminal-WACC override would produce identical rows and
+            # defeat the purpose of the reasonableness check.
+            flexed_assumptions = replace(assumptions, terminal_wacc=terminal_wacc)
+            discount_wacc = wacc + (terminal_wacc - terminal_center)
+            res = run_dcf(row, scenario, flexed_assumptions, discount_wacc, mult)
             g = res.implied_terminal_growth
             column.append(g if g is not None else np.nan)
         grid[f"{mult:g}x"] = column

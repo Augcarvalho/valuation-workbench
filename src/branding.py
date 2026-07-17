@@ -15,39 +15,39 @@ from __future__ import annotations
 PALETTE = {
     # Structure. The legacy "navy" names are kept so existing chart and layout
     # code can inherit the new direction without mechanical refactors.
-    "navy": "#1f2421",        # charcoal header/sidebar
-    "navy_2": "#29322c",      # dark moss charcoal
-    "navy_3": "#6f7f63",      # sage accent
-    "ink": "#20221d",         # primary text
-    "slate": "#4a4f45",       # secondary text
-    "muted": "#74786e",       # tertiary / captions
-    "muted_2": "#9c9a90",     # faint labels
-    "line": "#d8d0c1",        # card / table borders
-    "line_soft": "#e9e2d6",   # hairline separators
-    "bg": "#f3f0e8",          # warm app canvas
-    "panel": "#fffdf7",       # cards
-    "panel_alt": "#f6f1e8",   # zebra / table head
+    "navy": "#2F4F4F",        # dark slate header/sidebar
+    "navy_2": "#243D3D",      # deeper dark slate chrome
+    "navy_3": "#778899",      # slate-gray accent
+    "ink": "#243333",         # primary text
+    "slate": "#2F4F4F",       # secondary text
+    "muted": "#687A82",       # tertiary / captions
+    "muted_2": "#9AA6AB",     # faint labels
+    "line": "#D3D3D3",        # card / table borders
+    "line_soft": "#E8EEEE",   # hairline separators
+    "bg": "#F4F7F7",          # neutral app canvas
+    "panel": "#FFFFFF",       # cards
+    "panel_alt": "#F0F4F4",   # zebra / table head
     # Data / accents
-    "blue": "#687a61",        # sage primary series
-    "blue_2": "#9b6a4c",      # copper secondary series
-    "gold": "#a8843f",        # editorial accent rule
-    "teal": "#5e746a",        # muted institutional green-gray
-    "sage": "#687a61",
-    "sage_soft": "#edf1e8",
-    "copper": "#9b6a4c",
+    "blue": "#20B2AA",        # primary teal
+    "blue_2": "#2F4F4F",      # secondary dark slate
+    "gold": "#778899",        # fourth-priority slate gray
+    "teal": "#20B2AA",
+    "sage": "#20B2AA",
+    "sage_soft": "#E3F6F5",
+    "copper": "#778899",
     "oxblood": "#8f2f3b",
-    "cream": "#f8f4ea",
-    "charcoal": "#1f2421",
+    "cream": "#F4F7F7",
+    "charcoal": "#2F4F4F",
     # Chart roles. Peers recede, the selected company leads, and operating
     # series remain distinct without borrowing traffic-light colors.
-    "anchor": "#28584a",
-    "peer": "#8b938f",
-    "series_revenue": "#3f6b63",
-    "series_ebitda": "#72586b",
-    "series_cash": "#4f7478",
-    "series_margin": "#ad843d",
-    "series_secondary": "#9a654f",
-    "series_debt": "#8a3f4c",
+    "anchor": "#20B2AA",
+    "peer": "#D3D3D3",
+    "series_revenue": "#20B2AA",
+    "series_ebitda": "#2F4F4F",
+    "series_cash": "#778899",
+    "series_margin": "#778899",
+    "series_secondary": "#D3D3D3",
+    "series_debt": "#2F4F4F",
     # Signals (muted, institutional)
     "green": "#4f7658",
     "green_soft": "#e8efe5",

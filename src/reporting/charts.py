@@ -73,12 +73,13 @@ def _style(fig: go.Figure, title: str, subtitle: str = "", height: int = 380) ->
     # the legend strip sits above the plot area without touching either.
     fig.update_layout(
         title=dict(text=f"<b>{title}</b>", x=0, xanchor="left", y=0.98, yanchor="top",
-                   font=dict(size=17, color=PALETTE["navy"], family=FONT_SERIF),
+                   font=dict(size=17, color=PALETTE["navy"], family=FONT_SANS),
                    subtitle=dict(text=subtitle or None,
                                  font=dict(size=11.5, color=PALETTE["muted"], family=FONT_SANS))),
         font=dict(family=FONT_SANS, color=PALETTE["slate"], size=12),
-        plot_bgcolor="#ffffff",
-        paper_bgcolor="#ffffff",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        colorway=[PALETTE["teal"], PALETTE["navy"], PALETTE["line"], PALETTE["navy_3"]],
         height=height,
         margin=dict(l=24, r=20, t=94 if subtitle else 66, b=48),
         legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1.0,

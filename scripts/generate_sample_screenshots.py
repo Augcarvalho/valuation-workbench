@@ -10,6 +10,7 @@ the verdict, KPIs, and commentary match what the app shows.
 
 from __future__ import annotations
 
+import argparse
 import sys
 import textwrap
 from pathlib import Path
@@ -20,6 +21,7 @@ import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Rectangle
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +29,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.branding import MPL_FONT_STACK, PALETTE, VERDICT_COLORS, signal_hex
-from src.config import DEFAULT_PROCESSED_DATASET, REPORTS_SAMPLE_DIR
+from src.config import DEFAULT_PROCESSED_DATASET, PRIVATE_PROCESSED_DATASET, REPORTS_SAMPLE_DIR
 from src.ingestion.store import load_store
 from src.modeling.assessment import build_assessment
 from src.modeling.assessment import watchlist_summary
@@ -57,6 +59,7 @@ GOLD = PALETTE["series_margin"]
 
 SIG_TEXT = {"green": "GREEN", "yellow": "AMBER", "red": "RED", "n/a": "N/A"}
 SHOWCASE_COMPANY_ID = "GOOGL"
+SCREENSHOT_DEMO = True
 
 
 def _bg_axes(fig):
@@ -68,9 +71,12 @@ def _bg_axes(fig):
 
 
 def _load(company_id: str | None = None):
-    if not DEFAULT_PROCESSED_DATASET.exists():
+    path = DEFAULT_PROCESSED_DATASET if SCREENSHOT_DEMO else PRIVATE_PROCESSED_DATASET
+    if SCREENSHOT_DEMO and not path.exists():
         build_dataset("public-demo")
-    df = pd.read_csv(DEFAULT_PROCESSED_DATASET, parse_dates=["period"])
+    if not path.exists():
+        raise FileNotFoundError(f"Screenshot dataset not found: {path}")
+    df = pd.read_csv(path, parse_dates=["period"])
     if company_id is None:
         latest = latest_rows(df)
         company_id = SHOWCASE_COMPANY_ID if SHOWCASE_COMPANY_ID in set(latest["company_id"]) else (
@@ -80,7 +86,7 @@ def _load(company_id: str | None = None):
 
 
 def _store():
-    return load_store(demo=True)
+    return load_store(demo=SCREENSHOT_DEMO)
 
 
 def _header(ax, row, verdict=None, height=0.135, y=0.865):
@@ -114,7 +120,9 @@ def _header_clean(ax, row, verdict=None, height=0.135, y=0.865):
     ax.text(
         0.018,
         y + height - 0.028,
-        "INVESTMENT ANALYSIS PLATFORM | PUBLIC DEMO | QUARTERLY REVIEW",
+        ("INVESTMENT ANALYSIS PLATFORM | PUBLIC DEMO | QUARTERLY REVIEW"
+         if SCREENSHOT_DEMO else
+         "INVESTMENT ANALYSIS PLATFORM | PRIVATE DATA WORKFLOW | ANALYST CASE"),
         fontsize=7.5,
         color="#93acc6",
         zorder=2,
@@ -122,7 +130,8 @@ def _header_clean(ax, row, verdict=None, height=0.135, y=0.865):
     )
     ax.text(0.018, y + height - 0.066, name, fontsize=18, color="white", weight="bold", zorder=2, va="center")
     period = pd.Timestamp(row["period"])
-    country = "United States" if str(row.get("exchange", "")).upper() in {"NASDAQ", "NYSE"} else "Brazil"
+    exchange = str(row.get("exchange", "")).upper()
+    country = "United States" if exchange.startswith("NASDAQ") or exchange.startswith("NYSE") else "Brazil"
     sector_label = str(row.get("sector", ""))
     if sector_label == "Mega-Cap Tech & Digital Platforms":
         sector_label = "Mega-Cap Tech Platforms"
@@ -220,10 +229,10 @@ def _table(ax, headers, rows, bbox, anchor_idx=None, median_idx=None, colw=None,
         else:
             cell.set_facecolor("white")
             if anchor_idx is not None and r == anchor_idx + 1:
-                cell.set_facecolor("#eef4fb")
+                cell.set_facecolor(PALETTE["sage_soft"])
                 cell.set_text_props(weight="bold", color=NAVY)
             if median_idx is not None and r == median_idx + 1:
-                cell.set_facecolor("#f3f1e9")
+                cell.set_facecolor(PALETTE["panel_alt"])
                 cell.set_text_props(style="italic", color=SLATE)
         if c >= numeric_from:
             cell.set_text_props(ha="right")
@@ -244,14 +253,14 @@ def watchlist_overview(path: Path) -> None:
     _platform_header(
         ax,
         "Multi-Company Investment Watchlist",
-        f"{len(summary)} monitored names | {len(latest)} companies in the demo universe | "
+        f"{len(summary)} monitored names | {len(latest)} companies in the analytical universe | "
         f"{summary['peer_group'].nunique()} reviewed peer groups",
     )
 
     verdict_counts = summary["verdict_key"].value_counts().to_dict()
     cards = [
         ("MONITORED NAMES", str(len(summary)), "ranked by analytical attention", GREEN),
-        ("DEMO UNIVERSE", str(len(latest)), "watchlist companies plus trading comps", BLUE),
+        ("ANALYTICAL UNIVERSE", str(len(latest)), "watchlist companies plus trading comps", BLUE),
         ("PEER GROUPS", str(summary["peer_group"].nunique()), "Brazil and U.S. coverage", GOLD),
         ("DO WORK", str(verdict_counts.get("do_work", 0)), "dislocations requiring analyst review", GOLD),
         ("OPEN FLAGS", str(int(summary["flags"].sum())), "high and medium severity", PALETTE["red"]),
@@ -310,7 +319,9 @@ def watchlist_overview(path: Path) -> None:
 def comparison_snapshot(path: Path) -> None:
     df, _ = _load()
     store = _store()
-    selected = ["GOOGL", "TOTS3.SA", "VLID3.SA", "CSUD3.SA"]
+    anchor = build_assessment(df, SHOWCASE_COMPANY_ID, store=store)
+    peer_ids = [c for c in anchor.peers["company_id"].tolist() if c != SHOWCASE_COMPANY_ID]
+    selected = [SHOWCASE_COMPANY_ID] + peer_ids[:3]
     assessments = [build_assessment(df, cid, store=store) for cid in selected]
 
     fig = plt.figure(figsize=(12.8, 7.2), dpi=150)
@@ -669,9 +680,7 @@ def consensus_snapshot(path: Path) -> None:
 
 
 def capital_structure_snapshot(path: Path) -> None:
-    # CSU's demo balance sheet reconciles cleanly and also demonstrates that the
-    # workflow is not tied to the Alphabet showcase company.
-    df, cid = _load("CSUD3.SA")
+    df, cid = _load()
     a = build_assessment(df, cid, store=_store())
     cs = build_capital_structure(a.row)
     bridge = ev_bridge(a.row)
@@ -759,6 +768,320 @@ def _price(value) -> str:
     return f"{float(value):,.2f}"
 
 
+def _waterfall_axes(ax, labels, values, measures, currency, title):
+    running = 0.0
+    bases, heights, colors = [], [], []
+    for value, measure in zip(values, measures):
+        if measure == "absolute":
+            base, height = 0.0, value
+            running = value
+            color = NAVY
+        elif measure == "total":
+            base, height = 0.0, value
+            running = value
+            color = NAVY
+        else:
+            start = running
+            running += value
+            base, height = min(start, running), abs(value)
+            color = GREEN if value >= 0 else PALETTE["navy_3"]
+        bases.append(base)
+        heights.append(height)
+        colors.append(color)
+    x = np.arange(len(labels))
+    bars = ax.bar(x, heights, bottom=bases, color=colors, width=0.62)
+    for bar, value, measure in zip(bars, values, measures):
+        y = bar.get_y() + bar.get_height()
+        prefix = "" if measure in {"absolute", "total"} else ("+" if value >= 0 else "-")
+        ax.text(bar.get_x() + bar.get_width() / 2, y, f"{prefix}{abs(value):,.0f}",
+                ha="center", va="bottom", fontsize=7.3, color=SLATE)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=7.5, rotation=12, ha="right")
+    ax.set_ylabel(f"{currency}m", fontsize=8)
+    ax.set_title(title, loc="left", fontsize=9, color=NAVY, weight="bold", pad=10)
+    ax.grid(True, axis="y", alpha=0.15)
+    ax.set_axisbelow(True)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+
+
+def _annotated_heatmap(ax, frame: pd.DataFrame, title: str, formatter, center=None):
+    z = frame.to_numpy(dtype=float)
+    cmap = LinearSegmentedColormap.from_list(
+        "investment_teal", [PALETTE["line"], PALETTE["panel"], PALETTE["teal"]]
+    )
+    finite = z[np.isfinite(z)]
+    if finite.size:
+        vmin, vmax = float(finite.min()), float(finite.max())
+        if center is not None:
+            spread = max(abs(vmin - center), abs(vmax - center), 1e-9)
+            vmin, vmax = center - spread, center + spread
+    else:
+        vmin, vmax = 0.0, 1.0
+    ax.imshow(z, cmap=cmap, aspect="auto", vmin=vmin, vmax=vmax)
+    for i in range(z.shape[0]):
+        for j in range(z.shape[1]):
+            value = z[i, j]
+            if np.isfinite(value):
+                ax.text(j, i, formatter(value), ha="center", va="center",
+                        fontsize=7.7, color=INK, weight="bold" if (i, j) == (z.shape[0] // 2, z.shape[1] // 2) else "normal")
+    ax.set_xticks(np.arange(len(frame.columns)))
+    ax.set_xticklabels(frame.columns, fontsize=7.5)
+    ax.set_yticks(np.arange(len(frame.index)))
+    ax.set_yticklabels(frame.index, fontsize=7.5)
+    ax.set_title(title, loc="left", fontsize=9, color=NAVY, weight="bold", pad=10)
+    for side in ax.spines.values():
+        side.set_color(LINE)
+
+
+def valuation_forecast_snapshot(path: Path) -> None:
+    df, cid = _load()
+    case = _case(df, cid)
+    if case is None:
+        company_tearsheet(path)
+        return
+    row, base = case.assessment.row, case.base
+    currency = str(row.get("currency", "USD"))
+    forecast = base.forecast
+
+    fig = plt.figure(figsize=(12.8, 7.4), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _header_clean(ax, row, case.assessment)
+    _section(ax, 0.018, 0.815, "Operating Forecast & Free Cash Flow", "Base case | explicit forecast before terminal value")
+
+    fax = fig.add_axes([0.055, 0.42, 0.52, 0.32])
+    labels = ["LTM"] + [f"Y{int(y)}" for y in forecast["year"]]
+    revenue = [row.get("revenue_ttm")] + forecast["revenue"].tolist()
+    ebitda = [row.get("ebitda_ttm")] + forecast["ebitda"].tolist()
+    ufcf = [np.nan] + forecast["ufcf"].tolist()
+    x = np.arange(len(labels))
+    fax.bar(x, revenue, color=[PALETTE["line"]] + [BLUE] * len(forecast), width=0.58, label="Revenue")
+    fax.plot(x, ebitda, color=NAVY, marker="o", linewidth=2.3, label="EBITDA")
+    fax.plot(x, ufcf, color=PALETTE["navy_3"], marker="o", linewidth=2.1, linestyle="--", label="UFCF")
+    fax.set_xticks(x)
+    fax.set_xticklabels(labels, fontsize=8)
+    fax.set_ylabel(f"{currency}m", fontsize=8)
+    fax.set_title("REVENUE, EBITDA AND UFCF", loc="left", fontsize=9, color=NAVY, weight="bold", pad=10)
+    fax.grid(True, axis="y", alpha=0.15)
+    fax.legend(frameon=False, fontsize=8, ncols=3, loc="lower center", bbox_to_anchor=(0.5, 1.0))
+    for side in ("top", "right"):
+        fax.spines[side].set_visible(False)
+
+    terminal = forecast.iloc[-1]
+    taxes = -float(terminal["taxes"])
+    capex = -float(terminal["capex"])
+    delta_nwc = -float(terminal["delta_nwc"])
+    bridge_ax = fig.add_axes([0.62, 0.42, 0.34, 0.32])
+    _waterfall_axes(
+        bridge_ax,
+        ["EBITDA", "Cash taxes", "Capex", "Change NWC", "UFCF"],
+        [float(terminal["ebitda"]), taxes, capex, delta_nwc, float(terminal["ufcf"])],
+        ["absolute", "relative", "relative", "relative", "total"],
+        currency,
+        "TERMINAL-YEAR UFCF BRIDGE",
+    )
+
+    ax.add_patch(Rectangle((0.018, 0.075), 0.964, 0.27, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.018, 0.075), 0.004, 0.27, facecolor=GREEN))
+    ax.text(0.038, 0.318, "FORECAST DRIVERS", fontsize=7.2, color=NAVY, weight="bold")
+    segments = case.assumptions.segments or []
+    total = sum(float(s.get("revenue_per_unit", 0)) * float(s.get("units", 1)) for s in segments) or 1.0
+    rows = []
+    for segment in segments[:4]:
+        growth = segment.get("rpu_growth", {}).get("base", [])
+        amount = float(segment.get("revenue_per_unit", 0)) * float(segment.get("units", 1))
+        rows.append([segment.get("name", "Segment"), f"{amount / total:.0%}",
+                     fmt_pct(growth[0] if growth else None), fmt_pct(growth[-1] if growth else None),
+                     str(segment.get("source", "analyst"))[:24]])
+    tax = fig.add_axes([0.038, 0.115, 0.60, 0.17])
+    tax.axis("off")
+    _table(tax, ["Segment", "LTM mix", "Y1 growth", "Y5 growth", "Source"], rows,
+           bbox=[0, 0, 1, 1], colw=[0.27, 0.13, 0.14, 0.14, 0.32])
+    notes = [
+        f"D&A anchor: {case.assumptions.anchors['d_and_a_pct']:.1%} of revenue, checked against EBITDA minus EBIT.",
+        f"Capex: {case.assumptions.scenarios['base'].capex_pct[0]:.1%} of revenue; working capital modeled using operating days.",
+        "Scenario and sensitivity changes flow through the segment forecast instead of being ignored.",
+    ]
+    y = 0.292
+    for note in notes:
+        ax.text(0.67, y, u"\u2022", fontsize=10, color=GREEN, va="top")
+        _wrapped(ax, note, 0.688, y, width=48, fontsize=7.7, color=SLATE, lh=0.018)
+        y -= 0.067
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
+def valuation_sensitivity_snapshot(path: Path) -> None:
+    df, cid = _load()
+    case = _case(df, cid)
+    if case is None:
+        company_tearsheet(path)
+        return
+    row = case.assessment.row
+    fig = plt.figure(figsize=(12.8, 7.6), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _header_clean(ax, row, case.assessment)
+    _section(ax, 0.018, 0.815, "Valuation Sensitivities", "Target price, terminal reasonableness and one-way driver analysis")
+
+    h1 = fig.add_axes([0.055, 0.43, 0.40, 0.31])
+    _annotated_heatmap(h1, case.sens_wacc_multiple, "TARGET PRICE | WACC x EXIT MULTIPLE", lambda v: f"{v:,.0f}", center=case.base.current_price)
+    h1.set_xlabel("Exit EV / EBITDA", fontsize=8)
+    h1.set_ylabel("WACC", fontsize=8)
+    h2 = fig.add_axes([0.545, 0.43, 0.40, 0.31])
+    _annotated_heatmap(h2, case.sens_implied_growth, "IMPLIED PERPETUITY GROWTH", lambda v: f"{v:+.1%}", center=case.assumptions.perpetuity_growth)
+    h2.set_xlabel("Exit EV / EBITDA", fontsize=8)
+    h2.set_ylabel("Terminal WACC", fontsize=8)
+
+    tornado = case.tornado.sort_values("low_price")
+    tax = fig.add_axes([0.08, 0.10, 0.55, 0.24])
+    y = np.arange(len(tornado))
+    tax.barh(y, tornado["high_price"] - tornado["low_price"], left=tornado["low_price"], color=BLUE, height=0.55)
+    tax.axvline(case.base.target_price, color=NAVY, linewidth=1.5, linestyle="--")
+    tax.set_yticks(y)
+    tax.set_yticklabels(tornado["driver"], fontsize=7.6)
+    tax.set_xlabel("Implied share price", fontsize=8)
+    tax.set_title("TORNADO | ONE-WAY DRIVER SENSITIVITY", loc="left", fontsize=9, color=NAVY, weight="bold", pad=10)
+    tax.grid(True, axis="x", alpha=0.15)
+    for side in ("top", "right", "left"):
+        tax.spines[side].set_visible(False)
+
+    ax.add_patch(Rectangle((0.68, 0.09), 0.302, 0.26, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.68, 0.09), 0.004, 0.26, facecolor=PALETTE["navy_3"]))
+    ax.text(0.698, 0.318, "READ-THROUGH", fontsize=7.2, color=NAVY, weight="bold")
+    notes = [
+        f"Base target: {_price(case.base.target_price)} versus current {_price(case.base.current_price)}.",
+        f"Largest one-way driver: {case.tornado.iloc[0]['driver']}.",
+        "The implied-growth grid checks whether a selected exit multiple embeds a credible growth-forever assumption.",
+    ]
+    yy = 0.285
+    for note in notes:
+        ax.text(0.700, yy, u"\u2022", fontsize=10, color=GREEN, va="top")
+        _wrapped(ax, note, 0.718, yy, width=39, fontsize=7.7, color=SLATE, lh=0.018)
+        yy -= 0.070
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
+def valuation_bridges_snapshot(path: Path) -> None:
+    df, cid = _load()
+    case = _case(df, cid)
+    if case is None:
+        company_tearsheet(path)
+        return
+    row, base = case.assessment.row, case.base
+    currency = str(row.get("currency", "USD"))
+    fig = plt.figure(figsize=(12.8, 7.3), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _header_clean(ax, row, case.assessment)
+    _section(ax, 0.018, 0.815, "Terminal Value & Equity Bridge", "Reconcile enterprise value, debt-like claims and share-price implications")
+
+    left = fig.add_axes([0.055, 0.38, 0.52, 0.35])
+    bridge_labels = ["PV explicit FCF", "PV terminal value", "Enterprise value", "Net debt", "Minority", "Preferred", "Equity value"]
+    bridge_values = [base.pv_explicit, base.pv_terminal_exit, base.enterprise_value,
+                     -base.net_debt, -base.minority_interest, -base.preferred_equity, base.implied_equity]
+    bridge_measures = ["absolute", "relative", "total", "relative", "relative", "relative", "total"]
+    _waterfall_axes(left, bridge_labels, bridge_values, bridge_measures, currency, "BASE-CASE EQUITY VALUE BRIDGE")
+
+    right = fig.add_axes([0.65, 0.40, 0.30, 0.32])
+    market_pv = base.pv_terminal_exit * case.market_reference_multiple / case.exit_multiple if case.market_reference_multiple else np.nan
+    values = [base.pv_terminal_exit, base.pv_terminal_perp, market_pv]
+    labels = [f"Exit {case.exit_multiple:.1f}x", f"Perpetuity {case.assumptions.perpetuity_growth:.1%}", "Peer reference"]
+    bars = right.bar(labels, values, color=[BLUE, PALETTE["navy"], PALETTE["navy_3"]], width=0.58)
+    for bar, value in zip(bars, values):
+        if np.isfinite(value):
+            right.text(bar.get_x() + bar.get_width()/2, value, f"{value:,.0f}", ha="center", va="bottom", fontsize=7.6)
+    right.set_title("PV OF TERMINAL VALUE", loc="left", fontsize=9, color=NAVY, weight="bold", pad=10)
+    right.set_ylabel(f"{currency}m", fontsize=8)
+    right.tick_params(axis="x", labelsize=7.5, rotation=12)
+    right.grid(True, axis="y", alpha=0.15)
+    for side in ("top", "right"):
+        right.spines[side].set_visible(False)
+
+    perp_equity = base.enterprise_value_perp - base.net_debt - base.minority_interest - base.preferred_equity
+    perp_target = base.current_price * perp_equity / base.market_cap if base.current_price and base.market_cap else np.nan
+    cards = [
+        ("Current price", _price(base.current_price), "market anchor"),
+        ("Exit-method target", _price(base.target_price), _pct_signed(base.upside)),
+        ("Perpetuity target", _price(perp_target), f"implied {base.implied_exit_multiple:.1f}x" if base.implied_exit_multiple else "n/a"),
+        ("Terminal value / EV", fmt_pct(base.terminal_pct_of_ev), "dependency check"),
+    ]
+    gap, w = 0.014, (0.964 - 0.014 * 3) / 4
+    for i, (label, value, note) in enumerate(cards):
+        x0 = 0.018 + i * (w + gap)
+        ax.add_patch(Rectangle((x0, 0.16), w, 0.11, facecolor="white", edgecolor=LINE, linewidth=0.8))
+        ax.add_patch(Rectangle((x0, 0.265), w, 0.005, facecolor=[BLUE, NAVY, PALETTE["navy_3"], LINE][i]))
+        ax.text(x0 + 0.012, 0.238, label.upper(), fontsize=6.7, color=MUTED, weight="bold")
+        ax.text(x0 + 0.012, 0.204, value, fontsize=15, color=INK, weight="bold")
+        ax.text(x0 + 0.012, 0.178, note, fontsize=6.8, color=MUTED)
+    gap_pct = base.enterprise_value_perp / base.enterprise_value - 1.0
+    ax.text(0.018, 0.095, f"METHOD RECONCILIATION: perpetuity EV is {gap_pct:+.1%} versus the exit-multiple EV. "
+            "The difference is disclosed because the analyst exit multiple and stable-growth economics are independent checks.",
+            fontsize=8.0, color=SLATE)
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
+def valuation_assumptions_snapshot(path: Path) -> None:
+    df, cid = _load()
+    case = _case(df, cid)
+    if case is None:
+        company_tearsheet(path)
+        return
+    row, wacc = case.assessment.row, case.wacc
+    fig = plt.figure(figsize=(12.8, 7.2), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _header_clean(ax, row, case.assessment)
+    _section(ax, 0.018, 0.815, "WACC & Assumption Provenance", "Every material input is labeled as analyst, Capital IQ or derived")
+
+    wax = fig.add_axes([0.07, 0.42, 0.40, 0.30])
+    labels = ["Risk-free", "Beta x ERP", "After-tax debt", "WACC", "Terminal WACC"]
+    values = [wacc.risk_free_rate, wacc.beta * wacc.equity_risk_premium,
+              wacc.cost_of_debt_aftertax, wacc.wacc, case.base.terminal_wacc]
+    bars = wax.barh(labels, values, color=[PALETTE["line"], BLUE, PALETTE["navy_3"], NAVY, BLUE])
+    for bar, value in zip(bars, values):
+        wax.text(value, bar.get_y() + bar.get_height()/2, f" {value:.1%}", va="center", fontsize=8, color=INK)
+    wax.xaxis.set_major_formatter(lambda v, _: f"{v:.0%}")
+    wax.set_title("WACC BUILD", loc="left", fontsize=9, color=NAVY, weight="bold", pad=10)
+    wax.grid(True, axis="x", alpha=0.15)
+    for side in ("top", "right", "left"):
+        wax.spines[side].set_visible(False)
+
+    base = case.assumptions.scenarios["base"]
+    rows = [
+        ["Revenue growth", fmt_pct(base.revenue_growth[0]), fmt_pct(base.revenue_growth[-1]), "Analyst glidepath"],
+        ["EBITDA margin", fmt_pct(base.ebitda_margin[0]), fmt_pct(base.ebitda_margin[-1]), "Analyst glidepath"],
+        ["D&A / revenue", fmt_pct(base.d_and_a_pct[0]), fmt_pct(base.d_and_a_pct[-1]), "Validated historical anchor"],
+        ["Capex / revenue", fmt_pct(base.capex_pct[0]), fmt_pct(base.capex_pct[-1]), "Analyst assumption"],
+        ["Exit EV / EBITDA", fmt_multiple(case.exit_multiple), fmt_multiple(case.exit_multiple), case.exit_multiple_source],
+        ["Perpetuity growth", fmt_pct(case.assumptions.perpetuity_growth), fmt_pct(case.assumptions.perpetuity_growth), case.assumptions.perpetuity_source],
+        ["Terminal ROIC", fmt_pct(case.base.terminal_roic), fmt_pct(case.base.terminal_roic), case.assumptions.terminal_roic_source],
+    ]
+    tax = fig.add_axes([0.53, 0.40, 0.452, 0.33])
+    tax.axis("off")
+    _table(tax, ["Driver", "Y1", "Terminal", "Provenance"], rows, bbox=[0, 0, 1, 1], colw=[0.26, 0.16, 0.18, 0.40])
+
+    ax.add_patch(Rectangle((0.018, 0.075), 0.964, 0.25, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.018, 0.075), 0.004, 0.25, facecolor=GREEN))
+    ax.text(0.038, 0.292, "CONTROL NOTES", fontsize=7.2, color=NAVY, weight="bold")
+    notes = [
+        f"Beta {wacc.beta:.2f} from {wacc.beta_source}; capital weights use current market equity and reported debt.",
+        f"WACC {wacc.wacc:.1%} is an analyst override; computed economics remain disclosed in the model notes.",
+        f"Peer set: {case.assessment.peer_set_name}; reviewed status: {'approved' if case.assessment.peer_reviewed else 'pending analyst approval'}.",
+        "The Lululemon assumptions remain draft, so outputs are labeled indicative rather than a formal recommendation.",
+    ]
+    y = 0.255
+    for note in notes:
+        ax.text(0.040, y, u"\u2022", fontsize=10, color=GREEN, va="top")
+        _wrapped(ax, note, 0.058, y, width=135, fontsize=8.0, color=SLATE, lh=0.018)
+        y -= 0.052
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _case(df: pd.DataFrame, cid: str):
     try:
         return build_valuation_case(df, cid, store=_store())
@@ -841,7 +1164,7 @@ def valuation_case_snapshot(path: Path) -> None:
     ax.text(0.628, 0.365, "MODEL WARNINGS / DILIGENCE QUESTIONS", fontsize=7.2, color=NAVY, weight="bold")
     warnings = case_warnings(case)[:4]
     if not warnings:
-        warnings = [{"severity": "info", "text": "No major model-quality warning on the illustrative case."}]
+        warnings = [{"severity": "info", "text": "Draft assumptions and unreviewed peers: indicative calibration, not a formal recommendation."}]
     y = 0.337
     for warning in warnings:
         sev = str(warning.get("severity", "info")).upper()
@@ -1055,7 +1378,88 @@ def data_audit_snapshot(path: Path) -> None:
     plt.close(fig)
 
 
+def ic_memo_snapshot(path: Path) -> None:
+    df, cid = _load()
+    case = _case(df, cid)
+    if case is None:
+        company_tearsheet(path)
+        return
+    a, base = case.assessment, case.base
+    thesis = a.thesis
+    fig = plt.figure(figsize=(12.8, 7.8), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _header_clean(ax, a.row, a)
+    _section(ax, 0.018, 0.815, "Investment Committee Memo", "Machine-checked evidence plus explicit analyst judgment")
+
+    cards = [
+        ("Analytical status", case.recommendation.stance, "draft assumptions"),
+        ("Current price", _price(base.current_price), "market reference"),
+        ("Base target", _price(base.target_price), _pct_signed(base.upside)),
+        ("Peer discount", a.valuation.get("premium_label", "n/a"), a.valuation.get("multiple_name", "")),
+        ("Attention score", f"{a.attention_score:.0f}", "diligence priority"),
+    ]
+    gap, w = 0.012, (0.964 - 0.012 * 4) / 5
+    for i, (label, value, note) in enumerate(cards):
+        x = 0.018 + i * (w + gap)
+        ax.add_patch(Rectangle((x, 0.70), w, 0.10, facecolor="white", edgecolor=LINE, linewidth=0.8))
+        ax.add_patch(Rectangle((x, 0.795), w, 0.005, facecolor=BLUE if i in (1, 2) else PALETTE["navy_3"]))
+        ax.text(x + 0.010, 0.770, label.upper(), fontsize=6.5, color=MUTED, weight="bold")
+        ax.text(x + 0.010, 0.738, str(value), fontsize=13.5, color=INK, weight="bold")
+        ax.text(x + 0.010, 0.715, str(note), fontsize=6.5, color=MUTED)
+
+    ax.add_patch(Rectangle((0.018, 0.39), 0.47, 0.27, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.018, 0.39), 0.004, 0.27, facecolor=GREEN))
+    ax.text(0.038, 0.630, "THESIS & VARIANT PERCEPTION", fontsize=7.2, color=NAVY, weight="bold")
+    thesis_text = thesis.thesis if thesis else a.sponsor_view
+    variant = thesis.variant_perception if thesis else a.verdict_rationale
+    _wrapped(ax, thesis_text, 0.038, 0.602, width=80, fontsize=7.6, color=SLATE, style="italic", lh=0.018)
+    ax.text(0.038, 0.485, "VARIANT VIEW", fontsize=6.8, color=MUTED, weight="bold")
+    _wrapped(ax, variant, 0.038, 0.460, width=80, fontsize=7.2, color=SLATE, lh=0.016)
+
+    ax.add_patch(Rectangle((0.512, 0.39), 0.47, 0.27, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.512, 0.39), 0.004, 0.27, facecolor=PALETTE["navy_3"]))
+    ax.text(0.532, 0.630, "KEY DEBATE", fontsize=7.2, color=NAVY, weight="bold")
+    debate = thesis.key_debate if thesis else a.sponsor_view
+    _wrapped(ax, debate, 0.532, 0.602, width=68, fontsize=8.0, color=SLATE, style="italic", lh=0.020)
+    ax.text(0.532, 0.485, "WHAT NEEDS TO BE TRUE", fontsize=6.8, color=MUTED, weight="bold")
+    conditions = a.valuation.get("what_needs_to_be_true", [])[:3]
+    y = 0.458
+    for condition in conditions:
+        ax.text(0.534, y, u"\u2022", fontsize=9, color=GREEN, va="top")
+        _wrapped(ax, condition, 0.550, y, width=60, fontsize=7.5, color=SLATE, lh=0.017)
+        y -= 0.055
+
+    _section(ax, 0.018, 0.355, "Catalysts, Risks & Management Questions")
+    columns = [
+        ("CATALYSTS", [f"{c.get('date')}: {c.get('event')}" for c in (thesis.catalysts[:3] if thesis else [])]),
+        ("KEY RISKS", thesis.risks[:3] if thesis else a.concerns[:3]),
+        ("QUESTIONS FOR MANAGEMENT", thesis.management_questions[:3] if thesis else a.management_questions[:3]),
+    ]
+    widths = [0.30, 0.31, 0.325]
+    x = 0.018
+    for (label, items), width in zip(columns, widths):
+        ax.add_patch(Rectangle((x, 0.075), width, 0.235, facecolor="white", edgecolor=LINE, linewidth=0.8))
+        ax.text(x + 0.015, 0.280, label, fontsize=7, color=NAVY, weight="bold")
+        y = 0.250
+        for item in items:
+            ax.text(x + 0.015, y, u"\u2022", fontsize=9, color=GREEN, va="top")
+            _wrapped(ax, str(item), x + 0.032, y, width=max(30, int(width * 170)), fontsize=7.2, color=SLATE, lh=0.016)
+            y -= 0.060
+        x += width + 0.014
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate README screenshots from demo or private data.")
+    parser.add_argument("--private", action="store_true", help="Use local Capital IQ-derived private data.")
+    parser.add_argument("--company-id", default=None, help="Anchor company ID, e.g. NASDAQ:LULU.")
+    args = parser.parse_args()
+    global SCREENSHOT_DEMO, SHOWCASE_COMPANY_ID
+    SCREENSHOT_DEMO = not args.private
+    if args.company_id:
+        SHOWCASE_COMPANY_ID = args.company_id
     ensure_dir(REPORTS_SAMPLE_DIR)
     watchlist_overview(REPORTS_SAMPLE_DIR / "01_watchlist_overview.png")
     kpi_dashboard(REPORTS_SAMPLE_DIR / "02_company_situation.png")
@@ -1065,9 +1469,14 @@ def main() -> None:
     consensus_snapshot(REPORTS_SAMPLE_DIR / "06_actual_vs_consensus.png")
     capital_structure_snapshot(REPORTS_SAMPLE_DIR / "07_capital_structure.png")
     valuation_case_snapshot(REPORTS_SAMPLE_DIR / "08_valuation_case.png")
-    football_field_snapshot(REPORTS_SAMPLE_DIR / "09_football_field.png")
-    multiples_scorecard_snapshot(REPORTS_SAMPLE_DIR / "10_multiples_scorecard.png")
-    data_audit_snapshot(REPORTS_SAMPLE_DIR / "11_data_audit.png")
+    valuation_forecast_snapshot(REPORTS_SAMPLE_DIR / "09_operating_forecast.png")
+    valuation_sensitivity_snapshot(REPORTS_SAMPLE_DIR / "10_dcf_sensitivity.png")
+    valuation_bridges_snapshot(REPORTS_SAMPLE_DIR / "11_terminal_value_bridges.png")
+    valuation_assumptions_snapshot(REPORTS_SAMPLE_DIR / "12_wacc_assumptions.png")
+    football_field_snapshot(REPORTS_SAMPLE_DIR / "13_football_field.png")
+    multiples_scorecard_snapshot(REPORTS_SAMPLE_DIR / "14_multiples_scorecard.png")
+    data_audit_snapshot(REPORTS_SAMPLE_DIR / "15_data_audit.png")
+    ic_memo_snapshot(REPORTS_SAMPLE_DIR / "16_ic_memo.png")
     print(f"Sample screenshots written to {REPORTS_SAMPLE_DIR}")
 
 

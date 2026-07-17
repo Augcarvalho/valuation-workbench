@@ -41,6 +41,25 @@ def test_football_field_ranges(demo_case):
     assert dcf["high"] == pytest.approx(max(s.target_price for s in scen.values()))
 
 
+def test_football_field_price_history_is_company_scoped(demo_case):
+    _, case = demo_case
+    cid = case.company_id
+    history = pd.DataFrame([
+        {"company_id": cid, "date": "2026-01-31", "share_price": 100.0},
+        {"company_id": cid, "date": "2026-02-28", "share_price": 110.0},
+        {"company_id": cid, "date": "2026-03-31", "share_price": 120.0},
+        {"company_id": cid, "date": "2026-04-30", "share_price": 130.0},
+        {"company_id": cid, "date": "2026-05-31", "share_price": 140.0},
+        {"company_id": cid, "date": "2026-06-30", "share_price": 150.0},
+        {"company_id": "OTHER", "date": "2026-06-30", "share_price": 2_650_000.0},
+    ])
+    history["date"] = pd.to_datetime(history["date"])
+    data = vch.football_field_data(case, history)
+    trading = next(r for r in data["ranges"] if "52-week" in r["label"])
+    assert trading["low"] == pytest.approx(100.0)
+    assert trading["high"] == pytest.approx(150.0)
+
+
 def test_fcf_bridge_sums_to_ufcf(demo_case):
     _, case = demo_case
     steps = vch.fcf_bridge_data(case.base.forecast)

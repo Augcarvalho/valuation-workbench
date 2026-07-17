@@ -133,7 +133,20 @@ def derive_anchors(row: pd.Series, params: dict) -> dict:
     reported_d_and_a = _clean(row.get("d_and_a_ttm"))
     ebitda = _clean(row.get("ebitda_ttm"))
     ebit = _clean(row.get("ebit_ttm"))
-    if revenue and reported_d_and_a is not None and reported_d_and_a >= 0 and revenue > 0:
+    implied_d_and_a = (
+        max(ebitda - ebit, 0.0)
+        if ebitda is not None and ebit is not None and ebitda >= ebit
+        else None
+    )
+    reported_is_plausible = reported_d_and_a is not None and reported_d_and_a >= 0
+    if reported_is_plausible and implied_d_and_a is not None and implied_d_and_a > 0:
+        # Capital IQ template mappings occasionally place quarterly EPS in the
+        # D&A field. Reject only gross inconsistencies; moderate differences can
+        # legitimately arise from adjusted EBITDA definitions.
+        reported_is_plausible = 0.20 * implied_d_and_a <= reported_d_and_a <= 2.0 * implied_d_and_a
+        if not reported_is_plausible:
+            notes.append("reported D&A failed the EBITDA-to-EBIT consistency check")
+    if revenue and reported_is_plausible and revenue > 0:
         d_and_a_pct = reported_d_and_a / revenue
         notes.append("D&A anchor uses the reported TTM field")
     elif revenue and ebitda is not None and ebit is not None and revenue > 0:

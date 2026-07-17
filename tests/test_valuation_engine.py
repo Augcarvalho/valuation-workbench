@@ -121,6 +121,18 @@ def test_reported_d_and_a_is_preferred_over_ebitda_minus_ebit(tmp_path):
     assert any("reported TTM" in note for note in assumptions.anchors["notes"])
 
 
+def test_implausible_reported_d_and_a_falls_back_to_ebitda_minus_ebit(tmp_path):
+    row = _row(
+        revenue_ttm=1_000.0,
+        d_and_a_ttm=2.0,
+        ebitda_ttm=300.0,
+        ebit_ttm=200.0,
+    )
+    assumptions = load_valuation_assumptions(row, tmp_path / "none")
+    assert assumptions.anchors["d_and_a_pct"] == pytest.approx(0.10)
+    assert any("consistency check" in note for note in assumptions.anchors["notes"])
+
+
 def test_wacc_params_currency_fallback():
     usd = load_wacc_params("USD")
     brl = load_wacc_params("BRL")
@@ -406,6 +418,10 @@ def test_implied_growth_grid_and_tornado():
     mid = len(ig.index) // 2
     row_vals = ig.iloc[mid].dropna().to_numpy(dtype=float)
     assert (np.diff(row_vals) > 0).all()
+    # At a fixed exit multiple, a higher terminal WACC requires a higher
+    # implied perpetual growth rate to reconcile to the same terminal value.
+    col_vals = ig.iloc[:, len(ig.columns) // 2].dropna().to_numpy(dtype=float)
+    assert (np.diff(col_vals) > 0).all()
 
     t = case.tornado
     assert not t.empty

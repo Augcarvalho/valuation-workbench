@@ -108,3 +108,22 @@ def test_segments_flow_through_forecast():
     assert fc["revenue"].iloc[1] == pytest.approx(1400.0)   # 14 x 100
     assert fc["revenue_growth"].iloc[0] == pytest.approx(0.2)  # vs TTM 1000
     assert fc["ebitda"].iloc[0] == pytest.approx(1200.0 * 0.20)
+
+
+def test_segment_forecast_accepts_growth_sensitivity_delta():
+    from src.modeling.forecast import build_forecast
+    from src.modeling.valuation_assumptions import ScenarioAssumptions
+
+    scn = ScenarioAssumptions(
+        name="base", revenue_growth=[0.05] * 2, ebitda_margin=[0.20] * 2,
+        d_and_a_pct=[0.03] * 2, capex_pct=[0.04] * 2, tax_rate=0.30,
+        dso=None, dih=None, dpo=None, nwc_pct_revenue=[0.10] * 2, nwc_mode="pct")
+    segs = [{"name": "S", "units": 10, "revenue_per_unit": 100,
+             "rpu_growth": 0.05}]
+    base = build_forecast(1_000.0, scn, 0.6, 100.0, segments=segs)
+    flexed = build_forecast(
+        1_000.0, scn, 0.6, 100.0, segments=segs,
+        segment_growth_delta=[0.02, 0.02],
+    )
+    assert flexed["revenue"].iloc[0] > base["revenue"].iloc[0]
+    assert flexed["revenue"].iloc[1] > base["revenue"].iloc[1]

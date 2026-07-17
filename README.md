@@ -6,11 +6,13 @@ Construí este projeto para integrar, em um único fluxo, tarefas que normalment
 
 O sistema não tenta substituir o analista ou gerar uma recomendação automática. Ele organiza evidências, explicita premissas, identifica inconsistências e libera tempo para o trabalho que realmente exige julgamento: entender o negócio, revisar peers, questionar o consenso e construir uma tese.
 
+Os materiais abaixo usam **Lululemon como case demonstrativo** para mostrar o fluxo completo, da triagem multiempresa ao forecast, DCF, sensitivities e memo para comitê de investimento.
+
 ![Visão geral da watchlist](reports/sample/01_watchlist_overview.png)
 
 ## Escala da análise
 
-A demonstração pública contém **14 companhias** entre empresas monitoradas e trading comps, com **8 nomes priorizados** na watchlist e cobertura no Brasil e nos Estados Unidos. O modo privado não é limitado a esse universo: qualquer companhia adicionada por meio dos templates de exportação do Capital IQ passa pelo mesmo pipeline de financials, estimates, peers, capital structure, valuation e reporting.
+A demonstração pública contém **14 companhias** entre empresas monitoradas e trading comps. O ambiente privado ilustrado nos prints contém **186 companhias**, entre nomes monitorados e comparáveis, com **8 empresas priorizadas** na watchlist. O sistema não é limitado a esse universo: qualquer companhia adicionada pelos templates de exportação do Capital IQ passa pelo mesmo pipeline de financials, estimates, peers, capital structure, valuation e reporting.
 
 Na prática, a plataforma permite:
 
@@ -20,7 +22,7 @@ Na prática, a plataforma permite:
 - Criar peer groups revisáveis, excluindo a própria empresa da mediana dos pares.
 - Trocar a companhia selecionada e reconstruir automaticamente todas as análises aplicáveis.
 
-> **Nota sobre os prints:** as imagens abaixo usam uma base pública demonstrativa e premissas ilustrativas. Dados licenciados do Capital IQ, teses privadas e outputs reais permanecem exclusivamente no ambiente local.
+> **Nota sobre os prints:** as imagens mostram uma execução ilustrativa do workflow privado para Lululemon. Os exports brutos do Capital IQ não são versionados. As premissas do case permanecem identificadas como draft e os outputs como indicativos, não como recomendação de investimento.
 
 ## Da informação à decisão
 
@@ -93,9 +95,17 @@ O valuation case conecta forecast operacional, WACC, DCF, terminal value, equity
 - O histórico de negociação da própria companhia.
 - A faixa de preço observada no mercado.
 
-| Valuation Case | Football Field |
+| Visão geral do valuation | Forecast operacional e FCF |
 | --- | --- |
-| ![Valuation Case](reports/sample/08_valuation_case.png) | ![Football Field](reports/sample/09_football_field.png) |
+| ![Valuation Case](reports/sample/08_valuation_case.png) | ![Forecast operacional](reports/sample/09_operating_forecast.png) |
+
+| Sensitivities e tornado | Terminal value e equity bridge |
+| --- | --- |
+| ![Sensitivities](reports/sample/10_dcf_sensitivity.png) | ![Terminal value e bridges](reports/sample/11_terminal_value_bridges.png) |
+
+| WACC e proveniência das premissas | Football field |
+| --- | --- |
+| ![WACC e premissas](reports/sample/12_wacc_assumptions.png) | ![Football Field](reports/sample/13_football_field.png) |
 
 O modelo também testa a dependência do terminal value, a coerência entre crescimento terminal, reinvestimento e ROIC, e a distância entre métodos. Divergências relevantes não são escondidas: viram warnings e perguntas para revisão do analista.
 
@@ -103,7 +113,7 @@ O modelo também testa a dependência do terminal value, a coerência entre cres
 
 EV/EBITDA não é tratado como resposta universal. A plataforma classifica EV/EBITDA, EV/Revenue, P/E e P/TBV como múltiplos primários, secundários, cross-checks ou não significativos conforme o business model e a qualidade do denominador.
 
-![Multi-Multiple Scorecard](reports/sample/10_multiples_scorecard.png)
+![Multi-Multiple Scorecard](reports/sample/14_multiples_scorecard.png)
 
 Além do snapshot atual, o sistema suporta histórico de múltiplos e comparação entre movimento da empresa e do peer group para distinguir rerating específico de mudança setorial.
 
@@ -121,7 +131,7 @@ O modelo não utiliza um número apenas porque ele existe na base. A camada de q
 - Outliers de múltiplos.
 - Consistência entre dataset e refresh log.
 
-![Data Audit](reports/sample/11_data_audit.png)
+![Data Audit](reports/sample/15_data_audit.png)
 
 Campos ausentes permanecem como ausentes. A plataforma evita preencher artificialmente EPS, guidance, consensus histórico ou bridge items que não tenham sido exportados.
 
@@ -139,9 +149,9 @@ Os cálculos são automatizados; a conclusão de investimento não. O analista m
 
 Essa combinação gera um memo estruturado para comitê de investimento, reunindo dados, valuation e julgamento em um único documento.
 
-![Prévia do IC Memo](reports/sample/12_ic_memo.png)
+![Prévia do IC Memo](reports/sample/16_ic_memo.png)
 
-Outputs demonstrativos:
+Outputs HTML da demonstração pública, mantidos separados do case privado exibido nos prints:
 
 - [IC Memo de Alphabet](reports/sample/ic_memo_GOOGL.html)
 - [Valuation Case de Alphabet](reports/sample/valuation_case_GOOGL.html)
@@ -166,7 +176,7 @@ Stack principal: **Python, pandas, Streamlit, Plotly, Matplotlib, Jinja, PowerSh
 
 ## Capital IQ e confidencialidade
 
-O ambiente privado utiliza exports do Capital IQ para financial statements, market data, estimates, valuation history e peer information. A licença não é usada como material de divulgação: arquivos brutos, dados derivados licenciados, teses e relatórios privados permanecem em `data_private/`, fora do versionamento.
+O ambiente privado utiliza exports do Capital IQ para financial statements, market data, estimates, valuation history e peer information. Arquivos brutos, bases tabulares derivadas, teses completas e relatórios privados permanecem em `data_private/`, fora do versionamento. O repositório contém apenas screenshots estáticos selecionados para demonstrar o workflow, sem os arquivos-fonte licenciados nem informação suficiente para reconstruir a base privada.
 
 O repositório inclui controles específicos para evitar exposição acidental:
 

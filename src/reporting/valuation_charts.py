@@ -47,12 +47,13 @@ def _style(fig: go.Figure, title: str, subtitle: str = "", height: int = 360) ->
     # strip so none of the three ever touch.
     fig.update_layout(
         title=dict(text=f"<b>{title}</b>", x=0, xanchor="left", y=0.98, yanchor="top",
-                   font=dict(size=16.5, color=GRAPHITE, family=FONT_SERIF),
+                   font=dict(size=16.5, color=GRAPHITE, family=FONT_SANS),
                    subtitle=dict(text=subtitle or None,
                                  font=dict(size=11, color=MUTED, family=FONT_SANS))),
         font=dict(family=FONT_SANS, color=PALETTE["slate"], size=12),
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
+        colorway=[PALETTE["teal"], PALETTE["navy"], PALETTE["line"], PALETTE["navy_3"]],
         height=height,
         margin=dict(l=24, r=20, t=92 if subtitle else 64, b=46),
         legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="right", x=1.0,
@@ -213,9 +214,19 @@ def football_field_data(case, price_history: pd.DataFrame | None = None) -> dict
     wk_lo, wk_hi = _clean(row.get("week52_low")), _clean(row.get("week52_high"))
     if not (wk_lo and wk_hi) and price_history is not None and not price_history.empty \
             and {"date", "share_price"}.issubset(price_history.columns):
-        recent = price_history[price_history["date"]
-                               >= price_history["date"].max() - pd.DateOffset(months=12)]
+        own_history = price_history
+        if "company_id" in own_history.columns:
+            own_history = own_history[
+                own_history["company_id"].astype(str) == str(case.company_id)
+            ]
+        recent = own_history[own_history["date"]
+                             >= own_history["date"].max() - pd.DateOffset(months=12)]
         prices = pd.to_numeric(recent["share_price"], errors="coerce").dropna()
+        if price and price > 0:
+            # Defensive unit guard: a stray price from another listing or a
+            # market-cap field mapped into share_price must not flatten the
+            # entire football field.
+            prices = prices[(prices >= price * 0.05) & (prices <= price * 20.0)]
         if len(prices) >= 6:
             wk_lo, wk_hi = float(prices.min()), float(prices.max())
     if wk_lo and wk_hi and wk_hi > wk_lo:
@@ -388,7 +399,7 @@ def sensitivity_heatmap(case, height: int = 480) -> go.Figure:
     z = grid.values.astype(float)
     fig = go.Figure(go.Heatmap(
         z=z, x=list(grid.columns), y=list(grid.index),
-        colorscale=[[0.0, COPPER], [0.5, CREAM], [1.0, GREEN]],
+        colorscale=[[0.0, PALETTE["line"]], [0.5, CREAM], [1.0, PALETTE["teal"]]],
         zmid=price if price else float(np.nanmean(z)),
         text=[[f"{v:,.2f}" if not np.isnan(v) else "n/a" for v in r] for r in z],
         texttemplate="%{text}", textfont=dict(size=11.5, family=FONT_SANS),
@@ -513,7 +524,7 @@ def implied_growth_heatmap(case, height: int = 460) -> go.Figure:
     z = grid.values.astype(float)
     fig = go.Figure(go.Heatmap(
         z=z, x=list(grid.columns), y=list(grid.index),
-        colorscale=[[0.0, CREAM], [0.5, "#efe6cf"], [1.0, RED]],
+        colorscale=[[0.0, PALETTE["line"]], [0.5, PALETTE["navy_3"]], [1.0, PALETTE["navy"]]],
         zmid=anchor,
         text=[[f"{v:+.1%}" if not np.isnan(v) else "n/a" for v in r] for r in z],
         texttemplate="%{text}", textfont=dict(size=11.5, family=FONT_SANS),

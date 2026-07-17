@@ -44,6 +44,7 @@ def segment_revenue_path(
     segments: list[dict],
     horizon: int,
     scenario_name: str = "base",
+    growth_delta: list[float] | None = None,
 ) -> list[float]:
     """Total revenue per year from units x revenue-per-unit segment builds.
 
@@ -52,6 +53,7 @@ def segment_revenue_path(
     ``{bear:, base:, bull:}`` map (Grupo Mateus: 10/25/50 new stores a year).
     """
     totals = [0.0] * horizon
+    delta = growth_delta or [0.0] * horizon
     for seg in segments:
         units = float(seg["units"])
         rpu = float(seg["revenue_per_unit"])
@@ -59,7 +61,7 @@ def segment_revenue_path(
         growth = _per_year(seg.get("rpu_growth", 0.0), horizon, scenario_name)
         for t in range(horizon):
             units += adds[t]
-            rpu *= (1.0 + growth[t])
+            rpu *= (1.0 + growth[t] + delta[t])
             totals[t] += units * rpu
     return totals
 
@@ -70,6 +72,7 @@ def build_forecast(
     cogs_pct: float | None,
     nwc_now: float | None,
     segments: list[dict] | None = None,
+    segment_growth_delta: list[float] | None = None,
 ) -> pd.DataFrame:
     """Project the P&L-to-UFCF waterfall for one scenario."""
     if revenue_ttm is None or pd.isna(revenue_ttm) or revenue_ttm <= 0:
@@ -77,7 +80,9 @@ def build_forecast(
 
     n = len(scenario.revenue_growth)
     if segments:
-        revenue = segment_revenue_path(segments, n, scenario.name)
+        revenue = segment_revenue_path(
+            segments, n, scenario.name, growth_delta=segment_growth_delta
+        )
         growth_path = [revenue[0] / float(revenue_ttm) - 1.0] + [
             revenue[t] / revenue[t - 1] - 1.0 for t in range(1, n)
         ]
