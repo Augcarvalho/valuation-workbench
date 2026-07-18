@@ -45,8 +45,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             if bp and Path(bp).exists():
                 st.download_button("Download board pack (HTML)", data=Path(bp).read_bytes(),
                                    file_name=Path(bp).name, mime="text/html", use_container_width=True)
-    out_dir = Path(memo_path).parent
-    ui.footnote(f"Written to <code>{out_dir}</code>"
+    output_label = "data_private/reports/" if not DEMO_MODE else "reports/sample/"
+    ui.footnote(f"Written to <code>{output_label}</code>"
                 + (" — private outputs never enter version control." if not DEMO_MODE else "."))
 
     with st.expander("Preview IC memo", expanded=True):

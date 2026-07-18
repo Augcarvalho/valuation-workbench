@@ -40,7 +40,12 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             "green" if latest["data_quality_score"].mean() >= 0.9 else "yellow"),
     ]
     ui.kpi_grid(cards, columns=5)
-    ui.footnote(f"Dataset path: <code>{dataset_path}</code>")
+    dataset_label = (
+        "data_private/processed/monitoring_dataset.csv"
+        if not DEMO_MODE
+        else "data/sample/public_demo/monitoring_dataset.csv"
+    )
+    ui.footnote(f"Dataset: <code>{dataset_label}</code>")
 
     if not DEMO_MODE:
         ui.section("CapIQ Refresh Log")
