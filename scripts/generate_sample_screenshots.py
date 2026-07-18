@@ -16,6 +16,7 @@ import textwrap
 from pathlib import Path
 
 import matplotlib
+import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 
@@ -37,7 +38,7 @@ from src.modeling.capital_structure import build_capital_structure, ev_bridge
 from src.modeling.consensus import build_consensus_read
 from src.modeling.data_audit import audit_scores, run_audit
 from src.modeling.metrics import latest_rows
-from src.modeling.multiples import multiples_summary
+from src.modeling.multiples import multiple_history, multiple_momentum, multiples_summary
 from src.modeling.valuation_case import CaseNotApplicableError, build_valuation_case, case_warnings
 from src.pipeline.build_dataset import build_dataset
 from src.reporting.valuation_charts import football_field_data
@@ -202,7 +203,8 @@ def _section(ax, x, y, title, note=""):
         ax.text(x + 0.012 + 0.0072 * len(title), y + 0.007, "   " + note, fontsize=7, color=MUTED, va="center", zorder=3)
 
 
-def _platform_header(ax, title: str, subtitle: str, badge: str = "PUBLIC DEMO") -> None:
+def _platform_header(ax, title: str, subtitle: str, badge: str | None = None) -> None:
+    badge = badge or ("PUBLIC DEMO" if SCREENSHOT_DEMO else "PRIVATE WORKFLOW")
     ax.add_patch(Rectangle((0, 0.865), 1, 0.135, color=NAVY, zorder=1))
     ax.text(0.018, 0.971, "INVESTMENT ANALYSIS PLATFORM", fontsize=7.5,
             color="#93acc6", zorder=2, va="center")
@@ -254,7 +256,7 @@ def watchlist_overview(path: Path) -> None:
         ax,
         "Multi-Company Investment Watchlist",
         f"{len(summary)} monitored names | {len(latest)} companies in the analytical universe | "
-        f"{summary['peer_group'].nunique()} reviewed peer groups",
+        f"{summary['peer_group'].nunique()} peer groups",
     )
 
     verdict_counts = summary["verdict_key"].value_counts().to_dict()
@@ -309,7 +311,10 @@ def watchlist_overview(path: Path) -> None:
         fontsize=8.2,
         color=SLATE,
     )
-    ax.text(0.982, 0.047, "Demo estimates are illustrative; licensed Capital IQ data stays outside GitHub.",
+    footer = ("Demo estimates are illustrative; licensed Capital IQ data stays outside GitHub."
+              if SCREENSHOT_DEMO else
+              "Selected private-workflow screenshot; licensed source tables stay outside GitHub.")
+    ax.text(0.982, 0.047, footer,
             fontsize=6.8, color=MUTED, ha="right")
 
     fig.savefig(path, facecolor=BG, bbox_inches="tight")
@@ -1451,6 +1456,258 @@ def ic_memo_snapshot(path: Path) -> None:
     plt.close(fig)
 
 
+def platform_workflow_snapshot(path: Path) -> None:
+    """One-screen explanation of how data becomes an investment output."""
+    df, _ = _load()
+    store = _store()
+    latest = latest_rows(df)
+
+    fig = plt.figure(figsize=(12.8, 7.0), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _platform_header(
+        ax,
+        "From Capital IQ to Investment Decision",
+        f"{len(latest)} companies | one normalized analytical framework | analyst-controlled conclusions",
+    )
+
+    _section(ax, 0.018, 0.815, "Data pipeline", "Licensed source data stays local")
+    pipeline = [
+        ("CAPITAL IQ", "Excel Add-In exports", GREEN),
+        ("NORMALIZE", "Quarterly internal schema", NAVY),
+        ("VALIDATE", "Audit, units and provenance", GOLD),
+        ("ANALYZE", "Peers, consensus and valuation", GREEN),
+        ("DECIDE", "Analyst thesis and IC memo", NAVY),
+    ]
+    gap = 0.018
+    width = (0.964 - gap * 4) / 5
+    for i, (title, note, color) in enumerate(pipeline):
+        x = 0.018 + i * (width + gap)
+        ax.add_patch(Rectangle((x, 0.680), width, 0.090, facecolor="white", edgecolor=LINE, linewidth=0.9))
+        ax.add_patch(Rectangle((x, 0.680), 0.005, 0.090, facecolor=color, edgecolor="none"))
+        ax.text(x + 0.016, 0.742, title, fontsize=8.2, color=NAVY, weight="bold")
+        ax.text(x + 0.016, 0.708, note, fontsize=6.8, color=MUTED)
+        if i < len(pipeline) - 1:
+            ax.annotate("", xy=(x + width + gap * 0.78, 0.725), xytext=(x + width + gap * 0.20, 0.725),
+                        arrowprops=dict(arrowstyle="->", color=PALETTE["navy_3"], lw=1.4))
+
+    _section(ax, 0.018, 0.625, "Analytical workbench", "Every page answers a specific investment question")
+    columns = [
+        ("1  TRIAGE", "Watchlist Home\nCompare", "Where should the analyst spend time?"),
+        ("2  UNDERWRITE", "Situation | Financials\nPeers | Consensus", "Is performance improving, and why?"),
+        ("3  VALUE", "Capital Structure\nDCF | Multiples | Scenarios", "What is priced in and what can go wrong?"),
+        ("4  COMMUNICATE", "Data Audit\nIC Memo | Decision Journal", "Can the conclusion survive IC scrutiny?"),
+    ]
+    cgap = 0.014
+    cwidth = (0.964 - cgap * 3) / 4
+    for i, (title, pages, question) in enumerate(columns):
+        x = 0.018 + i * (cwidth + cgap)
+        ax.add_patch(Rectangle((x, 0.337), cwidth, 0.235, facecolor="white", edgecolor=LINE, linewidth=0.9))
+        ax.add_patch(Rectangle((x, 0.551), cwidth, 0.021, facecolor=[GREEN, NAVY, GOLD, PALETTE["navy_3"]][i], edgecolor="none"))
+        ax.text(x + 0.016, 0.520, title, fontsize=8.1, color=NAVY, weight="bold")
+        ax.text(x + 0.016, 0.458, pages, fontsize=9.1, color=INK, weight="bold", linespacing=1.45)
+        ax.text(x + 0.016, 0.370, textwrap.fill(question, 30), fontsize=7.2, color=SLATE, linespacing=1.35)
+
+    ax.add_patch(Rectangle((0.018, 0.087), 0.964, 0.190, facecolor="white", edgecolor=LINE, linewidth=0.9))
+    ax.add_patch(Rectangle((0.018, 0.087), 0.006, 0.190, facecolor=GREEN, edgecolor="none"))
+    ax.text(0.040, 0.242, "WHAT IS AUTOMATED", fontsize=7.5, color=NAVY, weight="bold")
+    ax.text(0.040, 0.198,
+            "Ingestion  |  period normalization  |  TTM/NTM metrics  |  peer statistics  |  valuation mechanics  |  report assembly",
+            fontsize=8.0, color=SLATE)
+    ax.text(0.040, 0.146, "WHAT REMAINS HUMAN", fontsize=7.5, color=GOLD, weight="bold")
+    ax.text(0.040, 0.108,
+            "Peer approval  |  forecast assumptions  |  thesis  |  catalysts and risks  |  management questions  |  recommendation",
+            fontsize=8.0, color=SLATE)
+    ax.text(0.982, 0.050,
+            f"Side tables: {len(store.valuation_history):,} valuation-history rows | {len(store.estimates):,} estimate rows",
+            fontsize=6.8, color=MUTED, ha="right")
+
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
+def multiples_history_snapshot(path: Path) -> None:
+    """Valuation & Expectations page focused on history and re-rating momentum."""
+    df, cid = _load()
+    store = _store()
+    assessment = build_assessment(df, cid, store=store)
+    peer_ids = [p for p in assessment.peers["company_id"].tolist() if p != cid]
+    row = assessment.row
+
+    fig = plt.figure(figsize=(12.8, 7.5), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _header_clean(ax, row, assessment)
+    _section(ax, 0.018, 0.815, "Valuation & Expectations",
+             "Own history vs peer median, multiple momentum and re-rating attribution")
+
+    metrics = [("EV / EBITDA (LTM)", "ev_to_ebitda_ltm"), ("P / E (LTM)", "pe_ltm")]
+    chart_positions = [[0.055, 0.425, 0.430, 0.315], [0.535, 0.425, 0.430, 0.315]]
+    momentum_rows = []
+    for (label, column), pos in zip(metrics, chart_positions):
+        hist = multiple_history(store.valuation_history, cid, peer_ids, column)
+        chart = fig.add_axes(pos)
+        chart.set_facecolor("white")
+        if not hist.get("available"):
+            chart.text(0.5, 0.5, "History not available", ha="center", va="center", color=MUTED)
+            chart.axis("off")
+            continue
+        own = hist["company"]
+        peers = hist["peers"]
+        if not peers.empty:
+            chart.fill_between(peers["date"], peers["q1"], peers["q3"], color=PALETTE["teal"], alpha=0.13,
+                               label="Peer 25th-75th pct")
+            chart.plot(peers["date"], peers["median"], color=NAVY, linewidth=1.6, linestyle="--",
+                       label="Peer median (ex-company)")
+        chart.plot(own["date"], own["value"], color=GREEN, linewidth=2.4, label="LULU")
+        chart.scatter(own["date"].iloc[-1], own["value"].iloc[-1], s=52, color=GOLD, zorder=4,
+                      edgecolor=NAVY, linewidth=0.8)
+        chart.axhline(hist["own_median"], color=PALETTE["navy_3"], linewidth=1.0, linestyle=":")
+        chart.set_title(label, fontsize=9.2, color=NAVY, weight="bold", loc="left", pad=8)
+        chart.yaxis.set_major_formatter(lambda v, _: f"{v:.0f}x")
+        chart.xaxis.set_major_locator(mdates.MonthLocator(interval=6))
+        chart.xaxis.set_major_formatter(mdates.DateFormatter("%b %y"))
+        chart.tick_params(axis="both", labelsize=7.2)
+        chart.grid(True, axis="y", alpha=0.18)
+        chart.set_axisbelow(True)
+        for spine in ("top", "right"):
+            chart.spines[spine].set_visible(False)
+        chart.legend(loc="upper right", frameon=False, fontsize=6.6)
+
+        mom = multiple_momentum(store.valuation_history, cid, peer_ids, column)
+        momentum_rows.append([
+            label,
+            fmt_multiple(mom.get("current")),
+            _pct_signed(mom.get("chg", {}).get(3)),
+            _pct_signed(mom.get("chg", {}).get(6)),
+            _pct_signed(mom.get("chg", {}).get(12)),
+            _pct_signed(mom.get("relative", {}).get(12)),
+            str(mom.get("verdict") or "n/a").replace(" - ", " / "),
+        ])
+
+    _section(ax, 0.018, 0.357, "Multiple momentum",
+             "Company move versus peer move; current company excluded from the peer median")
+    table_ax = fig.add_axes([0.018, 0.105, 0.964, 0.205])
+    table_ax.axis("off")
+    _table(
+        table_ax,
+        ["Multiple", "Current", "3M", "6M", "12M", "12M vs peers", "Read"],
+        momentum_rows,
+        bbox=[0, 0, 1, 1],
+        colw=[0.23, 0.10, 0.09, 0.09, 0.09, 0.12, 0.28],
+        numeric_from=1,
+    )
+    ax.text(0.982, 0.060,
+            "Monthly Capital IQ valuation history | positive denominators only | current marker in slate gray",
+            fontsize=6.8, color=MUTED, ha="right")
+
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
+def data_refresh_snapshot(path: Path) -> None:
+    """Data & Refresh page without exposing local paths or licensed tables."""
+    df, _ = _load()
+    store = _store()
+    latest = latest_rows(df)
+    completeness = pd.to_numeric(latest.get("data_quality_score"), errors="coerce").mean()
+
+    fig = plt.figure(figsize=(12.8, 7.2), dpi=150)
+    fig.patch.set_facecolor(BG)
+    ax = _bg_axes(fig)
+    _platform_header(
+        ax,
+        "Data & Refresh",
+        "Capital IQ Excel workflow, source governance and controlled company onboarding",
+    )
+
+    cards = [
+        ("DATA MODE", "Capital IQ", "private local workflow", GREEN),
+        ("COMPANIES", f"{len(latest):,}", "watchlist plus trading comps", NAVY),
+        ("VALUATION HISTORY", f"{len(store.valuation_history):,}", "monthly observations", PALETTE["navy_3"]),
+        ("ESTIMATE ROWS", f"{len(store.estimates):,}", "consensus and revisions", GREEN),
+        ("AVG COMPLETENESS", fmt_pct(completeness), "required fields populated", GOLD),
+    ]
+    gap = 0.012
+    width = (0.964 - gap * 4) / 5
+    for i, (label, value, note, color) in enumerate(cards):
+        x = 0.018 + i * (width + gap)
+        ax.add_patch(Rectangle((x, 0.707), width, 0.112, facecolor="white", edgecolor=LINE, linewidth=0.8))
+        ax.add_patch(Rectangle((x, 0.814), width, 0.005, facecolor=color, edgecolor="none"))
+        ax.text(x + 0.012, 0.786, label, fontsize=6.7, color=MUTED, weight="bold")
+        ax.text(x + 0.012, 0.748, value, fontsize=16.5, color=INK, weight="bold")
+        ax.text(x + 0.012, 0.720, note, fontsize=6.4, color=MUTED)
+
+    _section(ax, 0.018, 0.665, "Refresh pipeline", "Excel stays the authenticated Capital IQ execution layer")
+    steps = [
+        ("1", "Refresh formulas", "Excel Add-In"),
+        ("2", "Stage exports", "CSV / XLSX local"),
+        ("3", "Validate", "schema + units"),
+        ("4", "Merge", "company-safe upsert"),
+        ("5", "Rebuild", "normalized dataset"),
+        ("6", "Publish", "all app pages"),
+    ]
+    sw = 0.146
+    sg = 0.017
+    for i, (num, title, note) in enumerate(steps):
+        x = 0.018 + i * (sw + sg)
+        ax.add_patch(Rectangle((x, 0.548), sw, 0.083, facecolor="white", edgecolor=LINE, linewidth=0.8))
+        ax.text(x + 0.012, 0.594, num, fontsize=12, color=GREEN, weight="bold")
+        ax.text(x + 0.040, 0.599, title, fontsize=7.4, color=NAVY, weight="bold")
+        ax.text(x + 0.040, 0.569, note, fontsize=6.5, color=MUTED)
+        if i < len(steps) - 1:
+            ax.annotate("", xy=(x + sw + sg * 0.82, 0.588), xytext=(x + sw + sg * 0.18, 0.588),
+                        arrowprops=dict(arrowstyle="->", color=PALETTE["navy_3"], lw=1.1))
+
+    _section(ax, 0.018, 0.505, "Add company from ticker",
+             "The same workflow extends the analytical universe without manual file surgery")
+    onboarding = [
+        ("IDENTIFIER", "NASDAQ:LULU"),
+        ("LOOKUP", "Resolve company via CapIQ"),
+        ("PEERS", "Approve suggested comps"),
+        ("FETCH", "20 quarters + estimates"),
+        ("READY", "All pages and reports"),
+    ]
+    ow = 0.180
+    og = 0.016
+    for i, (title, note) in enumerate(onboarding):
+        x = 0.018 + i * (ow + og)
+        ax.add_patch(Rectangle((x, 0.386), ow, 0.080, facecolor=PALETTE["panel_alt"], edgecolor=LINE, linewidth=0.8))
+        ax.text(x + 0.014, 0.435, title, fontsize=7.0, color=NAVY, weight="bold")
+        ax.text(x + 0.014, 0.405, note, fontsize=6.5, color=SLATE)
+
+    _section(ax, 0.018, 0.342, "Source governance", "Coverage and refresh status are visible before analysis")
+    source_rows = [
+        ["Quarterly financials", "20 quarters / company", "Revenue, margins, cash flow, balance sheet"],
+        ["Market snapshot", "Latest available", "Price, market cap, EV, shares and beta"],
+        ["Consensus estimates", "NTM + revisions", "Revenue, EBITDA, EPS and earnings dates"],
+        ["Valuation history", "Monthly", "EV/Revenue, EV/EBITDA, P/E and share price"],
+        ["Peer information", "Analyst-reviewable", "CapIQ suggestion, approval and exclusions"],
+    ]
+    source_ax = fig.add_axes([0.018, 0.105, 0.620, 0.200])
+    source_ax.axis("off")
+    _table(source_ax, ["Dataset", "Cadence", "Analytical use"], source_rows,
+           bbox=[0, 0, 1, 1], colw=[0.25, 0.22, 0.53], numeric_from=99)
+
+    ax.add_patch(Rectangle((0.660, 0.105), 0.322, 0.200, facecolor="white", edgecolor=LINE, linewidth=0.8))
+    ax.add_patch(Rectangle((0.660, 0.105), 0.006, 0.200, facecolor=GREEN, edgecolor="none"))
+    ax.text(0.682, 0.270, "PRIVATE BY DESIGN", fontsize=7.5, color=NAVY, weight="bold")
+    privacy = [
+        "Raw Capital IQ exports stay outside Git.",
+        "Private datasets and theses are gitignored.",
+        "Static screenshots expose no reconstructable source tables.",
+        "Every refresh records provenance and status.",
+    ]
+    y = 0.232
+    for item in privacy:
+        ax.text(0.685, y, u"\u2022", fontsize=9, color=GREEN, va="top")
+        ax.text(0.700, y, item, fontsize=6.9, color=SLATE, va="top")
+        y -= 0.036
+
+    fig.savefig(path, facecolor=BG, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate README screenshots from demo or private data.")
     parser.add_argument("--private", action="store_true", help="Use local Capital IQ-derived private data.")
@@ -1461,6 +1718,7 @@ def main() -> None:
     if args.company_id:
         SHOWCASE_COMPANY_ID = args.company_id
     ensure_dir(REPORTS_SAMPLE_DIR)
+    platform_workflow_snapshot(REPORTS_SAMPLE_DIR / "00_how_it_works.png")
     watchlist_overview(REPORTS_SAMPLE_DIR / "01_watchlist_overview.png")
     kpi_dashboard(REPORTS_SAMPLE_DIR / "02_company_situation.png")
     company_tearsheet(REPORTS_SAMPLE_DIR / "03_company_financials.png")
@@ -1477,6 +1735,8 @@ def main() -> None:
     multiples_scorecard_snapshot(REPORTS_SAMPLE_DIR / "14_multiples_scorecard.png")
     data_audit_snapshot(REPORTS_SAMPLE_DIR / "15_data_audit.png")
     ic_memo_snapshot(REPORTS_SAMPLE_DIR / "16_ic_memo.png")
+    data_refresh_snapshot(REPORTS_SAMPLE_DIR / "17_data_refresh.png")
+    multiples_history_snapshot(REPORTS_SAMPLE_DIR / "18_multiples_history.png")
     print(f"Sample screenshots written to {REPORTS_SAMPLE_DIR}")
 
 
