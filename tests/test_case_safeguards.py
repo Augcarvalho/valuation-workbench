@@ -18,6 +18,7 @@ from src.modeling.valuation_case import (
     case_warnings,
     dcf_applicability,
 )
+from src.modeling.valuation_diagnostics import diagnose_case
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +65,7 @@ def test_auto_case_never_shows_formal_recommendation(demo_df):
     case = build_valuation_case(df, "PRNR3.SA", store=store)   # no assumptions file
     assert not case.assumptions.from_file
     assert case.recommendation.stance == "INDICATIVE"
-    assert "NOT an investment view" in case.recommendation.headline
+    assert "NOT a final investment view" in case.recommendation.headline
     assert case.recommendation.stance not in {"BUY", "HOLD", "SELL"}
 
 
@@ -81,8 +82,11 @@ def test_illustrative_file_does_not_issue_formal_recommendation(demo_df):
 def test_case_warnings_flag_default_beta_and_fallbacks(demo_df):
     df, store = demo_df
     case = build_valuation_case(df, "PRNR3.SA", store=store)
-    texts = " | ".join(w["text"] for w in case_warnings(case))
-    assert "default 1.0" in texts                       # beta default flagged
+    assumptions = [d for d in diagnose_case(case) if d.category == "assumption"]
+    texts = " | ".join(d.text for d in assumptions)
+    assert "1.0 fallback" in texts
+    # Assumption gaps are not mislabeled as mathematical failures.
+    assert "1.0 fallback" not in " | ".join(w["text"] for w in case_warnings(case))
     severities = {w["severity"] for w in case_warnings(case)}
     assert severities <= {"high", "medium", "low"}
 
@@ -91,9 +95,10 @@ def test_case_warnings_terminal_value_thresholds(demo_df):
     df, store = demo_df
     case = build_valuation_case(df, "GOOGL", store=store)
     tv_pct = case.base.terminal_pct_of_ev
-    texts = " | ".join(w["text"] for w in case_warnings(case))
-    if tv_pct > 0.85:
-        assert "of EV" in texts
+    cross_checks = [d for d in diagnose_case(case) if d.category == "cross_check"]
+    texts = " | ".join(d.text for d in cross_checks)
+    if tv_pct > 0.90:
+        assert "enterprise value" in texts
     # Implied-growth-vs-WACC guard fires when the gap is inside 150bps.
     if case.base.implied_terminal_growth is not None and \
             case.base.implied_terminal_growth >= case.wacc.wacc - 0.015:

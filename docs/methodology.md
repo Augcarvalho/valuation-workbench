@@ -195,13 +195,30 @@ multiples in the intrinsic DCF.
 ## DCF terminal-value consistency
 
 The explicit forecast uses company-specific WACC and operating drivers. Auto
-cases extend to ten years when current growth exceeds 10% or current
-EV/EBITDA exceeds 15x; otherwise the horizon is five years. The stable period
-then normalizes three linked inputs:
+cases extend to ten detailed years when current growth exceeds 10% or current
+EV/EBITDA exceeds 15x; otherwise the detailed horizon is five years. If any
+scenario has not reached the perpetual growth rate, the engine appends a
+disclosed two-to-five-year transition period, limiting the annual fade to
+approximately 200bps. This prevents an artificial jump from year N into the
+perpetuity. An analyst may set ``transition_years`` explicitly in the private
+assumptions YAML.
+
+The Streamlit **Assumption Workbench** is the governed front end to those YAML
+files. It loads the currently resolved automatic values before the analyst
+edits anything. Unchanged fields remain automatic; only deviations are written
+as company-specific overrides. Partial scenario overrides inherit the proper
+Bear/Base/Bull defaults for every untouched driver. Saving performs structural
+and finance checks, atomically replaces the private YAML, archives the prior
+version, appends a local audit entry, and rebuilds every valuation output from
+the saved set. Restoring automatic assumptions also archives the analyst file
+before removing it.
+
+The stable period then normalizes three linked inputs:
 
 - terminal beta converges to 1.0 and debt weight to the peer median;
 - terminal ROIC converges to the peer median when at least three valid peers
-  exist (otherwise the capped company anchor is used);
+  exist (otherwise the capped company anchor is used), with terminal WACC as
+  the neutral competitive floor for mechanically generated cases;
 - stable reinvestment rate = perpetuity growth / terminal ROIC.
 
 The Gordon terminal cash flow is therefore:
@@ -217,6 +234,32 @@ the same stable-growth economics. The independent adjusted peer multiple is
 shown separately as **Market Reference**. It enters the DCF only through an
 explicit analyst assumption in the company YAML; this avoids silently mixing
 relative valuation with intrinsic valuation.
+
+This follows the internally consistent FCFF framework described by Aswath
+Damodaran: stable growth must be sustainable in the cash-flow currency,
+reinvestment must equal ``g / ROIC``, beta and leverage should converge toward
+stable-company levels, and a market-derived exit multiple is a relative-value
+cross-check rather than an intrinsic terminal-value input. Primary references:
+
+- [Estimating Terminal Value](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/valquestions/termvalapproaches.htm)
+- [Excess Returns and Terminal Value](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/valquestions/termvalueexreturns.htm)
+- [Stable-growth project guidance](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/project/prques.htm)
+
+## Valuation diagnostics and human review
+
+The valuation case separates three classes of finding:
+
+- **Model integrity exceptions**: invalid Gordon math, non-positive implied
+  equity, out-of-bounds drivers, or an abrupt unresolved stable-state jump.
+- **Analyst review queue**: default beta, fallback borrowing cost, draft/auto
+  assumptions, missing working-capital inputs, or an unapproved peer set.
+- **Valuation cross-checks**: market-versus-fundamental multiple gaps, terminal
+  value concentration, extreme upside/downside, or negative terminal spreads.
+
+Only the first class means the model cannot be relied upon mechanically. The
+other two are intentionally preserved because valuation requires analyst
+judgment; relabeling them prevents normal investment debate from looking like
+a software error while keeping every caveat visible.
 
 ## Peer review workflow
 

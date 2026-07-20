@@ -90,13 +90,15 @@ def test_assumptions_yaml_and_auto_scenarios(tmp_path):
     )
     row = _row()
     a = load_valuation_assumptions(row, tmp_path)
-    assert a.from_file and a.horizon_years == 4
+    assert a.from_file and a.explicit_horizon_years == 4
+    assert a.transition_years == 2 and a.horizon_years == 6
     assert a.exit_multiple == 9.0 and a.perpetuity_growth == 0.03 and a.beta == 0.8
     assert a.terminal_roic == pytest.approx(0.14)
     assert a.terminal_wacc == pytest.approx(0.09)
     assert a.terminal_roic_source == "analyst"
     assert a.scenarios["base"].source == "analyst"
-    assert a.scenarios["base"].ebitda_margin == [0.30] * 4
+    assert a.scenarios["base"].ebitda_margin == [0.30] * 6
+    assert a.scenarios["base"].revenue_growth[-1] == pytest.approx(0.03)
     # bear/bull not in the file -> auto-derived around anchors
     assert a.scenarios["bear"].source == "derived"
     assert a.scenarios["bear"].revenue_growth[0] < a.scenarios["base"].revenue_growth[0]
@@ -112,6 +114,25 @@ def test_assumptions_yaml_and_auto_scenarios(tmp_path):
     )
     assert high_growth.horizon_years == 10
     assert any("extended to 10 years" in n for n in high_growth.anchors["notes"])
+
+
+def test_partial_scenario_override_keeps_scenario_specific_defaults(tmp_path):
+    (tmp_path / "X_TEST.yaml").write_text(
+        "horizon_years: 5\n"
+        "scenarios:\n"
+        "  bear:\n"
+        "    revenue_growth: {start: -0.02, end: 0.01}\n",
+        encoding="utf-8",
+    )
+    assumptions = load_valuation_assumptions(_row(), tmp_path)
+    bear = assumptions.scenarios["bear"]
+
+    assert bear.revenue_growth[0] == pytest.approx(-0.02)
+    # The untouched Bear margin keeps the automatic 200-bps haircut instead
+    # of reverting to the Base EBITDA-margin anchor.
+    assert bear.ebitda_margin[0] == pytest.approx(
+        assumptions.anchors["ebitda_margin"] - 0.02
+    )
 
 
 def test_reported_d_and_a_is_preferred_over_ebitda_minus_ebit(tmp_path):

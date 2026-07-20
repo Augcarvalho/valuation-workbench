@@ -24,11 +24,16 @@ from src.modeling.valuation_case import (
     CaseNotApplicableError,
     ValuationCase,
     build_valuation_case,
-    case_warnings,
 )
+from src.modeling.valuation_diagnostics import diagnose_case, integrity_status
 from src.reporting.board_pack import load_dataset
 from src.reporting.valuation_case_template import VALUATION_CASE_TEMPLATE, valuation_case_css
-from src.reporting.valuation_charts import assumptions_provenance, assumptions_status, case_chart_images
+from src.reporting.valuation_charts import (
+    assumptions_provenance,
+    assumptions_status,
+    case_chart_images,
+    key_assumptions_table,
+)
 from src.utils import ensure_dir, fmt_money, fmt_multiple, fmt_pct
 
 
@@ -74,16 +79,6 @@ def _grid_context(grid: pd.DataFrame, kind: str) -> dict:
     return {"columns": [str(c) for c in grid.columns], "rows": rows}
 
 
-
-
-def _case_warnings_with_divergence(case: ValuationCase) -> list[dict]:
-    from src.reporting.valuation_charts import terminal_value_divergence
-
-    warnings = case_warnings(case)
-    note = terminal_value_divergence(case)
-    if note:
-        warnings.append({"severity": "medium", "text": note})
-    return warnings
 
 
 def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None = None) -> dict:
@@ -235,6 +230,24 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         + ("Notes: " + "; ".join(case.notes) + "." if case.notes else "")
     )
 
+    diagnostics = diagnose_case(case)
+    integrity = [d for d in diagnostics if d.category == "integrity"]
+    assumption_review = [d for d in diagnostics if d.category == "assumption"]
+    cross_checks = [d for d in diagnostics if d.category == "cross_check"]
+    assumption_rows = [
+        {
+            "group": r["group"], "assumption": r["assumption"],
+            "value": r["value"], "source": r["source"],
+            "source_class": {
+                "automatic stable-growth fade": "anchored",
+                "not required": "calculated",
+            }.get(str(r["source"]), str(r["source"])),
+            "method": r["method"],
+        }
+        for _, r in key_assumptions_table(case, "base").iterrows()
+    ]
+    integrity_key, integrity_detail = integrity_status(case)
+
     return {
         "css": valuation_case_css(),
         "case_date": pd.Timestamp.today().strftime("%d %b %Y"),
@@ -308,7 +321,18 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         "perp_growth": f"{case.assumptions.perpetuity_growth:.1%}",
         "provenance_note": provenance,
         "images": case_chart_images(case, df=df),
-        "warnings": _case_warnings_with_divergence(case),
+        "warnings": [{"severity": d.severity, "text": d.text} for d in integrity],
+        "assumption_findings": [
+            {"severity": d.severity, "text": d.text, "action": d.action}
+            for d in assumption_review
+        ],
+        "cross_checks": [
+            {"severity": d.severity, "text": d.text, "action": d.action}
+            for d in cross_checks
+        ],
+        "assumption_rows": assumption_rows,
+        "integrity_status": integrity_key,
+        "integrity_detail": integrity_detail,
         "status_key": assumptions_status(case)[0],
         "status_label": assumptions_status(case)[1],
         "provenance_rows": [

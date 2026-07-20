@@ -20,8 +20,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     from src.modeling.valuation_case import (
         CaseNotApplicableError,
         build_valuation_case,
-        case_warnings,
     )
+    from src.modeling.valuation_diagnostics import diagnose_case, integrity_status
     from src.reporting import valuation_charts as vch
     from src.reporting.valuation_case import generate_valuation_case
 
@@ -124,7 +124,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         folder_name = "data/sample/assumptions" if DEMO_MODE else "data_private/assumptions"
         detail = {
             "auto": (f"Every driver was derived mechanically from LTM data - no analyst file exists. "
-                     f"Create <code>{folder_name}/{target_file}</code> from the template to set a real view."),
+                     f"Use the editor below to create <code>{folder_name}/{target_file}</code> "
+                     "and convert selected fields into analyst overrides."),
             "illustrative": "The analyst assumptions behind this case are labeled placeholders pending diligence.",
             "draft": "Analyst assumptions are in draft; numbers are directional.",
         }.get(status_key, "")
@@ -144,12 +145,13 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     target_txt = f" - target {base.target_price:,.2f} vs {base.current_price:,.2f}" if base.target_price else ""
     recommendation_label = ("Indicative calibration" if case.recommendation.stance == "INDICATIVE"
                             else case.recommendation.stance)
+    output_type = "Calibration" if case.recommendation.stance == "INDICATIVE" else "Recommendation"
     st.markdown(
         f"""
         <div class="pe-verdict">
           <div class="pe-verdict-flag" style="background:{rec_color}"></div>
           <div class="pe-verdict-body">
-            <div class="pe-verdict-kicker">DCF {'Calibration' if status_key == 'auto' else 'Recommendation'} | WACC {case.wacc.wacc:.1%} | Exit {case.exit_multiple:.1f}x ({case.exit_multiple_source})</div>
+            <div class="pe-verdict-kicker">DCF {output_type} | WACC {case.wacc.wacc:.1%} | Exit {case.exit_multiple:.1f}x ({case.exit_multiple_source})</div>
             <div class="pe-verdict-label" style="color:{rec_color}">{recommendation_label}{target_txt}</div>
             <div class="pe-verdict-rationale">{case.recommendation.headline} {case.recommendation.reconciliation}</div>
           </div>
@@ -158,31 +160,87 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         unsafe_allow_html=True,
     )
 
-    # --- Model-quality warnings ------------------------------------------------------
-    warnings = case_warnings(case)
+    # --- Editable assumptions ------------------------------------------------------
+    from src.app.assumption_workbench import render_assumption_workbench
+
+    render_assumption_workbench(
+        df,
+        company_id,
+        store,
+        case,
+        demo_mode=DEMO_MODE,
+    )
+
+    # --- Assumptions: visible before outputs, not buried in an appendix. ------------
+    integrity_key, integrity_detail = integrity_status(case)
+    integrity_tone = {"PASS": "green", "REVIEW": "yellow", "BLOCKED": "red"}[integrity_key]
+    human_checks = int(case.assumptions.status == "final") + int(a.peer_reviewed)
+    horizon_text = f"{case.assumptions.explicit_horizon_years}Y"
+    if case.assumptions.transition_years:
+        horizon_text += f" + {case.assumptions.transition_years}Y fade"
+
+    ui.section("Key Valuation Assumptions", "Historicals -> assumptions -> forecast -> terminal value")
+    ui.kpi_grid([
+        Kpi("integrity", "Model Integrity", integrity_key, integrity_detail, integrity_tone),
+        Kpi("horizon", "Forecast Structure", horizon_text,
+            case.assumptions.transition_source, "n/a"),
+        Kpi("growth", "Revenue Growth",
+            f"{base.forecast['revenue_growth'].iloc[0]:+.1%} -> {base.forecast['revenue_growth'].iloc[-1]:+.1%}",
+            f"stable growth {base.perpetuity_growth:.1%}", "n/a"),
+        Kpi("wacc", "WACC -> Terminal", f"{case.wacc.wacc:.1%} -> {base.terminal_wacc:.1%}",
+            case.assumptions.terminal_wacc_source, "n/a"),
+        Kpi("terminal", "Terminal Economics",
+            f"g {base.perpetuity_growth:.1%} | ROIC {base.terminal_roic:.1%}",
+            f"reinvestment {base.terminal_reinvestment_rate:.1%}" if base.terminal_reinvestment_rate is not None else "invalid",
+            "n/a"),
+        Kpi("governance", "Human Sign-off", f"{human_checks}/2",
+            "final assumptions + approved peers", "green" if human_checks == 2 else "yellow"),
+    ], columns=6)
+
+    assumption_table = vch.key_assumptions_table(case, "base")
+    assumption_pills = {
+        "analyst": ("Analyst", "yellow"),
+        "anchored": ("Data anchored", "green"),
+        "mixed": ("Mixed", "yellow"),
+        "calculated": ("Calculated", "na"),
+        "automatic stable-growth fade": ("Auto fade", "green"),
+        "not required": ("No fade", "na"),
+    }
+    assumption_rows = []
+    for _, item in assumption_table.iterrows():
+        label, tone = assumption_pills.get(item["source"], (str(item["source"]).title(), "na"))
+        assumption_rows.append([
+            str(item["group"]), str(item["assumption"]), str(item["value"]),
+            ui.cell_pill(label, tone), str(item["method"]),
+        ])
+    ui.html_table(
+        ["Area", "Assumption", "Base Case", "Source", "Method / Rationale"],
+        assumption_rows,
+        numeric_from=99,
+        wrap=True,
+        dense=True,
+    )
+    ui.footnote(
+        "Stable-state convention: reinvestment rate = g / ROIC; terminal FCFF = NOPAT x "
+        "(1 - g / ROIC); terminal value = FCFF / (WACC - g). Market multiples remain an "
+        "independent cross-check unless the analyst explicitly selects one."
+    )
+
+    # --- Diagnostics: errors, human decisions, and market findings are distinct. ----
+    diagnostics = diagnose_case(case)
+    integrity_findings = [d for d in diagnostics if d.category == "integrity"]
+    assumption_findings = [d for d in diagnostics if d.category == "assumption"]
+    cross_checks = [d for d in diagnostics if d.category == "cross_check"]
     tv_note = vch.terminal_value_divergence(case)
-    if tv_note:
-        warnings.append({"severity": "medium", "text": tv_note})
-    if a.peer_warning:
-        warnings.append({"severity": "high", "text": a.peer_warning})
-    if not a.peer_reviewed:
-        if a.peer_source == "capiq_comp_set":
-            warnings.append({"severity": "low",
-                             "text": "Comp set is S&P Capital IQ's official peer list (not yet analyst-reviewed) - "
-                                     "approve it on the Peer Benchmarking page to sign off."})
-        elif a.peer_source == "fallback":
-            warnings.append({"severity": "low",
-                             "text": "Comp set is the CapIQ-attribute scored set (not yet analyst-reviewed) - "
-                                     "approve or edit it on the Peer Benchmarking page."})
-        else:
-            warnings.append({"severity": "medium",
-                             "text": f"Comp set is the {a.peer_source.replace('_', ' ')} (not analyst-reviewed) - "
-                                     f"approve a peer set on the Peer Benchmarking page to firm up the exit multiple."})
-    if warnings:
-        flags = [{"severity": w["severity"].title(), "area": "Model quality",
-                  "observation": w["text"], "management_question": ""} for w in warnings]
-        ui.section("Model-Quality Warnings", "Read these before trusting the target")
-        ui.flag_list(flags)
+    if integrity_findings:
+        ui.section("Model Integrity Exceptions", "Resolve before relying on valuation outputs")
+        ui.flag_list([d.as_flag() for d in integrity_findings])
+    if assumption_findings:
+        ui.section("Analyst Review Queue", "Valid mechanically; pending human judgment or data refresh")
+        ui.flag_list([d.as_flag() for d in assumption_findings])
+    if cross_checks:
+        ui.section("Valuation Cross-Checks", "Interpretation of the result, not software errors")
+        ui.flag_list([d.as_flag() for d in cross_checks])
 
     # --- Row 1: scenario targets | sensitivity heatmap --------------------------------
     ui.section("Valuation Range", "Where the DCF, comps, and history place the share price")
@@ -323,7 +381,13 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     # --- Provenance --------------------------------------------------------------------------
     ui.section("Assumptions Provenance", "Every input classified - no black box")
     prov = vch.assumptions_provenance(case)
-    pill = {"analyst": ("Analyst", "yellow"), "anchored": ("Anchored LTM", "green"), "default": ("Default", "red")}
+    pill = {
+        "analyst": ("Analyst", "yellow"),
+        "anchored": ("Data anchored", "green"),
+        "mixed": ("Mixed", "yellow"),
+        "calculated": ("Calculated", "na"),
+        "default": ("Default", "red"),
+    }
     rows = [[r["item"], r["value"], ui.cell_pill(*pill.get(r["source"], (r["source"], "na")))]
             for _, r in prov.iterrows()]
     ui.html_table(["Input", "Value", "Source"], rows, numeric_from=99)

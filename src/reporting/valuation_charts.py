@@ -16,7 +16,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from src.branding import FONT_SANS, FONT_SERIF, PALETTE
+from src.branding import FONT_SANS, PALETTE
 
 INK = PALETTE["ink"]
 GRAPHITE = PALETTE["charcoal"]
@@ -286,11 +286,14 @@ def assumptions_provenance(case) -> pd.DataFrame:
 
     for name in ("bear", "base", "bull"):
         scen = a.scenarios[name]
+        growth_source = a.provenance.get(f"{name}.revenue_growth", "anchored")
+        margin_source = a.provenance.get(f"{name}.ebitda_margin", "anchored")
+        scenario_source = growth_source if growth_source == margin_source else "mixed"
         items.append({
             "item": f"{name.title()} scenario drivers",
             "value": f"g {scen.revenue_growth[0]:+.0%}->{scen.revenue_growth[-1]:+.0%}, "
                      f"margin {scen.ebitda_margin[-1]:.0%}",
-            "source": "analyst" if scen.source == "analyst" else "anchored",
+            "source": scenario_source,
         })
 
     beta_map = {"analyst": "analyst", "market_data": "anchored", "peers": "anchored", "default": "default"}
@@ -334,6 +337,61 @@ def assumptions_provenance(case) -> pd.DataFrame:
             items.append({"item": "Anchor fallback", "value": note, "source": "default"})
 
     return pd.DataFrame(items)
+
+
+def key_assumptions_table(case, scenario_name: str = "base") -> pd.DataFrame:
+    """Material assumptions in the order an analyst underwrites the case."""
+    a = case.assumptions
+    s = a.scenarios[scenario_name]
+    w = case.wacc
+    base = case.scenarios[scenario_name]
+
+    def source(key: str, fallback: str = "anchored") -> str:
+        return a.provenance.get(key, fallback)
+
+    nwc_value = (
+        f"DSO {s.dso[0]:.0f}d / DIH {s.dih[0]:.0f}d / DPO {s.dpo[0]:.0f}d"
+        if s.nwc_mode == "days" and all(v is not None for v in (s.dso, s.dih, s.dpo))
+        else f"{s.nwc_pct_revenue[0]:.1%} of revenue"
+        if s.nwc_pct_revenue else "n/a"
+    )
+    transition = (
+        f"{a.explicit_horizon_years} detailed + {a.transition_years} transition"
+        if a.transition_years else f"{a.explicit_horizon_years} detailed"
+    )
+    rows = [
+        ("Forecast", "Forecast horizon", transition, a.transition_source,
+         "Transition years fade growth to the stable-state rate."),
+        ("Operations", "Revenue growth", f"{s.revenue_growth[0]:+.1%} -> {s.revenue_growth[-1]:+.1%}",
+         source(f"{scenario_name}.revenue_growth"), "Year 1 to final explicit year."),
+        ("Operations", "EBITDA margin", f"{s.ebitda_margin[0]:.1%} -> {s.ebitda_margin[-1]:.1%}",
+         source(f"{scenario_name}.ebitda_margin"), "Year 1 to final explicit year."),
+        ("Capital needs", "D&A / revenue", f"{s.d_and_a_pct[0]:.1%} -> {s.d_and_a_pct[-1]:.1%}",
+         source(f"{scenario_name}.d_and_a_pct_revenue"), "Non-cash operating expense."),
+        ("Capital needs", "Capex / revenue", f"{s.capex_pct[0]:.1%} -> {s.capex_pct[-1]:.1%}",
+         source(f"{scenario_name}.capex_pct_revenue"), "Cash investment in fixed assets."),
+        ("Capital needs", "Working capital", nwc_value,
+         source(f"{scenario_name}.dso") if s.nwc_mode == "days" else
+         source(f"{scenario_name}.nwc_pct_revenue"), "Projected from operating days or revenue intensity."),
+        ("Tax", "Normalized tax rate", f"{s.tax_rate:.1%}",
+         source(f"{scenario_name}.tax_rate"), "Applied to positive EBIT."),
+        ("Discount rate", "Explicit-period WACC", f"{w.wacc:.1%}",
+         "analyst" if w.overridden else "anchored", "Market-value capital structure and CAPM."),
+        ("Discount rate", "Terminal WACC", f"{base.terminal_wacc:.1%}",
+         "analyst" if a.terminal_wacc_source.startswith("analyst") else "anchored",
+         a.terminal_wacc_source),
+        ("Terminal value", "Perpetual growth", f"{a.perpetuity_growth:.1%}",
+         a.perpetuity_source, "Nominal long-run growth in the cash-flow currency."),
+        ("Terminal value", "Terminal ROIC", f"{a.terminal_roic:.1%}",
+         "analyst" if a.terminal_roic_source == "analyst" else "anchored",
+         a.terminal_roic_source),
+        ("Terminal value", "Stable reinvestment", f"{base.terminal_reinvestment_rate:.1%}"
+         if base.terminal_reinvestment_rate is not None else "n/m", "calculated", "g / terminal ROIC."),
+        ("Terminal value", "Primary exit multiple", f"{case.exit_multiple:.1f}x",
+         "analyst" if "analyst" in case.exit_multiple_source else "calculated",
+         case.exit_multiple_source),
+    ]
+    return pd.DataFrame(rows, columns=["group", "assumption", "value", "source", "method"])
 
 
 # =====================================================================================

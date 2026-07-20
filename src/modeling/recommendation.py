@@ -34,7 +34,9 @@ def _conviction(upside: float, bear_upside: float | None, bull_upside: float | N
         return "n/a", "Scenario range unavailable."
     spread = bull_upside - bear_upside
     if upside >= BUY_THRESHOLD and bear_upside >= -0.05:
-        return "high", f"Even the bear case holds near breakeven ({bear_upside:+.0%})."
+        if bear_upside >= BUY_THRESHOLD:
+            return "high", f"Even the bear case remains materially positive ({bear_upside:+.0%})."
+        return "high", f"The bear case holds near breakeven ({bear_upside:+.0%})."
     if upside <= SELL_THRESHOLD and bull_upside <= 0.05:
         return "high", f"Even the bull case fails to reach upside ({bull_upside:+.0%})."
     if spread >= 0.80:
@@ -49,6 +51,7 @@ def recommend(
     verdict_key: str | None = None,
     formal: bool = True,
     formal_reason: str | None = None,
+    calibration_label: str = "Auto-anchored calibration",
 ) -> Recommendation:
     """Return a formal recommendation only after all readiness gates pass."""
     if upside is None:
@@ -64,8 +67,8 @@ def recommend(
         conviction, conviction_note = _conviction(upside, bear_upside, bull_upside)
         return Recommendation(
             stance="INDICATIVE",
-            headline=(f"Auto-anchored calibration: mechanical extrapolation of TTM data implies "
-                      f"{upside:+.0%} - NOT an investment view."),
+            headline=(f"{calibration_label}: the current assumptions imply {upside:+.0%} - "
+                      f"NOT a final investment view."),
             conviction="n/a",
             reconciliation=(f"{reason}. Complete the readiness checks before issuing a formal "
                             f"recommendation. {conviction_note}"),

@@ -19,6 +19,7 @@ samples under ``data/sample/assumptions/``.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import ceil
 from pathlib import Path
 
 import numpy as np
@@ -33,6 +34,14 @@ SCENARIO_NAMES = ("bear", "base", "bull")
 
 # Bounds used when anchoring growth on a single noisy TTM reading.
 GROWTH_ANCHOR_CLIP = (-0.05, 0.25)
+
+# A terminal period is not a sixth forecast year. If the explicit forecast
+# still grows materially faster than the economy, append a transparent fade
+# period before applying the perpetuity. Two percentage points per year keeps
+# the transition gradual without making the DCF needlessly long.
+STABLE_GROWTH_TOLERANCE = 0.01
+MAX_GROWTH_FADE_PER_YEAR = 0.02
+MAX_TRANSITION_YEARS = 5
 
 
 # --- reference parameters -----------------------------------------------------
@@ -240,6 +249,14 @@ class ValuationAssumptions:
     terminal_wacc_source: str = "pending"
     # Tier-2 operational drivers (units x revenue/unit segment build); None = Tier-1.
     segments: list[dict] | None = None
+    # The YAML horizon is the detailed forecast. ``transition_years`` is an
+    # automatically generated fade to stable growth, disclosed separately.
+    explicit_horizon_years: int = 5
+    transition_years: int = 0
+    transition_source: str = "not required"
+    # Per-driver provenance used by the dashboard and exported appendix.
+    # Values: analyst | anchored | mixed.
+    provenance: dict[str, str] = field(default_factory=dict)
 
     @property
     def from_file(self) -> bool:
@@ -289,12 +306,85 @@ def _build_scenario(name: str, spec: dict, horizon: int, anchors: dict, source: 
     )
 
 
+def _transition_year_count(
+    scenarios: dict[str, ScenarioAssumptions],
+    perpetuity_growth: float,
+    raw_value,
+) -> tuple[int, str]:
+    """Resolve the fade period shared by all scenarios.
+
+    ``auto`` adds only the years needed to bring the most distant scenario to
+    stable growth at no more than 200bps of deceleration per year. An analyst
+    can set an explicit integer, including zero, but the diagnostics layer will
+    flag an abrupt terminal jump when one remains.
+    """
+    if raw_value is not None and not (
+        isinstance(raw_value, str) and raw_value.strip().lower() == "auto"
+    ):
+        years = max(int(raw_value), 0)
+        return years, "analyst"
+
+    max_gap = max(
+        abs(float(s.revenue_growth[-1]) - perpetuity_growth)
+        for s in scenarios.values()
+    )
+    if max_gap <= STABLE_GROWTH_TOLERANCE + 1e-9:
+        return 0, "not required"
+    years = min(MAX_TRANSITION_YEARS, max(2, ceil(max_gap / MAX_GROWTH_FADE_PER_YEAR)))
+    return years, "automatic stable-growth fade"
+
+
+def _append_stable_transition(
+    scenario: ScenarioAssumptions,
+    years: int,
+    perpetuity_growth: float,
+) -> None:
+    """Append a stable-growth fade in place while holding other drivers flat."""
+    if years <= 0:
+        return
+    start = float(scenario.revenue_growth[-1])
+    scenario.revenue_growth.extend(
+        [float(v) for v in np.linspace(start, perpetuity_growth, years + 1)[1:]]
+    )
+    for values in (
+        scenario.ebitda_margin,
+        scenario.d_and_a_pct,
+        scenario.capex_pct,
+        scenario.dso,
+        scenario.dih,
+        scenario.dpo,
+        scenario.nwc_pct_revenue,
+    ):
+        if values is not None:
+            values.extend([float(values[-1])] * years)
+
+
 def assumptions_filename(company_id: str) -> str:
     return company_id.replace(":", "_") + ".yaml"
 
 
-def _auto_segments_from_capiq(row: pd.Series, anchors: dict, horizon: int,
-                              terminal_g: float, notes: list[str]) -> list[dict] | None:
+def _spec_source(spec, has_file: bool) -> str:
+    if not has_file or spec is None:
+        return "anchored"
+    if isinstance(spec, str) and spec.strip().lower() == "auto":
+        return "anchored"
+    if isinstance(spec, dict):
+        values = list(spec.values())
+        explicit = [v for v in values if not (v is None or (isinstance(v, str) and v.lower() == "auto"))]
+        automatic = [v for v in values if v is None or (isinstance(v, str) and v.lower() == "auto")]
+        if explicit and automatic:
+            return "mixed"
+    return "analyst"
+
+
+def _auto_segments_from_capiq(
+    row: pd.Series,
+    anchors: dict,
+    horizon: int,
+    terminal_g: float,
+    notes: list[str],
+    scenarios: dict[str, ScenarioAssumptions] | None = None,
+) -> list[dict] | None:
     """Tier-2 auto drivers from the CapIQ segment extraction.
 
     Segment revenues on the CIQ page are USD-converted, so absolute levels and
@@ -332,6 +422,16 @@ def _auto_segments_from_capiq(row: pd.Series, anchors: dict, horizon: int,
         return [round(start + (end - start) * t / (n - 1)
                       + tilt * (1.0 - t / (n - 1)), 6) for t in range(n)]
 
+    def scenario_path(name: str, start: float, end: float, tilt: float) -> list[float]:
+        scenario = (scenarios or {}).get(name)
+        if scenario is None:
+            return path_for(start, end, tilt)
+        values = list(scenario.revenue_growth)
+        return [
+            round(float(value) + tilt * (1.0 - t / max(len(values) - 1, 1)), 6)
+            for t, value in enumerate(values)
+        ]
+
     segments = []
     for (_, seg), w, cagr in zip(mine.iterrows(), weights, cagrs):
         tilt = float(np.clip(cagr - blended, -0.08, 0.08))
@@ -340,9 +440,11 @@ def _auto_segments_from_capiq(row: pd.Series, anchors: dict, horizon: int,
             "units": 1,
             "revenue_per_unit": float(w) * revenue_ttm,
             "rpu_growth": {
-                "bear": path_for(max(g0 - 0.05, -0.05), max(tg - 0.01, 0.0), tilt),
-                "base": path_for(g0, tg, tilt),
-                "bull": path_for(g0 + 0.05, tg + 0.01, tilt),
+                "bear": scenario_path(
+                    "bear", max(g0 - 0.05, -0.05), max(tg - 0.01, 0.0), tilt
+                ),
+                "base": scenario_path("base", g0, tg, tilt),
+                "bull": scenario_path("bull", g0 + 0.05, tg + 0.01, tilt),
             },
             "source": "capiq segments (auto)",
         })
@@ -375,13 +477,13 @@ def load_valuation_assumptions(
     if path is None:
         own_multiple = _clean(row.get("ev_to_ebitda_ttm")) or 0.0
         high_growth = anchors["revenue_growth"] > 0.10 or own_multiple > 15.0
-        horizon = 10 if high_growth else 5
+        explicit_horizon = 10 if high_growth else 5
         if high_growth:
             anchors.setdefault("notes", []).append(
                 "auto horizon extended to 10 years because growth or valuation has not reached a stable state"
             )
     else:
-        horizon = int(raw.get("horizon_years", 5))
+        explicit_horizon = int(raw.get("horizon_years", 5))
     status_raw = str(raw.get("status", "")).strip().lower()
     if path is None:
         status = "auto"
@@ -430,9 +532,48 @@ def load_valuation_assumptions(
     scenarios: dict[str, ScenarioAssumptions] = {}
     for name in SCENARIO_NAMES:
         if name in scenario_specs:
-            scenarios[name] = _build_scenario(name, scenario_specs[name], horizon, anchors, "analyst")
+            # An editor file contains only analyst deviations. Missing fields,
+            # and fields explicitly left as ``auto``, inherit the correct
+            # scenario-specific default (for example the Bear margin haircut),
+            # not the Base anchor.
+            analyst_spec = scenario_specs[name] or {}
+            merged_spec = dict(auto_specs[name])
+            for key, value in analyst_spec.items():
+                if isinstance(value, str) and value.strip().lower() == "auto":
+                    continue
+                merged_spec[key] = value
+            scenarios[name] = _build_scenario(
+                name, merged_spec, explicit_horizon, anchors, "analyst"
+            )
         else:
-            scenarios[name] = _build_scenario(name, auto_specs[name], horizon, anchors, "derived")
+            scenarios[name] = _build_scenario(
+                name, auto_specs[name], explicit_horizon, anchors, "derived"
+            )
+
+    provenance: dict[str, str] = {}
+    driver_keys = (
+        "revenue_growth", "ebitda_margin", "d_and_a_pct_revenue",
+        "capex_pct_revenue", "tax_rate", "dso", "dih", "dpo",
+        "nwc_pct_revenue",
+    )
+    for name in SCENARIO_NAMES:
+        spec = scenario_specs.get(name, {})
+        for key in driver_keys:
+            provenance[f"{name}.{key}"] = _spec_source(spec.get(key), path is not None)
+
+    transition_years, transition_source = _transition_year_count(
+        scenarios,
+        perpetuity_growth,
+        raw.get("transition_years", "auto"),
+    )
+    for scenario in scenarios.values():
+        _append_stable_transition(scenario, transition_years, perpetuity_growth)
+    horizon = explicit_horizon + transition_years
+    if transition_years:
+        anchors.setdefault("notes", []).append(
+            f"{transition_years}-year stable-growth transition appended after the "
+            f"{explicit_horizon}-year detailed forecast"
+        )
 
     wacc_raw = raw.get("wacc") or {}
 
@@ -440,16 +581,30 @@ def load_valuation_assumptions(
         v = wacc_raw.get(key)
         return None if v is None or (isinstance(v, str) and v.lower() == "auto") else float(v)
 
-    segments = raw.get("segments") or None
+    segments_raw = raw.get("segments")
+    auto_segments_requested = (
+        isinstance(segments_raw, str) and segments_raw.strip().lower() == "auto"
+    )
+    segments = segments_raw if isinstance(segments_raw, list) else None
     if segments is not None:
         # Minimal validation: every segment needs a unit count and revenue/unit.
         segments = [s for s in segments
                     if isinstance(s, dict) and s.get("units") is not None
                     and s.get("revenue_per_unit") is not None] or None
-    if segments is None:
+    if segments is None and (path is None or auto_segments_requested):
         # Tier-2 auto: CapIQ business-segment mix + relative growth, when extracted.
-        segments = _auto_segments_from_capiq(row, anchors, horizon, perpetuity_growth,
-                                             anchors.setdefault("notes", []))
+        segments = _auto_segments_from_capiq(
+            row,
+            anchors,
+            horizon,
+            perpetuity_growth,
+            anchors.setdefault("notes", []),
+            scenarios,
+        )
+    elif path is not None and segments is None:
+        anchors.setdefault("notes", []).append(
+            "analyst revenue-growth assumptions take precedence; CapIQ segment build not enabled"
+        )
 
     return ValuationAssumptions(
         company_id=company_id,
@@ -469,4 +624,19 @@ def load_valuation_assumptions(
         terminal_roic_source=terminal_roic_source,
         terminal_wacc_source="analyst" if terminal_wacc is not None else "pending",
         segments=segments,
+        explicit_horizon_years=explicit_horizon,
+        transition_years=transition_years,
+        transition_source=transition_source,
+        provenance={
+            **provenance,
+            "wacc.beta": _spec_source(wacc_raw.get("beta"), path is not None),
+            "wacc.pretax_cost_of_debt": _spec_source(
+                wacc_raw.get("pretax_cost_of_debt"), path is not None
+            ),
+            "wacc.override": _spec_source(wacc_raw.get("wacc_override"), path is not None),
+            "terminal.exit_multiple": _spec_source(em, path is not None),
+            "terminal.perpetuity_growth": _spec_source(pg, path is not None),
+            "terminal.roic": _spec_source(terminal_roic_raw, path is not None),
+            "terminal.wacc": _spec_source(terminal_wacc_raw, path is not None),
+        },
     )

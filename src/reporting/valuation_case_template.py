@@ -50,6 +50,8 @@ def valuation_case_css() -> str:
 .src-derived { background: var(--panel-alt); color: var(--muted); }
 .src-anchored { background: var(--green-soft); color: var(--green); }
 .src-default { background: var(--red-soft); color: var(--red); }
+.src-mixed { background: var(--amber-soft); color: var(--amber); }
+.src-calculated { background: var(--panel-alt); color: var(--muted); }
 .status-pill { font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
   padding:4px 12px; border-radius:999px; margin-left:12px; vertical-align:middle; }
 .status-auto { background: rgba(143,47,59,.25); color:#f3c2c2; border:1px solid rgba(143,47,59,.6); }
@@ -104,10 +106,39 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
 
   {% if warnings %}
   <div class="warn-box">
-    <h4>Model-Quality Warnings</h4>
+    <h4>Model Integrity Exceptions</h4>
     <ul>
       {% for w in warnings %}<li class="sev-{{ w.severity }}">{{ w.text }}</li>{% endfor %}
     </ul>
+  </div>
+  {% endif %}
+
+  <section>
+    <div class="s-head"><div class="s-bar"></div><h2>Key Valuation Assumptions</h2>
+      <span class="s-note">Integrity {{ integrity_status }} | {{ integrity_detail }}</span></div>
+    <table>
+      <tr><th>Area</th><th>Assumption</th><th>Base Case</th><th>Source</th><th>Method / Rationale</th></tr>
+      {% for r in assumption_rows %}
+      <tr><td>{{ r.group }}</td><td>{{ r.assumption }}</td><td class="num">{{ r.value }}</td>
+        <td><span class="assump-src src-{{ r.source_class }}">{{ r.source }}</span></td>
+        <td>{{ r.method }}</td></tr>
+      {% endfor %}
+    </table>
+    <div class="s-note" style="margin-top:7px">Stable-state convention: reinvestment = g / ROIC;
+      terminal FCFF = NOPAT x (1 - g / ROIC); terminal value = FCFF / (WACC - g).</div>
+  </section>
+
+  {% if assumption_findings %}
+  <div class="warn-box">
+    <h4>Analyst Review Queue</h4>
+    <ul>{% for w in assumption_findings %}<li>{{ w.text }}{% if w.action %} {{ w.action }}{% endif %}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  {% if cross_checks %}
+  <div class="warn-box" style="border-color:var(--line);background:var(--panel-alt)">
+    <h4 style="color:var(--slate)">Valuation Cross-Checks</h4>
+    <ul>{% for w in cross_checks %}<li>{{ w.text }}{% if w.action %} {{ w.action }}{% endif %}</li>{% endfor %}</ul>
   </div>
   {% endif %}
 

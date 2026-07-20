@@ -47,17 +47,64 @@ O módulo de capital structure reconcilia market cap, dívida e caixa até o ent
 
 ## Valuation em profundidade
 
-| Range de valor e model warnings | Sensitivities, tornado e football field |
+| Visão executiva do case | Editor de premissas |
 | --- | --- |
-| [![Valuation case da Lululemon](reports/sample/browser/08_valuation_case_top.png)](reports/sample/browser/08_valuation_case_top.png) | [![Sensitivities do DCF](reports/sample/browser/08b_valuation_sensitivities.png)](reports/sample/browser/08b_valuation_sensitivities.png) |
-| O sistema diferencia calibração indicativa de recomendação final e torna visíveis premissas draft, warnings e readiness checks. | WACC versus exit multiple, implied perpetuity growth, driver sensitivity e triangulação entre DCF, comps, histórico e 52-week range. |
+| [![Valuation case da Lululemon](reports/sample/browser/08_valuation_case_top.png)](reports/sample/browser/08_valuation_case_top.png) | [![Assumption Workbench da Lululemon](reports/sample/browser/08e_assumption_workbench.png)](reports/sample/browser/08e_assumption_workbench.png) |
+| Preço atual, target indicativo, WACC, terminal multiple e status de revisão no primeiro bloco. | Base, Bear e Bull começam preenchidos pelos anchors automáticos e podem ser ajustados pelo analista. |
 
-| Forecast e valuation bridges | WACC, terminal value e sponsor returns |
+O **Assumption Workbench** permite editar Base, Bear e Bull diretamente na
+plataforma. Todo campo abre preenchido com o valor automático vigente; somente
+as alterações feitas pelo analista são gravadas como overrides. O salvamento
+recalcula DCF, sensitivities, bridges, sponsor returns e exports a partir da
+mesma fonte, arquiva a versão anterior e mantém a trilha de mudanças em
+`data_private/`, fora do Git.
+
+| Drivers operacionais editáveis | WACC e premissas terminais |
 | --- | --- |
-| [![Forecast e bridges](reports/sample/browser/08c_valuation_model.png)](reports/sample/browser/08c_valuation_model.png) | [![DCF mechanics e LBO returns](reports/sample/browser/08d_dcf_mechanics.png)](reports/sample/browser/08d_dcf_mechanics.png) |
-| Forecast operacional de cinco anos, UFCF bridge, equity value bridge e EV bridge. | WACC build, cross-check entre exit multiple e perpetuity growth, MOIC, IRR, deleveraging e value-creation bridge. |
+| [![Editor de crescimento, margem e reinvestimento](reports/sample/browser/08f_assumption_drivers.png)](reports/sample/browser/08f_assumption_drivers.png) | [![Editor de WACC e terminal value](reports/sample/browser/08g_assumption_terminal.png)](reports/sample/browser/08g_assumption_terminal.png) |
+| Crescimento, margem, D&A, capex, tax rate e working capital por cenário. | Beta, custo da dívida, WACC, crescimento perpétuo, ROIC terminal e exit multiple. |
 
-No case demonstrativo, a Lululemon apresenta preço de referência de **US$ 113,62**, WACC de **8,8%**, exit multiple de **9,9x** e valor indicativo base de **US$ 214,56**. A divergência entre métodos permanece explícita para revisão do analista, em vez de ser escondida pelo modelo.
+[![Premissas e governança do valuation](reports/sample/browser/08a_valuation_assumptions.png)](reports/sample/browser/08a_valuation_assumptions.png)
+
+As premissas ficam visíveis antes dos outputs: horizonte detalhado e fade, crescimento, margem, D&A, capex, working capital, tax rate, WACC, crescimento perpétuo, ROIC terminal e reinvestimento. Cada input é classificado como `analyst`, `data anchored`, `mixed` ou `calculated`.
+
+[![Fila de revisão humana e cross-checks](reports/sample/browser/08h_analyst_review_queue.png)](reports/sample/browser/08h_analyst_review_queue.png)
+
+O sistema separa erro de modelo de julgamento pendente. A recomendação só pode se tornar final após aprovação das premissas e dos peers; divergências de valuation continuam visíveis para reconciliação.
+
+| Cenários e matriz WACC × múltiplo | Tornado e crescimento perpétuo implícito |
+| --- | --- |
+| [![Targets por cenário e sensitivity](reports/sample/browser/08b_valuation_sensitivities.png)](reports/sample/browser/08b_valuation_sensitivities.png) | [![Sensibilidade dos principais drivers](reports/sample/browser/08b2_valuation_range_detail.png)](reports/sample/browser/08b2_valuation_range_detail.png) |
+| Bear, Base e Bull contra o preço atual, com a célula-base destacada. | Receita, margem, WACC, capex e exit multiple testados isoladamente; o modelo também traduz o múltiplo em crescimento implícito. |
+
+[![Football field de valuation](reports/sample/browser/08b3_football_field.png)](reports/sample/browser/08b3_football_field.png)
+
+O football field triangula DCF, EV/EBITDA, EV/Revenue, P/E, histórico próprio e faixa de 52 semanas, mantendo o target e o preço atual como referências separadas.
+
+| Forecast operacional e UFCF | Equity value e enterprise value bridges |
+| --- | --- |
+| [![Forecast e free cash flow bridge](reports/sample/browser/08c_valuation_model.png)](reports/sample/browser/08c_valuation_model.png) | [![Equity e EV bridges](reports/sample/browser/08d_dcf_mechanics.png)](reports/sample/browser/08d_dcf_mechanics.png) |
+| Forecast com período detalhado e fade explícito até o steady state; EBITDA é convertido em UFCF. | O DCF reconcilia PV do forecast, terminal value, dívida líquida e equity value; o EV reportado é reconstruído separadamente. |
+
+[![WACC e terminal value](reports/sample/browser/08d1_wacc_terminal_value.png)](reports/sample/browser/08d1_wacc_terminal_value.png)
+
+O WACC mostra custo de equity, custo da dívida, estrutura de capital e taxa terminal. Perpetuity growth e múltiplo fundamental Gordon-consistent convergem por construção; o múltiplo de mercado permanece um cross-check independente.
+
+| Sponsor returns | Value creation e debt paydown |
+| --- | --- |
+| [![Sponsor returns e leverage](reports/sample/browser/08d2_sponsor_returns.png)](reports/sample/browser/08d2_sponsor_returns.png) | [![Value creation bridge e debt paydown](reports/sample/browser/08d3_sponsor_value_creation.png)](reports/sample/browser/08d3_sponsor_value_creation.png) |
+| Equity check, MOIC, IRR e leverage de entrada/saída sobre o mesmo forecast operacional. | Decomposição entre EBITDA growth, multiple change, deleveraging, caixa excedente e fees. |
+
+| Contexto de mercado | Proveniência das premissas |
+| --- | --- |
+| [![Market context](reports/sample/browser/08i_market_context.png)](reports/sample/browser/08i_market_context.png) | [![Assumptions provenance](reports/sample/browser/08j_assumptions_provenance.png)](reports/sample/browser/08j_assumptions_provenance.png) |
+| Quartis dos peers, revisions e working-capital days ajudam a testar se a narrativa operacional sustenta o valuation. | Cada input revela valor, fonte e classificação; defaults frágeis ficam destacados para revisão. |
+
+[![Export do valuation case](reports/sample/browser/08k_valuation_export.png)](reports/sample/browser/08k_valuation_export.png)
+
+O HTML standalone é gerado somente sob demanda e replica a mesma versão de premissas usada na interface.
+
+No case demonstrativo, a Lululemon apresenta preço de referência de **US$ 113,62** e WACC de **8,8%**. O DCF utiliza crescimento de longo prazo de **2,2%**, ROIC terminal de **11,0%** e múltiplo fundamental implícito de **7,7x**, mantendo o múltiplo dos peers como cross-check independente. O valor indicativo base é **US$ 230,34** e permanece marcado como draft até revisão e aprovação humana.
 
 ## Valuation e expectativas do mercado
 
@@ -101,6 +148,9 @@ Novas companhias podem ser incluídas por identificador, como `NASDAQ:LULU`, `NY
 - Premissas operacionais, WACC, terminal value e cenários.
 - Tese, variant perception, catalisadores, riscos e perguntas para management.
 - Interpretação dos resultados, diligência adicional e recomendação final.
+
+A metodologia completa de DCF, steady state, proveniência e classificação dos
+diagnósticos está documentada em [docs/methodology.md](docs/methodology.md).
 
 ## Capital IQ e confidencialidade
 

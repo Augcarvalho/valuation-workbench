@@ -67,91 +67,17 @@ def dcf_applicability(row: pd.Series) -> tuple[bool, str, str]:
 
 
 def case_warnings(case: "ValuationCase") -> list[dict]:
-    """Model-quality warnings, strongest first. Each: {severity, text}."""
-    warnings: list[dict] = []
-    base = case.base
-    w = case.wacc
+    """Backward-compatible integrity-only warning payload.
 
-    tv_pct = base.terminal_pct_of_ev
-    if pd.notna(tv_pct):
-        if tv_pct > 1.0:
-            warnings.append({"severity": "high",
-                             "text": f"Terminal value is {tv_pct:.0%} of EV - the explicit period destroys value; "
-                                     f"the case is entirely an exit-multiple bet."})
-        elif tv_pct > 0.85:
-            warnings.append({"severity": "medium",
-                             "text": f"Terminal value is {tv_pct:.0%} of EV - the DCF adds little beyond the exit multiple."})
+    Assumption governance and valuation cross-checks are intentionally exposed
+    through :mod:`valuation_diagnostics`; they are not model failures.
+    """
+    from src.modeling.valuation_diagnostics import diagnostics_for
 
-    if (base.implied_terminal_growth is not None
-            and base.implied_terminal_growth >= base.terminal_wacc - 0.015):
-        warnings.append({"severity": "high",
-                         "text": f"Exit multiple implies {base.implied_terminal_growth:+.1%} perpetual growth, within "
-                                 f"150bps of the {base.terminal_wacc:.1%} terminal WACC - it embeds "
-                                 f"near-perpetual value creation."})
-
-    terminal_growth_gap = abs(base.forecast["revenue_growth"].iloc[-1] - base.perpetuity_growth)
-    if terminal_growth_gap > 0.02:
-        warnings.append({"severity": "medium",
-                         "text": f"Year-{len(base.forecast)} revenue growth is "
-                                 f"{base.forecast['revenue_growth'].iloc[-1]:.1%} versus "
-                                 f"{base.perpetuity_growth:.1%} in perpetuity. Terminal FCFF is normalized, "
-                                 f"but the explicit fade should be reviewed."})
-
-    rr = base.terminal_reinvestment_rate
-    if rr is None or rr < 0 or rr > 1:
-        warnings.append({"severity": "high",
-                         "text": "Terminal reinvestment is outside 0-100%; Gordon Growth is not "
-                                 "economically valid until terminal ROIC and growth are reconciled."})
-    elif base.terminal_roic < base.terminal_wacc:
-        warnings.append({"severity": "medium",
-                         "text": f"Terminal ROIC {base.terminal_roic:.1%} is below terminal WACC "
-                                 f"{base.terminal_wacc:.1%}; perpetual growth destroys value."})
-
-    if abs(base.terminal_wacc - w.wacc) > 0.02:
-        warnings.append({"severity": "low",
-                         "text": f"WACC converges from {w.wacc:.1%} during the explicit period to "
-                                 f"{base.terminal_wacc:.1%} in stable growth."})
-
-    if w.wacc <= w.risk_free_rate + 0.005:
-        warnings.append({"severity": "high",
-                         "text": f"WACC {w.wacc:.1%} is within 50bps of or below the risk-free rate "
-                                 f"{w.risk_free_rate:.1%}; check beta, leverage, and tax-shield assumptions."})
-
-    if w.beta_source == "default":
-        warnings.append({"severity": "medium",
-                         "text": "Beta is the default 1.0 (no beta data exported yet) - cost of equity is generic."})
-    elif w.beta < 0.4 or w.beta > 2.5:
-        warnings.append({"severity": "low",
-                         "text": f"Levered beta of {w.beta:.2f} is extreme - thin trading can depress measured "
-                                 f"beta; consider a peer-relevered beta via the assumptions file."})
-
-    if ("LTM" in case.exit_multiple_source or "fallback" in case.exit_multiple_source
-            or "own" in case.exit_multiple_source or "default" in case.exit_multiple_source):
-        warnings.append({"severity": "medium",
-                         "text": f"Exit multiple comes from {case.exit_multiple_source} - forward comps preferred."})
-
-    if case.market_reference_multiple is not None and case.exit_multiple > 0:
-        market_gap = case.market_reference_multiple / case.exit_multiple - 1.0
-        if abs(market_gap) > 0.25:
-            direction = "above" if market_gap > 0 else "below"
-            warnings.append({"severity": "medium",
-                             "text": f"Market reference {case.market_reference_multiple:.1f}x is "
-                                     f"{abs(market_gap):.0%} {direction} the fundamental terminal "
-                                     f"multiple {case.exit_multiple:.1f}x. This is an expectations "
-                                     f"gap, not an automatic DCF input."})
-
-    if base.upside is not None and abs(base.upside) > 1.0:
-        warnings.append({"severity": "medium",
-                         "text": f"Base-case upside of {base.upside:+.0%} is beyond +/-100% - treat as calibration, "
-                                 f"not a target."})
-
-    if str(case.assessment.business_model) == "insurer":
-        warnings.append({"severity": "medium",
-                         "text": "Managed care / insurer: EBITDA DCF is a rough fit (MLR-driven economics); an "
-                                 "earnings-based model is preferred for a final view."})
-
-    order = {"high": 0, "medium": 1}
-    return sorted(warnings, key=lambda x: order.get(x["severity"], 2))
+    return [
+        {"severity": item.severity, "text": item.text}
+        for item in diagnostics_for(case, "integrity")
+    ]
 
 
 @dataclass
@@ -237,6 +163,22 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
         override=assumptions.terminal_wacc,
         company_id=company_id,
     )
+    # A mechanical case should not assume value-destructive growth forever.
+    # Competitive steady state (ROIC = WACC) is the neutral default; analysts
+    # can explicitly underwrite a premium or discount through the YAML.
+    if (assumptions.terminal_roic_source != "analyst"
+            and assumptions.terminal_roic < assumptions.terminal_wacc):
+        prior_roic = assumptions.terminal_roic
+        prior_source = assumptions.terminal_roic_source
+        assumptions.terminal_roic = float(assumptions.terminal_wacc)
+        assumptions.terminal_roic_source = "stable-state WACC normalization"
+        note = (
+            f"terminal ROIC normalized from {prior_roic:.1%} ({prior_source}) to "
+            f"terminal WACC {assumptions.terminal_wacc:.1%}; automatic cases assume "
+            "zero excess return in competitive steady state"
+        )
+        assumptions.anchors.setdefault("notes", []).append(note)
+        notes.append(note)
 
     estimates = getattr(store, "estimates", None)
     spread = comps_spread(assessment.peers, estimates)
@@ -311,6 +253,11 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
         verdict_key=assessment.verdict_key,
         formal=not formal_reasons,
         formal_reason="; ".join(formal_reasons),
+        calibration_label=(
+            "Auto-anchored calibration"
+            if not assumptions.from_file
+            else f"{assumptions.status.title()} analyst calibration"
+        ),
     )
 
     return ValuationCase(

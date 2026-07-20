@@ -12,6 +12,10 @@
 status: draft
 
 horizon_years: 5
+# "auto" appends a disclosed fade period when the detailed forecast has not
+# reached stable growth. Set an integer only when the transition is modeled
+# explicitly; zero is allowed but an abrupt terminal jump will be flagged.
+transition_years: auto
 
 scenarios:
   base:
@@ -48,6 +52,8 @@ terminal:
 # unit_adds and rpu_growth accept a scalar, a per-year list, or a bear/base/bull map.
 #
 # segments:
+#   # Alternatively set `segments: auto` to use the locally extracted Capital
+#   # IQ segment mix. Omitted segments preserve analyst revenue-growth paths.
 #   - name: Cash-and-carry
 #     units: 108                # current unit count (stores, reps, clinics...)
 #     revenue_per_unit: 235.5   # in the same currency-millions as the model

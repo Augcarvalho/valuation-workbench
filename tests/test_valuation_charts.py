@@ -82,7 +82,7 @@ def test_equity_bridge_sums(demo_case):
 def test_provenance_classification(demo_case, auto_case):
     _, case = demo_case
     prov = vch.assumptions_provenance(case)
-    assert set(prov["source"]) <= {"analyst", "anchored", "default"}
+    assert set(prov["source"]) <= {"analyst", "anchored", "mixed", "default"}
     # TOTS3 demo file sets base scenario + exit multiple -> analyst rows exist.
     assert (prov["source"] == "analyst").any()
     # Default beta is disclosed as default.
