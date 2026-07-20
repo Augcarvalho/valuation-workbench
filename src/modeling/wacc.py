@@ -147,7 +147,7 @@ def build_wacc(
     wacc = we * ke + wd * kd_post
     overridden = False
     if wacc_override is not None:
-        notes.append(f"analyst WACC override applied: {wacc_override:.1%} (computed {wacc:.1%})")
+        notes.append(f"manual WACC override applied: {wacc_override:.1%} (computed {wacc:.1%})")
         wacc = wacc_override
         overridden = True
 

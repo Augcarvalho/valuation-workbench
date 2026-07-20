@@ -4,7 +4,7 @@ The old page put every caveat under "Model-Quality Warnings". That blurred
 three different questions:
 
 1. Is the model mathematically/economically valid?
-2. Which assumptions still require analyst sign-off?
+2. Which assumptions still require manual sign-off?
 3. What is the valuation telling us versus the market?
 
 Keeping those questions separate makes the framework stricter, not softer:
@@ -103,13 +103,13 @@ def diagnose_case(case) -> list[ValuationDiagnostic]:
 
     # --- Assumption governance: valid mechanically, pending human judgment. ---
     if not assumptions.from_file:
-        _add(items, "no_analyst_file", "assumption", "medium", "Analyst assumptions",
+        _add(items, "no_analyst_file", "assumption", "medium", "Manual assumptions review",
              "No company-specific assumptions file exists; drivers are mechanically anchored.",
-             "Use the Assumption Workbench to review the automatic defaults and save analyst overrides.")
+             "Use the Assumption Workbench to review the automatic defaults and save manual overrides.")
     elif assumptions.status != "final":
-        _add(items, "assumptions_not_final", "assumption", "medium", "Analyst assumptions",
+        _add(items, "assumptions_not_final", "assumption", "medium", "Manual assumptions review",
              f"The company assumptions are marked {assumptions.status}, not final.",
-             "Refresh the operating case and record analyst sign-off.")
+             "Refresh the operating case and record manual sign-off.")
 
     if wacc.beta_source == "default":
         _add(items, "default_beta", "assumption", "medium", "Beta",
@@ -119,7 +119,7 @@ def diagnose_case(case) -> list[ValuationDiagnostic]:
     if any("no interest/debt data" in note for note in wacc.notes):
         _add(items, "fallback_cost_of_debt", "assumption", "medium", "Cost of debt",
              "Pre-tax cost of debt uses the reference-rate-plus-spread fallback.",
-             "Refresh interest expense and average debt or enter an analyst borrowing-cost assumption.")
+             "Refresh interest expense and average debt or enter a manual borrowing-cost assumption.")
 
     assessment = case.assessment
     if assessment.peer_warning:
@@ -129,7 +129,7 @@ def diagnose_case(case) -> list[ValuationDiagnostic]:
     elif not assessment.peer_reviewed:
         source = str(assessment.peer_source).replace("_", " ")
         _add(items, "peers_unreviewed", "assumption", "medium", "Comparable companies",
-             f"The {source} peer set has not been analyst-approved.",
+             f"The {source} peer set has not been manually approved.",
              "Approve, reject, or manually adjust peers before relying on relative valuation.")
 
     anchor_notes = " | ".join(str(n) for n in assumptions.anchors.get("notes", []))
@@ -173,7 +173,7 @@ def diagnose_case(case) -> list[ValuationDiagnostic]:
         _add(items, "negative_terminal_spread", "cross_check", "medium", "Terminal economics",
              f"Terminal ROIC {base.terminal_roic:.1%} is below WACC {base.terminal_wacc:.1%}; "
              "growth destroys value in steady state.",
-             "Retain only if permanent negative excess returns are an explicit analyst view.")
+             "Retain only if permanent negative excess returns are an explicit manual view.")
 
     if (base.upside is not None and abs(base.upside) > 1.0
             and assumptions.status != "auto"):

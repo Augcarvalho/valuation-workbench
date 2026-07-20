@@ -1,7 +1,7 @@
 """IC memo generation — the decision document for one watchlist name.
 
 Combines the machine layer (assessment, valuation history, revisions,
-scenarios) with the analyst layer (thesis YAML) into a single HTML memo.
+scenarios) with the manual layer (thesis YAML) into a single HTML memo.
 Demo output goes to ``reports/sample``; private output stays inside
 ``data_private/reports`` and never enters version control.
 """
@@ -160,7 +160,7 @@ def build_memo_context(df: pd.DataFrame, company_id: str, store: WatchlistStore)
             "irr": _tone_irr(res.irr if res.valid else None),
         })
     horizon = results[0].case.horizon_years if results else 3
-    scenario_note = ("Cases from analyst thesis." if (thesis_scen) else
+    scenario_note = ("Cases from manually maintained thesis." if (thesis_scen) else
                      "Cases auto-derived from the company's current profile — refine in the thesis YAML.")
 
     fair_mult = med.get("pe_ttm") if financial else med.get("ev_to_ebitda_ttm")

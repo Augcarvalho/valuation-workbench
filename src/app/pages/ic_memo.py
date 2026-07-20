@@ -19,7 +19,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     store = get_store(DEMO_MODE)
     a = build_assessment(df, company_id, store=store)
     ui.header_band(a.row, DEMO_MODE)
-    ui.section("IC Memo Export", "The decision document: machine rigor + analyst judgment in one file")
+    ui.section("IC Memo Export", "The decision document: machine rigor + human judgment in one file")
 
     sections = [
         "Cover & verdict", "Situation overview", "Why now", "Business quality",

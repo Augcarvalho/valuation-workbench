@@ -5,7 +5,7 @@ needed and no licensed data is involved. The outputs are deliberately labeled
 synthetic: valuation history reuses the quarterly demo price points, and
 "consensus" is actuals perturbed by a deterministic small delta — enough to
 exercise the percentile, revision-momentum, and beats/misses machinery in demo
-mode without pretending to be real analyst data.
+mode without pretending to be real consensus data.
 
     python scripts/generate_demo_side_data.py
 """

@@ -200,17 +200,17 @@ EV/EBITDA exceeds 15x; otherwise the detailed horizon is five years. If any
 scenario has not reached the perpetual growth rate, the engine appends a
 disclosed two-to-five-year transition period, limiting the annual fade to
 approximately 200bps. This prevents an artificial jump from year N into the
-perpetuity. An analyst may set ``transition_years`` explicitly in the private
+perpetuity. A manual review may set ``transition_years`` explicitly in the private
 assumptions YAML.
 
 The Streamlit **Assumption Workbench** is the governed front end to those YAML
-files. It loads the currently resolved automatic values before the analyst
+files. It loads the currently resolved automatic values before any manual
 edits anything. Unchanged fields remain automatic; only deviations are written
 as company-specific overrides. Partial scenario overrides inherit the proper
 Bear/Base/Bull defaults for every untouched driver. Saving performs structural
 and finance checks, atomically replaces the private YAML, archives the prior
 version, appends a local audit entry, and rebuilds every valuation output from
-the saved set. Restoring automatic assumptions also archives the analyst file
+the saved set. Restoring automatic assumptions also archives the manual-input file
 before removing it.
 
 The stable period then normalizes three linked inputs:
@@ -232,7 +232,7 @@ perpetuity without an economic link to growth.
 In auto mode, the displayed DCF exit multiple is the EV/EBITDA expression of
 the same stable-growth economics. The independent adjusted peer multiple is
 shown separately as **Market Reference**. It enters the DCF only through an
-explicit analyst assumption in the company YAML; this avoids silently mixing
+explicit manual assumption in the company YAML; this avoids silently mixing
 relative valuation with intrinsic valuation.
 
 This follows the internally consistent FCFF framework described by Aswath
@@ -251,13 +251,13 @@ The valuation case separates three classes of finding:
 
 - **Model integrity exceptions**: invalid Gordon math, non-positive implied
   equity, out-of-bounds drivers, or an abrupt unresolved stable-state jump.
-- **Analyst review queue**: default beta, fallback borrowing cost, draft/auto
+- **Manual review queue**: default beta, fallback borrowing cost, draft/auto
   assumptions, missing working-capital inputs, or an unapproved peer set.
 - **Valuation cross-checks**: market-versus-fundamental multiple gaps, terminal
   value concentration, extreme upside/downside, or negative terminal spreads.
 
 Only the first class means the model cannot be relied upon mechanically. The
-other two are intentionally preserved because valuation requires analyst
+other two are intentionally preserved because valuation requires human
 judgment; relabeling them prevents normal investment debate from looking like
 a software error while keeping every caveat visible.
 
@@ -266,8 +266,8 @@ a software error while keeping every caveat visible.
 Peer sets carry inclusion_status (suggested/approved/rejected/manually_added),
 reviewed_at, and reviewer_note. Rejected members remain on file for audit but
 never feed analytics. Generated and official CapIQ sets stay UNREVIEWED until
-the analyst explicitly approves (Peer Benchmarking review actions). Hierarchy:
-analyst-approved set > reviewed CapIQ comp set > unreviewed generated set
+the reviewer explicitly approves (Peer Benchmarking review actions). Hierarchy:
+manually approved set > reviewed CapIQ comp set > unreviewed generated set
 (labeled directional) > static peer group > full universe (high warning).
 
 ## Financials-specific valuation

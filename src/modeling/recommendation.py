@@ -63,7 +63,7 @@ def recommend(
         )
 
     if not formal:
-        reason = formal_reason or "The case has not completed analyst review."
+        reason = formal_reason or "The case has not completed manual review."
         conviction, conviction_note = _conviction(upside, bear_upside, bull_upside)
         return Recommendation(
             stance="INDICATIVE",

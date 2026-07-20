@@ -162,7 +162,7 @@ def football_field_data(case, price_history: pd.DataFrame | None = None) -> dict
 
     ``price_history``: optional monthly valuation-history frame for the anchor
     (columns date/share_price) used to derive the 52-week range when the
-    dedicated export fields are absent. No analyst consensus target is
+    dedicated export fields are absent. No street-consensus target is
     exported, so that classic bar is not drawn - documented limitation.
     """
     row = case.assessment.row
@@ -267,8 +267,8 @@ def equity_bridge_data(base) -> list[dict]:
 _STATUS_LABELS = {
     "auto": "AUTO-ANCHORED - NOT AN INVESTMENT VIEW",
     "illustrative": "ILLUSTRATIVE ASSUMPTIONS - NOT A FINAL VIEW",
-    "draft": "ANALYST DRAFT",
-    "final": "ANALYST ASSUMPTIONS",
+    "draft": "MANUAL REVIEW DRAFT",
+    "final": "MANUALLY REVIEWED ASSUMPTIONS",
 }
 
 
@@ -279,7 +279,7 @@ def assumptions_status(case) -> tuple[str, str]:
 
 
 def assumptions_provenance(case) -> pd.DataFrame:
-    """Classify every material input: analyst | anchored | default."""
+    """Classify every material input using internal provenance keys."""
     a = case.assumptions
     w = case.wacc
     items: list[dict] = []
@@ -308,7 +308,7 @@ def assumptions_provenance(case) -> pd.DataFrame:
     if w.overridden:
         items.append({"item": "WACC override", "value": f"{w.wacc:.1%}", "source": "analyst"})
     items.append({"item": "Terminal WACC", "value": f"{a.terminal_wacc:.1%} ({a.terminal_wacc_source})",
-                  "source": "analyst" if a.terminal_wacc_source == "analyst" else "anchored"})
+                  "source": "analyst" if a.terminal_wacc_source.startswith("analyst") else "anchored"})
 
     items.append({"item": "Exit multiple", "value": f"{case.exit_multiple:.1f}x ({case.exit_multiple_source})",
                   "source": "analyst" if "analyst" in case.exit_multiple_source else
@@ -340,7 +340,7 @@ def assumptions_provenance(case) -> pd.DataFrame:
 
 
 def key_assumptions_table(case, scenario_name: str = "base") -> pd.DataFrame:
-    """Material assumptions in the order an analyst underwrites the case."""
+    """Material assumptions in the order used for manual underwriting."""
     a = case.assumptions
     s = a.scenarios[scenario_name]
     w = case.wacc
@@ -789,7 +789,7 @@ def wacc_build_chart(case, height: int = 360) -> go.Figure:
                            xanchor="left", font=dict(size=12, color=INK))
     weights = f"weights: {w.equity_weight:.0%} equity / {w.debt_weight:.0%} debt | beta source: {w.beta_source}"
     if w.overridden:
-        weights += " | ANALYST OVERRIDE"
+        weights += " | MANUAL OVERRIDE"
     fig = _style(fig, "WACC Build", weights, height)
     fig.update_layout(barmode="stack")
     fig.update_yaxes(showgrid=False, categoryorder="array",
@@ -802,7 +802,7 @@ def wacc_build_chart(case, height: int = 360) -> go.Figure:
 def terminal_value_chart(case, height: int = 360) -> go.Figure:
     base = case.base
     perp_ok = not np.isnan(base.terminal_value_perp)
-    exit_label = "Analyst exit multiple" if "analyst" in case.exit_multiple_source else "Fundamental multiple"
+    exit_label = "Manual exit multiple" if "analyst" in case.exit_multiple_source else "Fundamental multiple"
     x = [exit_label, "Perpetuity"]
     tv = [base.pv_terminal_exit, base.pv_terminal_perp if perp_ok else 0]
     colors = [SAGE, MUTED2]

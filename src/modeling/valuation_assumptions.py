@@ -603,7 +603,7 @@ def load_valuation_assumptions(
         )
     elif path is not None and segments is None:
         anchors.setdefault("notes", []).append(
-            "analyst revenue-growth assumptions take precedence; CapIQ segment build not enabled"
+            "manual revenue-growth assumptions take precedence; CapIQ segment build not enabled"
         )
 
     return ValuationAssumptions(

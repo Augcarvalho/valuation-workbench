@@ -385,7 +385,7 @@ def test_full_valuation_case_on_demo_data(tmp_path):
     auto = build_valuation_case(df, "PRNR3.SA", store=store)
     assert not auto.assumptions.from_file
     assert auto.base.enterprise_value > 0
-    assert any("no analyst assumptions file" in n for n in auto.notes)
+    assert any("no manual-input assumptions file" in n for n in auto.notes)
     assert auto.market_reference_multiple is not None
     # Auto cases express stable-growth economics as a multiple; the independent
     # peer multiple remains a separate market cross-check.

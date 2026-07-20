@@ -34,7 +34,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     source_labels = {
         "capiq_comp_set": ("Capital IQ comp set", "green"),
         "capiq_web_peer_comps": ("Capital IQ Web peers (suggested)", "yellow"),
-        "manual": ("Analyst-approved set", "green"),
+        "manual": ("Manually approved set", "green"),
         "fallback": ("Scored comps (approved)", "green") if a.peer_reviewed
                     else ("Scored comps (generated, unreviewed)", "yellow"),
         "peer_group": ("Static peer-group mapping (unreviewed)", "yellow"),
@@ -65,9 +65,9 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     with rc1:
         note = st.text_input("Reviewer note", value=current_set.get("reviewer_note", "") if current_set else "",
                              placeholder="e.g. checked vs 10-K competitors list")
-        if st.button("Mark set analyst-approved", type="primary", disabled=current_set is None):
+        if st.button("Mark set manually approved", type="primary", disabled=current_set is None):
             approve_peer_set(company_id, reviewer_note=note)
-            st.success("Peer set marked analyst-approved.")
+            st.success("Peer set marked manually approved.")
             st.rerun()
     with rc2:
         member_ids = current_set["members"] if current_set else []
@@ -121,7 +121,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         ui.html_table(["Ticker", "Company", "Peer group", "Source", "# Peers",
                        "Status", "Reviewed", "Warnings"], qrows, numeric_from=99)
         n_rev = sum(1 for q in qrows if "REVIEWED</" in q[5] or "REVIEWED" in q[5] and "UNREVIEWED" not in q[5])
-        ui.footnote(f"{n_rev} of {len(qrows)} names analyst-approved. Approval is always an "
+        ui.footnote(f"{n_rev} of {len(qrows)} names manually approved. Approval is always an "
                     f"explicit action - generated and official CapIQ sets stay flagged until you sign off.")
 
     # --- Peer set editor -----------------------------------------------------------
@@ -195,7 +195,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
 
     with st.expander("Peer methodology"):
         st.markdown(
-            "**Hierarchy:** 1) Capital IQ comp-set import (analyst-approved) -> 2) scored comp sets "
+            "**Hierarchy:** 1) Capital IQ comp-set import (manually approved) -> 2) scored comp sets "
             "and Capital IQ Web peer-comps (batch-generated and labeled *not reviewed* until approved) -> "
             "3) static peer-group mapping -> 4) full universe (flagged).\n\n"
             "**Suggestion scoring (0-100):** " +

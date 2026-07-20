@@ -35,7 +35,7 @@ scenarios:
     ebitda_margin: {start: auto, end: 0.20}
 
 wacc:
-  beta: auto                    # analyst override, e.g. 0.9
+  beta: auto                    # manual override, e.g. 0.9
   pretax_cost_of_debt: auto     # else derived from interest expense / debt
   wacc_override: null           # hard override; use sparingly and disclose
 
@@ -53,7 +53,7 @@ terminal:
 #
 # segments:
 #   # Alternatively set `segments: auto` to use the locally extracted Capital
-#   # IQ segment mix. Omitted segments preserve analyst revenue-growth paths.
+#   # IQ segment mix. Omitted segments preserve manual revenue-growth paths.
 #   - name: Cash-and-carry
 #     units: 108                # current unit count (stores, reps, clinics...)
 #     revenue_per_unit: 235.5   # in the same currency-millions as the model

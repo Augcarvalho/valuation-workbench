@@ -46,7 +46,7 @@ def valuation_case_css() -> str:
 .bridge .step .v { font-size:14px; font-weight:750; font-family:var(--font-mono); margin-top:4px; }
 .bridge .op { align-self:center; font-size:16px; color:var(--muted-2); font-weight:700; }
 .assump-src { font-size:9.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:1px 6px; border-radius:3px; }
-.src-analyst { background: var(--amber-soft); color: var(--amber); }
+.src-manual { background: var(--amber-soft); color: var(--amber); }
 .src-derived { background: var(--panel-alt); color: var(--muted); }
 .src-anchored { background: var(--green-soft); color: var(--green); }
 .src-default { background: var(--red-soft); color: var(--red); }
@@ -95,12 +95,12 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
   <div class="disclosure">
     <h4>Auto-anchored case - not an investment view</h4>
     <p>Every driver in this case was derived mechanically from the company's trailing-twelve-month data
-    because no analyst assumptions file exists. Treat the target as a calibration starting point, not a view.</p>
+    because no manual-input assumptions file exists. Treat the target as a calibration starting point, not a view.</p>
   </div>
   {% elif status_key in ('illustrative', 'draft') %}
   <div class="disclosure" style="border-color: var(--amber); background: var(--amber-soft);">
     <h4 style="color: var(--amber)">{{ status_label }}</h4>
-    <p>The analyst assumptions behind this case are placeholders pending full diligence. Numbers are directional.</p>
+    <p>The manually entered assumptions behind this case are placeholders pending full diligence. Numbers are directional.</p>
   </div>
   {% endif %}
 
@@ -130,7 +130,7 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
 
   {% if assumption_findings %}
   <div class="warn-box">
-    <h4>Analyst Review Queue</h4>
+    <h4>Manual Review Queue</h4>
     <ul>{% for w in assumption_findings %}<li>{{ w.text }}{% if w.action %} {{ w.action }}{% endif %}</li>{% endfor %}</ul>
   </div>
   {% endif %}
@@ -165,7 +165,7 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
 
   {% if analyst_thesis.pillars or analyst_thesis.variant_perception or analyst_thesis.key_debate %}
   <section>
-    <div class="s-head"><div class="s-bar"></div><h2>1A &middot; Analyst Thesis Overlay</h2>
+    <div class="s-head"><div class="s-bar"></div><h2>1A &middot; Manual Thesis Overlay</h2>
       <span class="s-note">{{ analyst_thesis.status or 'thesis file' }}</span></div>
     <div class="case-thesis">
       {% if analyst_thesis.pillars %}
@@ -361,7 +361,7 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
     <div class="s-head"><div class="s-bar"></div><h2>11 &middot; Methodology Appendix</h2></div>
     <div class="memo"><div class="appendix">
       <p><b>Forecast.</b> Tier-1 driver model: revenue growth, EBITDA margin, D&amp;A %, capex %, and working-capital
-      glidepaths, anchored on the company's own LTM data; analyst YAML overrides where present (labeled).
+      glidepaths, anchored on the company's own LTM data; manual YAML overrides where present (labeled).
       Taxes at {{ tax_rate }} on positive EBIT.</p>
       <p><b>DCF.</b> Mid-year discounting of interim UFCF; terminal value computed both by exit multiple
       ({{ exit_multiple }} EV/EBITDA, {{ exit_multiple_source }}) and Gordon perpetuity ({{ perp_growth }} growth),
@@ -369,7 +369,7 @@ VALUATION_CASE_TEMPLATE = """<!doctype html>
       &minus; minority &minus; preferred; upside measured against market cap (unit-safe), target = current price x (1 + upside).</p>
       <p><b>WACC.</b> CAPM with {{ wacc_source_note }}. Every component and fallback listed in section 4.</p>
       <p><b>Assumption provenance.</b> {{ provenance_note }}</p>
-      <p><b>Confidentiality.</b> Licensed Capital IQ data and analyst assumption files stay in <code>data_private/</code>,
+      <p><b>Confidentiality.</b> Licensed Capital IQ data and manual assumption files stay in <code>data_private/</code>,
       outside version control. Illustrative analysis; not investment advice.</p>
     </div></div>
   </section>

@@ -4,7 +4,7 @@
 # Private theses are never committed (data_private/ is gitignored).
 
 stage: watch            # watch | work | core | pass
-analyst_status: draft   # draft | reviewed | final | stale | legacy_refresh_required
+analyst_status: draft   # internal key; manual review status
 
 thesis: >
   One paragraph: what you would own and why the economics work.

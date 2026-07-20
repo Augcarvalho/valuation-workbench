@@ -67,7 +67,7 @@ def _endpoints(values: list[float], explicit_horizon: int) -> tuple[float, float
 def _different(left: float, right: float, tolerance: float = 6e-4) -> bool:
     # Inputs are displayed at two decimal places for percentages and three for
     # days/multiples. Ignore display-rounding noise so an untouched automatic
-    # case saves zero analyst overrides.
+    # case saves zero manual overrides.
     return abs(float(left) - float(right)) > tolerance
 
 
@@ -139,7 +139,7 @@ def _scenario_editor(
     st.caption(
         f"Automatic anchors: growth {auto_growth[0]:+.1%} to {auto_growth[1]:+.1%}; "
         f"margin {auto_margin[0]:.1%} to {auto_margin[1]:.1%}. "
-        "Only values changed from these anchors are stored as analyst overrides."
+        "Only values changed from these anchors are stored as manual overrides."
     )
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -263,7 +263,7 @@ def render_assumption_workbench(
     *,
     demo_mode: bool,
 ) -> None:
-    """Render the editor and persist only analyst deviations from auto anchors."""
+    """Render the editor and persist only manual deviations from auto anchors."""
     flash_key = f"assumption_flash_{company_id}"
     if flash_key in st.session_state:
         st.success(st.session_state.pop(flash_key))
@@ -291,7 +291,7 @@ def render_assumption_workbench(
     source_label = (
         f"Loaded from {Path(current.path).name}"
         if current.from_file
-        else "No analyst file: fields below are pre-filled from the automatic model"
+        else "No manual-input file: fields below are pre-filled from the automatic model"
     )
     with st.expander(
         "Assumption Workbench | Edit valuation assumptions",
@@ -314,7 +314,7 @@ def render_assumption_workbench(
                     ["draft", "final", "illustrative"],
                     index=["draft", "final", "illustrative"].index(default_status),
                     key=f"{prefix}_status",
-                    help="Final means the analyst has reviewed the full assumption set.",
+                    help="Final means the full assumption set has passed manual review.",
                 )
             with c2:
                 horizon = int(st.number_input(
@@ -422,7 +422,7 @@ def render_assumption_workbench(
                 )
             with c4:
                 review_note = st.text_area(
-                    "Analyst rationale",
+                    "Manual review rationale",
                     value=str(raw.get("review_note", "")),
                     placeholder="What changed, why, and which evidence supports it?",
                     height=86,
@@ -480,7 +480,7 @@ def render_assumption_workbench(
             override_count = sum(len(v) for v in scenario_overrides.values())
             override_count += len(wacc_overrides) + len(terminal_overrides)
             st.caption(
-                f"{override_count} analyst override(s) will be stored. Unchanged fields remain automatic."
+                f"{override_count} manual override(s) will be stored. Unchanged fields remain automatic."
             )
             submitted = st.form_submit_button(
                 "Save assumptions and recalculate",
@@ -496,7 +496,7 @@ def render_assumption_workbench(
             if terminal_roic <= perpetual_growth:
                 effective_errors.append("Terminal ROIC must exceed perpetuity growth.")
             if status == "final" and not review_note.strip():
-                effective_errors.append("A final assumption set requires an analyst rationale.")
+                effective_errors.append("A final assumption set requires a manual review rationale.")
             if effective_errors:
                 for error in effective_errors:
                     st.error(error)
@@ -524,6 +524,6 @@ def render_assumption_workbench(
             ):
                 if reset_assumption_payload(company_id, assumptions_dir):
                     st.session_state[flash_key] = (
-                        "Analyst assumptions archived; the company is back on automatic defaults."
+                        "Manual assumptions archived; the company is back on automatic defaults."
                     )
                     st.rerun()

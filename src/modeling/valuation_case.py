@@ -144,7 +144,7 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
     notes.extend(assumptions.anchors.get("notes", []))
     if not assumptions.from_file:
         notes.append(
-            "no analyst assumptions file; all drivers anchored on TTM data "
+            "no manual-input assumptions file; all drivers anchored on TTM data "
             "(copy data/templates/valuation_assumptions_template.yaml to refine)"
         )
 
@@ -241,11 +241,11 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
 
     formal_reasons = []
     if not assumptions.from_file:
-        formal_reasons.append("No analyst assumptions file exists")
+        formal_reasons.append("No manual-input assumptions file exists")
     elif assumptions.status != "final":
         formal_reasons.append(f"Assumptions status is {assumptions.status}, not final")
     if not assessment.peer_reviewed:
-        formal_reasons.append("Peer set is not analyst-approved")
+        formal_reasons.append("Peer set is not manually approved")
     recommendation = recommend(
         upside=base.upside,
         bear_upside=scenarios["bear"].upside,
@@ -256,7 +256,7 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
         calibration_label=(
             "Auto-anchored calibration"
             if not assumptions.from_file
-            else f"{assumptions.status.title()} analyst calibration"
+            else f"{assumptions.status.title()} manual calibration"
         ),
     )
 

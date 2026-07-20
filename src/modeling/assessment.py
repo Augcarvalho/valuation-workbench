@@ -663,7 +663,7 @@ def build_assessment(df: pd.DataFrame, company_id: str, store=None) -> Assessmen
 
     ``store`` is an optional :class:`src.ingestion.store.WatchlistStore`;
     when provided, valuation-history percentiles, revision momentum, the
-    attention score, and the analyst thesis are populated as well.
+    attention score, and the manually maintained thesis are populated as well.
     """
     history = _company_history(df, company_id)
     row = history.iloc[-1]

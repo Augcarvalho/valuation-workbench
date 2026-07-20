@@ -50,6 +50,19 @@ def _tone_pct(value) -> str:
     return f'<span class="{cls}">{value:+.1%}</span>'
 
 
+def _source_display(value: object) -> str:
+    """Translate internal provenance keys into presentation language."""
+    text = str(value)
+    return {
+        "analyst": "manual",
+        "analyst assumption": "manual assumption",
+        "analyst WACC override carried into terminal": "manual WACC override carried into terminal",
+    }.get(
+        text,
+        text.replace("ANALYST", "MANUAL").replace("Analyst", "Manual").replace("analyst", "manual"),
+    )
+
+
 def _price(value) -> str:
     if value is None or pd.isna(value):
         return "n/a"
@@ -88,7 +101,7 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
     base = case.base
     horizon = case.assumptions.horizon_years
 
-    # Overview: thesis text when the analyst wrote one, else generated description.
+    # Overview: manually written thesis text when present, else generated description.
     if a.thesis and a.thesis.thesis:
         overview = a.thesis.thesis
     else:
@@ -155,15 +168,15 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         {"label": "Risk-free rate", "value": f"{w.risk_free_rate:.2%}"},
         {"label": "Equity risk premium", "value": f"{w.equity_risk_premium:.2%}"},
         {"label": "Country risk premium", "value": f"{w.country_risk_premium:.2%}"},
-        {"label": f"Beta ({w.beta_source})", "value": f"{w.beta:.2f}"},
+        {"label": f"Beta ({_source_display(w.beta_source)})", "value": f"{w.beta:.2f}"},
         {"label": "Cost of equity", "value": f"{w.cost_of_equity:.2%}"},
         {"label": "Pre-tax cost of debt", "value": f"{w.cost_of_debt_pretax:.2%}"},
         {"label": f"After-tax cost of debt (t={w.tax_rate:.0%})", "value": f"{w.cost_of_debt_aftertax:.2%}"},
         {"label": "Equity / debt weights", "value": f"{w.equity_weight:.0%} / {w.debt_weight:.0%}"},
         {"label": "WACC" + (" (override)" if w.overridden else ""), "value": f"{w.wacc:.2%}"},
-        {"label": f"Terminal WACC ({case.assumptions.terminal_wacc_source})",
+        {"label": f"Terminal WACC ({_source_display(case.assumptions.terminal_wacc_source)})",
          "value": f"{base.terminal_wacc:.2%}"},
-        {"label": f"Terminal ROIC ({case.assumptions.terminal_roic_source})",
+        {"label": f"Terminal ROIC ({_source_display(case.assumptions.terminal_roic_source)})",
          "value": f"{base.terminal_roic:.2%}"},
         {"label": "Stable reinvestment (g / ROIC)",
          "value": f"{base.terminal_reinvestment_rate:.2%}"
@@ -219,12 +232,12 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
             "equity": money(r.implied_equity),
             "target": _price(r.target_price),
             "upside": _tone_pct(r.upside),
-            "source": scen.source,
+            "source": _source_display(scen.source),
         })
 
-    analyst_count = sum(1 for s in case.assumptions.scenarios.values() if s.source == "analyst")
+    manual_count = sum(1 for s in case.assumptions.scenarios.values() if s.source == "analyst")
     provenance = (
-        f"{analyst_count} of 3 scenarios analyst-specified"
+        f"{manual_count} of 3 scenarios manually specified"
         + (f" (file: {Path(str(case.assumptions.path)).name})" if case.assumptions.from_file else "")
         + "; remaining drivers anchored on LTM data. "
         + ("Notes: " + "; ".join(case.notes) + "." if case.notes else "")
@@ -237,12 +250,13 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
     assumption_rows = [
         {
             "group": r["group"], "assumption": r["assumption"],
-            "value": r["value"], "source": r["source"],
+            "value": r["value"], "source": _source_display(r["source"]),
             "source_class": {
+                "analyst": "manual",
                 "automatic stable-growth fade": "anchored",
                 "not required": "calculated",
             }.get(str(r["source"]), str(r["source"])),
-            "method": r["method"],
+            "method": _source_display(r["method"]),
         }
         for _, r in key_assumptions_table(case, "base").iterrows()
     ]
@@ -266,7 +280,7 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         "bull_upside": _pct(case.scenarios["bull"].upside, 0),
         "wacc_pct": f"{w.wacc:.1%}",
         "exit_multiple": f"{case.exit_multiple:.1f}x",
-        "exit_multiple_source": case.exit_multiple_source,
+        "exit_multiple_source": _source_display(case.exit_multiple_source),
         "market_reference_multiple": (
             f"{case.market_reference_multiple:.1f}x" if case.market_reference_multiple is not None else "n/a"
         ),
@@ -295,13 +309,13 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         "stat_rows": stat_rows,
         "years": list(range(1, horizon + 1)),
         "horizon": horizon,
-        "base_source": case.assumptions.scenarios["base"].source,
+        "base_source": _source_display(case.assumptions.scenarios["base"].source),
         "forecast_lines": forecast_lines,
         "nwc_note": ("DSO/DIH/DPO day glidepaths" if case.assumptions.scenarios["base"].nwc_mode == "days"
                      else "projected as % of revenue (AR/inventory/AP days unavailable)"),
         "wacc_rows": wacc_rows,
-        "wacc_notes": w.notes,
-        "wacc_source_note": ("peer-informed beta" if w.beta_source == "peers" else f"{w.beta_source} beta"),
+        "wacc_notes": [_source_display(note) for note in w.notes],
+        "wacc_source_note": ("peer-informed beta" if w.beta_source == "peers" else f"{_source_display(w.beta_source)} beta"),
         "tv_rows": tv_rows,
         "tv_crosscheck": tv_crosscheck,
         "bridge": {
@@ -336,7 +350,7 @@ def build_case_context(case: ValuationCase, demo: bool, df: pd.DataFrame | None 
         "status_key": assumptions_status(case)[0],
         "status_label": assumptions_status(case)[1],
         "provenance_rows": [
-            {"item": r["item"], "value": r["value"], "source": r["source"]}
+            {"item": r["item"], "value": _source_display(r["value"]), "source": _source_display(r["source"])}
             for _, r in assumptions_provenance(case).iterrows()
         ],
     }

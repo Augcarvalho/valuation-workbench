@@ -44,7 +44,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                      f"{rev['revenue']['d90']:+.1%}" if rev["revenue"]["d90"] is not None else "n/a",
                      "consensus momentum", _tone_ct(rev["revenue"]["d90"])))
     cards.append(Kpi("ne", "Next Earnings", read.next_earnings or "n/a",
-                     f"{read.num_analysts:.0f} analysts" if read.num_analysts else "coverage n/a",
+                     f"{read.num_analysts:.0f} consensus contributors" if read.num_analysts else "coverage n/a",
                      "n/a"))
     ui.kpi_grid(cards, columns=5)
 

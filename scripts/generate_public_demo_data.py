@@ -326,7 +326,7 @@ def main() -> None:
                 "source_name": "Synthetic demo estimates",
                 "source_url": "data/templates/estimates_template.csv",
                 "retrieved_at": datetime.now(timezone.utc).date().isoformat(),
-                "notes": "Generated deterministically from public-demo actuals for UI testing; not analyst consensus.",
+                "notes": "Generated deterministically from public-demo actuals for UI testing; not street consensus.",
             },
         ]
     )

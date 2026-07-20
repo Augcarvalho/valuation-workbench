@@ -14,6 +14,12 @@ from src.reporting.periods import company_snapshot_context
 from src.utils import fmt_money
 
 
+def _manual_label(value: object) -> str:
+    """Map legacy provenance keys to user-facing manual-review language."""
+    text = str(value)
+    return text.replace("ANALYST", "MANUAL").replace("Analyst", "Manual").replace("analyst", "manual")
+
+
 def render(df: pd.DataFrame, company_id: str) -> None:
 
     from src.branding import PALETTE
@@ -123,11 +129,11 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         target_file = assumptions_filename(company_id)
         folder_name = "data/sample/assumptions" if DEMO_MODE else "data_private/assumptions"
         detail = {
-            "auto": (f"Every driver was derived mechanically from LTM data - no analyst file exists. "
+            "auto": (f"Every driver was derived mechanically from LTM data - no manual-input file exists. "
                      f"Use the editor below to create <code>{folder_name}/{target_file}</code> "
-                     "and convert selected fields into analyst overrides."),
-            "illustrative": "The analyst assumptions behind this case are labeled placeholders pending diligence.",
-            "draft": "Analyst assumptions are in draft; numbers are directional.",
+                     "and convert selected fields into manual overrides."),
+            "illustrative": "The manually entered assumptions behind this case are labeled placeholders pending diligence.",
+            "draft": "Manual assumptions are in draft; numbers are directional.",
         }.get(status_key, "")
         st.markdown(
             f"""
@@ -188,7 +194,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             f"{base.forecast['revenue_growth'].iloc[0]:+.1%} -> {base.forecast['revenue_growth'].iloc[-1]:+.1%}",
             f"stable growth {base.perpetuity_growth:.1%}", "n/a"),
         Kpi("wacc", "WACC -> Terminal", f"{case.wacc.wacc:.1%} -> {base.terminal_wacc:.1%}",
-            case.assumptions.terminal_wacc_source, "n/a"),
+            _manual_label(case.assumptions.terminal_wacc_source), "n/a"),
         Kpi("terminal", "Terminal Economics",
             f"g {base.perpetuity_growth:.1%} | ROIC {base.terminal_roic:.1%}",
             f"reinvestment {base.terminal_reinvestment_rate:.1%}" if base.terminal_reinvestment_rate is not None else "invalid",
@@ -199,7 +205,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
 
     assumption_table = vch.key_assumptions_table(case, "base")
     assumption_pills = {
-        "analyst": ("Analyst", "yellow"),
+        "analyst": ("Manual", "yellow"),
         "anchored": ("Data anchored", "green"),
         "mixed": ("Mixed", "yellow"),
         "calculated": ("Calculated", "na"),
@@ -211,7 +217,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         label, tone = assumption_pills.get(item["source"], (str(item["source"]).title(), "na"))
         assumption_rows.append([
             str(item["group"]), str(item["assumption"]), str(item["value"]),
-            ui.cell_pill(label, tone), str(item["method"]),
+            ui.cell_pill(label, tone), _manual_label(item["method"]),
         ])
     ui.html_table(
         ["Area", "Assumption", "Base Case", "Source", "Method / Rationale"],
@@ -223,7 +229,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     ui.footnote(
         "Stable-state convention: reinvestment rate = g / ROIC; terminal FCFF = NOPAT x "
         "(1 - g / ROIC); terminal value = FCFF / (WACC - g). Market multiples remain an "
-        "independent cross-check unless the analyst explicitly selects one."
+        "independent cross-check unless it is explicitly selected during manual review."
     )
 
     # --- Diagnostics: errors, human decisions, and market findings are distinct. ----
@@ -236,7 +242,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         ui.section("Model Integrity Exceptions", "Resolve before relying on valuation outputs")
         ui.flag_list([d.as_flag() for d in integrity_findings])
     if assumption_findings:
-        ui.section("Analyst Review Queue", "Valid mechanically; pending human judgment or data refresh")
+        ui.section("Manual Review Queue", "Valid mechanically; pending human judgment or data refresh")
         ui.flag_list([d.as_flag() for d in assumption_findings])
     if cross_checks:
         ui.section("Valuation Cross-Checks", "Interpretation of the result, not software errors")
@@ -382,16 +388,16 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     ui.section("Assumptions Provenance", "Every input classified - no black box")
     prov = vch.assumptions_provenance(case)
     pill = {
-        "analyst": ("Analyst", "yellow"),
+        "analyst": ("Manual", "yellow"),
         "anchored": ("Data anchored", "green"),
         "mixed": ("Mixed", "yellow"),
         "calculated": ("Calculated", "na"),
         "default": ("Default", "red"),
     }
-    rows = [[r["item"], r["value"], ui.cell_pill(*pill.get(r["source"], (r["source"], "na")))]
+    rows = [[r["item"], _manual_label(r["value"]), ui.cell_pill(*pill.get(r["source"], (r["source"], "na")))]
             for _, r in prov.iterrows()]
     ui.html_table(["Input", "Value", "Source"], rows, numeric_from=99)
-    ui.footnote("Analyst = set in the assumptions YAML. Anchored = derived from the company's own LTM data "
+    ui.footnote("Manual = explicitly set in the assumptions YAML. Anchored = derived from the company's own LTM data "
                 "or the peer group. Default = generic fallback pending better data - treat with caution."
                 + (f" File: <code>{Path(str(case.assumptions.path)).name}</code>" if case.assumptions.from_file else ""))
 

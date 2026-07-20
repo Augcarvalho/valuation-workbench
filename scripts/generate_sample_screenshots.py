@@ -123,7 +123,7 @@ def _header_clean(ax, row, verdict=None, height=0.135, y=0.865):
         y + height - 0.028,
         ("INVESTMENT ANALYSIS PLATFORM | PUBLIC DEMO | QUARTERLY REVIEW"
          if SCREENSHOT_DEMO else
-         "INVESTMENT ANALYSIS PLATFORM | PRIVATE DATA WORKFLOW | ANALYST CASE"),
+         "INVESTMENT ANALYSIS PLATFORM | PRIVATE DATA WORKFLOW | MANUAL CASE"),
         fontsize=7.5,
         color="#93acc6",
         zorder=2,
@@ -264,7 +264,7 @@ def watchlist_overview(path: Path) -> None:
         ("MONITORED NAMES", str(len(summary)), "ranked by analytical attention", GREEN),
         ("ANALYTICAL UNIVERSE", str(len(latest)), "watchlist companies plus trading comps", BLUE),
         ("PEER GROUPS", str(summary["peer_group"].nunique()), "Brazil and U.S. coverage", GOLD),
-        ("DO WORK", str(verdict_counts.get("do_work", 0)), "dislocations requiring analyst review", GOLD),
+        ("DO WORK", str(verdict_counts.get("do_work", 0)), "dislocations requiring manual review", GOLD),
         ("OPEN FLAGS", str(int(summary["flags"].sum())), "high and medium severity", PALETTE["red"]),
     ]
     gap = 0.012
@@ -360,7 +360,7 @@ def comparison_snapshot(path: Path) -> None:
 
     ax.add_patch(Rectangle((0.018, 0.075), 0.964, 0.09, facecolor="white", edgecolor=LINE, linewidth=0.8))
     ax.add_patch(Rectangle((0.018, 0.075), 0.004, 0.09, facecolor=GOLD))
-    ax.text(0.035, 0.139, "ANALYST USE", fontsize=7.2, color=NAVY, weight="bold")
+    ax.text(0.035, 0.139, "MANUAL USE", fontsize=7.2, color=NAVY, weight="bold")
     ax.text(0.035, 0.106, "Compare operating quality, valuation and estimate momentum before deciding where deeper diligence is worth the time.",
             fontsize=8.2, color=SLATE)
 
@@ -670,7 +670,7 @@ def consensus_snapshot(path: Path) -> None:
     notes = [
         "Actual-versus-estimate comparisons are only called beats or misses when a matched pre-report consensus exists.",
         "The private workflow tracks revenue, EBITDA and EPS revisions over 30 and 90 days when exported from Capital IQ.",
-        "Missing guidance, analyst count or revision snapshots remain explicit; the model never fabricates unavailable fields.",
+        "Missing guidance, contributor count or revision snapshots remain explicit; the model never fabricates unavailable fields.",
     ]
     y = 0.255
     for note in notes:
@@ -753,7 +753,7 @@ def capital_structure_snapshot(path: Path) -> None:
     ax.text(0.035, 0.178, f"Illustrative incremental capacity at 4.0x EBITDA: {fmt_money(cs.sponsor_capacity, currency)}.",
             fontsize=8.4, color=SLATE)
     ax.text(0.035, 0.143, "The module separates reported capital structure, EV reconciliation and scenario capacity; actual debt pricing, "
-            "covenants and rating constraints remain analyst inputs.", fontsize=8.0, color=SLATE)
+            "covenants and rating constraints remain manual inputs.", fontsize=8.0, color=SLATE)
     ax.text(0.035, 0.108, "Financial institutions are routed to a dedicated P/E, P/TBV, ROE and capital-ratio framework instead of EBITDA leverage.",
             fontsize=8.0, color=SLATE)
 
@@ -1023,7 +1023,7 @@ def valuation_bridges_snapshot(path: Path) -> None:
         ax.text(x0 + 0.012, 0.178, note, fontsize=6.8, color=MUTED)
     gap_pct = base.enterprise_value_perp / base.enterprise_value - 1.0
     ax.text(0.018, 0.095, f"METHOD RECONCILIATION: perpetuity EV is {gap_pct:+.1%} versus the exit-multiple EV. "
-            "The difference is disclosed because the analyst exit multiple and stable-growth economics are independent checks.",
+            "The difference is disclosed because the manual exit multiple and stable-growth economics are independent checks.",
             fontsize=8.0, color=SLATE)
     fig.savefig(path, facecolor=BG, bbox_inches="tight")
     plt.close(fig)
@@ -1040,7 +1040,7 @@ def valuation_assumptions_snapshot(path: Path) -> None:
     fig.patch.set_facecolor(BG)
     ax = _bg_axes(fig)
     _header_clean(ax, row, case.assessment)
-    _section(ax, 0.018, 0.815, "WACC & Assumption Provenance", "Every material input is labeled as analyst, Capital IQ or derived")
+    _section(ax, 0.018, 0.815, "WACC & Assumption Provenance", "Every material input is labeled as manual, Capital IQ or derived")
 
     wax = fig.add_axes([0.07, 0.42, 0.40, 0.30])
     labels = ["Risk-free", "Beta x ERP", "After-tax debt", "WACC", "Terminal WACC"]
@@ -1057,10 +1057,10 @@ def valuation_assumptions_snapshot(path: Path) -> None:
 
     base = case.assumptions.scenarios["base"]
     rows = [
-        ["Revenue growth", fmt_pct(base.revenue_growth[0]), fmt_pct(base.revenue_growth[-1]), "Analyst glidepath"],
-        ["EBITDA margin", fmt_pct(base.ebitda_margin[0]), fmt_pct(base.ebitda_margin[-1]), "Analyst glidepath"],
+        ["Revenue growth", fmt_pct(base.revenue_growth[0]), fmt_pct(base.revenue_growth[-1]), "Manual glidepath"],
+        ["EBITDA margin", fmt_pct(base.ebitda_margin[0]), fmt_pct(base.ebitda_margin[-1]), "Manual glidepath"],
         ["D&A / revenue", fmt_pct(base.d_and_a_pct[0]), fmt_pct(base.d_and_a_pct[-1]), "Validated historical anchor"],
-        ["Capex / revenue", fmt_pct(base.capex_pct[0]), fmt_pct(base.capex_pct[-1]), "Analyst assumption"],
+        ["Capex / revenue", fmt_pct(base.capex_pct[0]), fmt_pct(base.capex_pct[-1]), "Manual assumption"],
         ["Exit EV / EBITDA", fmt_multiple(case.exit_multiple), fmt_multiple(case.exit_multiple), case.exit_multiple_source],
         ["Perpetuity growth", fmt_pct(case.assumptions.perpetuity_growth), fmt_pct(case.assumptions.perpetuity_growth), case.assumptions.perpetuity_source],
         ["Terminal ROIC", fmt_pct(case.base.terminal_roic), fmt_pct(case.base.terminal_roic), case.assumptions.terminal_roic_source],
@@ -1074,8 +1074,8 @@ def valuation_assumptions_snapshot(path: Path) -> None:
     ax.text(0.038, 0.292, "CONTROL NOTES", fontsize=7.2, color=NAVY, weight="bold")
     notes = [
         f"Beta {wacc.beta:.2f} from {wacc.beta_source}; capital weights use current market equity and reported debt.",
-        f"WACC {wacc.wacc:.1%} is an analyst override; computed economics remain disclosed in the model notes.",
-        f"Peer set: {case.assessment.peer_set_name}; reviewed status: {'approved' if case.assessment.peer_reviewed else 'pending analyst approval'}.",
+        f"WACC {wacc.wacc:.1%} is a manual override; computed economics remain disclosed in the model notes.",
+        f"Peer set: {case.assessment.peer_set_name}; reviewed status: {'approved' if case.assessment.peer_reviewed else 'pending manual approval'}.",
         "The Lululemon assumptions remain draft, so outputs are labeled indicative rather than a formal recommendation.",
     ]
     y = 0.255
@@ -1395,7 +1395,7 @@ def ic_memo_snapshot(path: Path) -> None:
     fig.patch.set_facecolor(BG)
     ax = _bg_axes(fig)
     _header_clean(ax, a.row, a)
-    _section(ax, 0.018, 0.815, "Investment Committee Memo", "Machine-checked evidence plus explicit analyst judgment")
+    _section(ax, 0.018, 0.815, "Investment Committee Memo", "Machine-checked evidence plus explicit human judgment")
 
     cards = [
         ("Analytical status", case.recommendation.stance, "draft assumptions"),
@@ -1468,7 +1468,7 @@ def platform_workflow_snapshot(path: Path) -> None:
     _platform_header(
         ax,
         "From Capital IQ to Investment Decision",
-        f"{len(latest)} companies | one normalized analytical framework | analyst-controlled conclusions",
+        f"{len(latest)} companies | one normalized analytical framework | manually controlled conclusions",
     )
 
     _section(ax, 0.018, 0.815, "Data pipeline", "Licensed source data stays local")
@@ -1477,7 +1477,7 @@ def platform_workflow_snapshot(path: Path) -> None:
         ("NORMALIZE", "Quarterly internal schema", NAVY),
         ("VALIDATE", "Audit, units and provenance", GOLD),
         ("ANALYZE", "Peers, consensus and valuation", GREEN),
-        ("DECIDE", "Analyst thesis and IC memo", NAVY),
+        ("DECIDE", "Manual thesis and IC memo", NAVY),
     ]
     gap = 0.018
     width = (0.964 - gap * 4) / 5
@@ -1493,7 +1493,7 @@ def platform_workflow_snapshot(path: Path) -> None:
 
     _section(ax, 0.018, 0.625, "Analytical workbench", "Every page answers a specific investment question")
     columns = [
-        ("1  TRIAGE", "Watchlist Home\nCompare", "Where should the analyst spend time?"),
+        ("1  TRIAGE", "Watchlist Home\nCompare", "Where should manual review focus?"),
         ("2  UNDERWRITE", "Situation | Financials\nPeers | Consensus", "Is performance improving, and why?"),
         ("3  VALUE", "Capital Structure\nDCF | Multiples | Scenarios", "What is priced in and what can go wrong?"),
         ("4  COMMUNICATE", "Data Audit\nIC Memo | Decision Journal", "Can the conclusion survive IC scrutiny?"),
@@ -1682,7 +1682,7 @@ def data_refresh_snapshot(path: Path) -> None:
         ["Market snapshot", "Latest available", "Price, market cap, EV, shares and beta"],
         ["Consensus estimates", "NTM + revisions", "Revenue, EBITDA, EPS and earnings dates"],
         ["Valuation history", "Monthly", "EV/Revenue, EV/EBITDA, P/E and share price"],
-        ["Peer information", "Analyst-reviewable", "CapIQ suggestion, approval and exclusions"],
+        ["Peer information", "Manually reviewable", "CapIQ suggestion, approval and exclusions"],
     ]
     source_ax = fig.add_axes([0.018, 0.105, 0.620, 0.200])
     source_ax.axis("off")

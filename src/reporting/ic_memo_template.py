@@ -107,12 +107,12 @@ IC_MEMO_TEMPLATE = """<!doctype html>
       <div>
         <div class="s-head"><div class="s-bar"></div><h2>4 &middot; Variant Perception</h2></div>
         {% if thesis.variant_perception %}<div class="memo"><p>{{ thesis.variant_perception }}</p></div>
-        {% else %}<div class="empty-note">No analyst variant perception on file — add one to the thesis YAML.</div>{% endif %}
+        {% else %}<div class="empty-note">No manually documented variant perception on file — add one to the thesis YAML.</div>{% endif %}
       </div>
       <div>
         <div class="s-head"><div class="s-bar"></div><h2>5 &middot; Key Debate</h2></div>
         {% if thesis.key_debate %}<div class="debate"><p>{{ thesis.key_debate }}</p></div>
-        {% else %}<div class="empty-note">No key debate on file — the memo is machine-only until the analyst writes it.</div>{% endif %}
+        {% else %}<div class="empty-note">No key debate on file — the memo remains machine-only until it is written manually.</div>{% endif %}
       </div>
     </div>
   </section>
@@ -173,7 +173,7 @@ IC_MEMO_TEMPLATE = """<!doctype html>
         <div class="s-head"><div class="s-bar"></div><h2>9 &middot; Risks</h2></div>
         {% if risks %}
         <div class="lst con"><ul>{% for r in risks %}<li>{{ r }}</li>{% endfor %}</ul></div>
-        {% else %}<div class="empty-note">No analyst risks on file; auto-generated concerns below.</div>
+        {% else %}<div class="empty-note">No manually documented risks on file; auto-generated concerns below.</div>
         <div class="lst con"><ul>{% for c in concerns %}<li>{{ c }}</li>{% endfor %}</ul></div>{% endif %}
       </div>
     </div>
@@ -181,7 +181,7 @@ IC_MEMO_TEMPLATE = """<!doctype html>
 
   {% if thesis.swot %}
   <section>
-    <div class="s-head"><div class="s-bar"></div><h2>10 &middot; SWOT From Analyst Case</h2></div>
+    <div class="s-head"><div class="s-bar"></div><h2>10 &middot; SWOT From Manual Case</h2></div>
     <div class="swot-grid">
       {% for key, label in [('strengths','Strengths'),('weaknesses','Weaknesses'),('opportunities','Opportunities'),('threats','Threats')] %}
       <div class="swot-card">
@@ -218,7 +218,7 @@ IC_MEMO_TEMPLATE = """<!doctype html>
     <div class="s-head"><div class="s-bar"></div><h2>13 &middot; Methodology Appendix</h2></div>
     <div class="memo"><div class="appendix">
       {% if thesis.source_deck or thesis.source_as_of or thesis.source_notes %}
-      <p><b>Analyst source.</b>
+      <p><b>Manual source.</b>
       {% if thesis.source_deck %}Deck/case: {{ thesis.source_deck }}. {% endif %}
       {% if thesis.source_as_of %}Thesis as of {{ thesis.source_as_of }}. {% endif %}
       {% if thesis.source_notes %}{{ thesis.source_notes }}{% endif %}</p>
@@ -228,10 +228,10 @@ IC_MEMO_TEMPLATE = """<!doctype html>
       not meaningful for the company's business model.</p>
       <p><b>Scenarios.</b> Exit value = exit-year {{ scenario_profit_label }} &times; exit multiple; equity bridged with today's net debt held
       constant and interim FCF ignored (conservative for cash-generative names). IRR = MOIC^(1/t)&minus;1 against today's market cap.
-      Cases come from the analyst thesis where present, otherwise derived from the company's current profile.</p>
+      Cases come from the manually maintained thesis where present, otherwise derived from the company's current profile.</p>
       <p><b>Implied expectations.</b> Solves the {{ scenario_profit_label }} CAGR required for today's value to compound at the stated
       returns assuming exit at the peer-median multiple.</p>
-      <p><b>Confidentiality.</b> Licensed Capital IQ data and analyst theses stay in <code>data_private/</code>, outside version control.
+      <p><b>Confidentiality.</b> Licensed Capital IQ data and manually developed theses stay in <code>data_private/</code>, outside version control.
       This memo is an illustrative watchlist artifact, not investment advice.</p>
     </div></div>
   </section>

@@ -1,4 +1,4 @@
-"""Company Situation: verdict, KPIs, flags, and the analyst thesis."""
+"""Company Situation: verdict, KPIs, flags, and the manually developed thesis."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             {"cutting": "red", "raising": "green"}.get(rev.get("direction"), "n/a")),
         Kpi("earn", "Next Earnings", rev.get("next_earnings_date") or "n/a", "Catalyst window", "n/a"),
         Kpi("stage", "Thesis Stage", a.thesis.stage_label if (a.thesis and a.thesis.exists) else "None",
-            "From the analyst thesis file", "n/a"),
+            "From the manually maintained thesis file", "n/a"),
     ]
     ui.section("Why Now")
     ui.kpi_grid(why_cards, columns=5)
@@ -65,17 +65,17 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     with qcol:
         ui.bullet_list("Questions for Management", a.management_questions, "q")
 
-    # --- Analyst thesis (merged from the former Company Thesis page) --------------
+    # --- Manual thesis (merged from the former Company Thesis page) ---------------
     thesis = a.thesis
     if thesis is None or not thesis.exists:
         from src.modeling.thesis import thesis_filename
         target_dir = store.theses_dir or PRIVATE_THESES_DIR
-        ui.section("Analyst Thesis", "No thesis on file yet")
+        ui.section("Manual Thesis", "No thesis on file yet")
         st.markdown(
             f"""
             <div class="pe-memo"><h4>Start the thesis</h4>
             <p style="font-family:var(--font-sans);font-size:13px">
-            No analyst thesis exists for this name yet. Copy
+            No manually developed thesis exists for this name yet. Copy
             <code>data/templates/thesis_template.yaml</code> to
             <code>{target_dir}\\{thesis_filename(company_id)}</code>
             and fill in the investment pillars, variant perception, key debate, SWOT,
@@ -87,7 +87,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         return
 
     status = f" | Status: {thesis.analyst_status}" if thesis.analyst_status else ""
-    ui.section("Analyst Thesis", f"Stage: {thesis.stage_label}{status} | from the thesis file")
+    ui.section("Manual Thesis", f"Stage: {thesis.stage_label}{status} | from the thesis file")
     ui.memo("What We Would Own", thesis.thesis or "--")
 
     if thesis.investment_pillars:
@@ -105,10 +105,10 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                  for c in thesis.catalysts] or ["No dated catalysts on file."]
         ui.bullet_list("Catalysts", items, "q")
     with c2:
-        ui.bullet_list("Risks", thesis.risks or ["No analyst risks on file."], "con")
+        ui.bullet_list("Risks", thesis.risks or ["No manually documented risks on file."], "con")
 
     if thesis.swot:
-        ui.section("SWOT From Analyst Case", "Qualitative work imported from the thesis file")
+        ui.section("SWOT From Manual Case", "Qualitative work imported from the thesis file")
         swot_cols = st.columns(4, gap="medium")
         labels = [
             ("strengths", "Strengths", "pos"),
@@ -121,7 +121,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                 ui.bullet_list(label, thesis.swot.get(key) or ["--"], kind)
 
     if thesis.management_questions:
-        ui.bullet_list("Analyst Diligence Questions", thesis.management_questions, "q")
+        ui.bullet_list("Manual Diligence Questions", thesis.management_questions, "q")
 
     if thesis.journal:
         entries = [f"{j.get('date', '')}: {j.get('note', '')}" for j in reversed(thesis.journal)]

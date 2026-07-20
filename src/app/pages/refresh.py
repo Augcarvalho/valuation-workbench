@@ -274,7 +274,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         '<div class="pe-memo" style="border-left-color:var(--amber);margin-top:14px">'
         '<h4 style="color:var(--amber)">Confidentiality</h4>'
         '<p style="font-family:var(--font-sans);font-size:12.5px">Licensed Capital IQ exports, private processed '
-        'datasets, analyst theses, and private reports are excluded from version control via <code>.gitignore</code> '
+        'datasets, manually developed theses, and private reports are excluded from version control via <code>.gitignore</code> '
         '(<code>data_private/</code>, <code>reports/private/</code>). The public repository ships only the '
         'synthetic public-demo dataset.</p></div>',
         unsafe_allow_html=True,

@@ -13,11 +13,11 @@ O ambiente demonstrado possui **186 companhias**, entre empresas monitoradas e t
 | Watchlist priorizada | Comparação entre companhias |
 | --- | --- |
 | [![Watchlist com múltiplas empresas](reports/sample/browser/01_watchlist_home.png)](reports/sample/browser/01_watchlist_home.png) | [![Comparação entre companhias](reports/sample/browser/02_compare.png)](reports/sample/browser/02_compare.png) |
-| Ranking de atenção combina valuation, revisões, inflexão operacional e red flags para direcionar o trabalho do analista. | Comparação lado a lado de Lululemon, Nike e Deckers, com performance, valuation, revisões e racional de priorização. |
+| Ranking de atenção combina valuation, revisões, inflexão operacional e red flags para direcionar a revisão humana. | Comparação lado a lado de Lululemon, Nike e Deckers, com performance, valuation, revisões e racional de priorização. |
 
 ## Leitura da companhia e tese
 
-| Monitoramento trimestral | Tese construída pelo analista |
+| Monitoramento trimestral | Tese construída manualmente |
 | --- | --- |
 | [![Situação da Lululemon](reports/sample/browser/03_company_situation_top.png)](reports/sample/browser/03_company_situation_top.png) | [![Tese de investimento da Lululemon](reports/sample/browser/03b_company_situation_thesis.png)](reports/sample/browser/03b_company_situation_thesis.png) |
 | KPIs, sinais de atenção, leitura executiva, red flags e perguntas para management. | What we would own, pilares, variant perception, debate central, catalisadores, riscos, SWOT e diligence questions. |
@@ -50,11 +50,11 @@ O módulo de capital structure reconcilia market cap, dívida e caixa até o ent
 | Visão executiva do case | Editor de premissas |
 | --- | --- |
 | [![Valuation case da Lululemon](reports/sample/browser/08_valuation_case_top.png)](reports/sample/browser/08_valuation_case_top.png) | [![Assumption Workbench da Lululemon](reports/sample/browser/08e_assumption_workbench.png)](reports/sample/browser/08e_assumption_workbench.png) |
-| Preço atual, target indicativo, WACC, terminal multiple e status de revisão no primeiro bloco. | Base, Bear e Bull começam preenchidos pelos anchors automáticos e podem ser ajustados pelo analista. |
+| Preço atual, target indicativo, WACC, terminal multiple e status de revisão no primeiro bloco. | Base, Bear e Bull começam preenchidos pelos anchors automáticos e podem ser ajustados manualmente. |
 
 O **Assumption Workbench** permite editar Base, Bear e Bull diretamente na
 plataforma. Todo campo abre preenchido com o valor automático vigente; somente
-as alterações feitas pelo analista são gravadas como overrides. O salvamento
+as alterações feitas manualmente são gravadas como overrides. O salvamento
 recalcula DCF, sensitivities, bridges, sponsor returns e exports a partir da
 mesma fonte, arquiva a versão anterior e mantém a trilha de mudanças em
 `data_private/`, fora do Git.
@@ -66,9 +66,9 @@ mesma fonte, arquiva a versão anterior e mantém a trilha de mudanças em
 
 [![Premissas e governança do valuation](reports/sample/browser/08a_valuation_assumptions.png)](reports/sample/browser/08a_valuation_assumptions.png)
 
-As premissas ficam visíveis antes dos outputs: horizonte detalhado e fade, crescimento, margem, D&A, capex, working capital, tax rate, WACC, crescimento perpétuo, ROIC terminal e reinvestimento. Cada input é classificado como `analyst`, `data anchored`, `mixed` ou `calculated`.
+As premissas ficam visíveis antes dos outputs: horizonte detalhado e fade, crescimento, margem, D&A, capex, working capital, tax rate, WACC, crescimento perpétuo, ROIC terminal e reinvestimento. Cada input é classificado como `manual`, `data anchored`, `mixed` ou `calculated`.
 
-[![Fila de revisão humana e cross-checks](reports/sample/browser/08h_analyst_review_queue.png)](reports/sample/browser/08h_analyst_review_queue.png)
+[![Fila de revisão manual e cross-checks](reports/sample/browser/08h_manual_review_queue.png)](reports/sample/browser/08h_manual_review_queue.png)
 
 O sistema separa erro de modelo de julgamento pendente. A recomendação só pode se tornar final após aprovação das premissas e dos peers; divergências de valuation continuam visíveis para reconciliação.
 
@@ -142,7 +142,7 @@ Novas companhias podem ser incluídas por identificador, como `NASDAQ:LULU`, `NY
 - DCF, WACC, sensitivities, football field, debt capacity, sponsor returns e report assembly.
 - Data audit, proveniência e controles contra campos incorretos, inconsistentes ou incompletos.
 
-## Onde o analista interfere
+## Onde entra a revisão manual
 
 - Aprovação, rejeição e justificativa dos peers.
 - Premissas operacionais, WACC, terminal value e cenários.
@@ -167,7 +167,7 @@ src/
   reporting/      charts, valuation cases, board packs and IC memos
   pipeline/       normalized dataset build
 data/
-  templates/      import and analyst-input schemas
+  templates/      import and manual-input schemas
   reference/      public reference parameters
   sample/         offline demonstration data
 tests/            financial logic, data quality, privacy and application tests
