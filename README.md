@@ -10,7 +10,7 @@ O ambiente demonstrado possui **26 companhias monitoradas e 160 trading comps**,
 
 [![Como a plataforma funciona](reports/sample/00_how_it_works.png)](reports/sample/00_how_it_works.png)
 
-> Clique em qualquer imagem para abrir em resolução completa. A galeria foi atualizada em agosto de 2026 e cobre os **39 gráficos atuais**, todas as páginas analíticas e o editor de premissas. Os outputs são indicativos, as premissas da Lululemon permanecem identificadas como draft e o material não constitui recomendação de investimento.
+> Clique em qualquer imagem para abrir em resolução completa. A galeria foi atualizada em agosto de 2026, recapturada em **1.584 px de largura nativa** e cobre os **39 gráficos atuais**, todas as páginas analíticas e o editor de premissas. Os outputs são indicativos, as premissas da Lululemon permanecem identificadas como draft e o material não constitui recomendação de investimento.
 
 ## Da watchlist à decisão
 
@@ -142,6 +142,10 @@ O memo reúne situação, business quality, variant perception, valuation, cená
 | --- | --- |
 | [![Exceções prioritárias do data audit](reports/sample/browser/current/11b_urgent_findings.png)](reports/sample/browser/current/11b_urgent_findings.png) | [![Rastreabilidade das fontes](reports/sample/browser/current/12c_source_log.png)](reports/sample/browser/current/12c_source_log.png) |
 | Os achados prioritários permanecem visíveis até correção ou revisão documentada. | Cada dataset informa origem, período, cobertura e status de atualização. |
+
+[![Audit scores por companhia](reports/sample/browser/current/11c_company_audit_scores.png)](reports/sample/browser/current/11c_company_audit_scores.png)
+
+O painel de audit scores compara completude, consistência e severidade dos achados entre todas as companhias monitoradas, permitindo priorizar a revisão dos dados antes do uso analítico.
 
 [![Inclusão de companhia pelo Capital IQ](reports/sample/browser/current/12b_add_company.png)](reports/sample/browser/current/12b_add_company.png)
 
