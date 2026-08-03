@@ -1,10 +1,10 @@
 # Investment Analysis
 
-> **Posicionamento:** workbench de underwriting de companhias publicas e viabilidade de aquisicao por sponsor. O sistema nao confunde uma empresa listada com uma portfolio company privada: dados publicos/Capital IQ alimentam screening, valuation e um LBO indicativo; budget mensal, covenants reais, ownership e value-creation plans entram apenas pelos modulos privados opcionais.
+> **Posicionamento:** O código executa um pipeline ETL em Python que lê, valida e normaliza os arquivos Excel/CSV alimentados pelo suplemento do S&P Capital IQ, utilizando-os como camada local de dados para demonstrações financeiras, mercado, consenso e múltiplos históricos.
 
 **Plataforma de análise de empresas, acompanhamento financeiro, análise de peers e valuation.**
 
-O ambiente demonstrado possui **186 companhias**, entre empresas monitoradas e trading comps, com cobertura no Brasil e nos Estados Unidos. A mesma arquitetura analítica pode ser aplicada a qualquer companhia adicionada ao universo. A **Lululemon** é utilizada abaixo como case demonstrativo do fluxo completo.
+O ambiente demonstrado possui **186 companhias**, mas qualquer empresa pode ser adicionada desde que os dados estejam disponíveis no capital IQ (a plataforma é alimentada por exports gerados por meio do meu acesso licenciado ao sistema deles). Estou cobrindo apenas empresas brasileiras e estadunidenses. A mesma arquitetura analítica pode ser aplicada a qualquer companhia adicionada ao universo. A **Lululemon** é utilizada abaixo como case demonstrativo do fluxo completo, pois é uma empresa que eu acompanho e já criei uma tese completa manualmente.
 
 [![Como a plataforma funciona](reports/sample/00_how_it_works.png)](reports/sample/00_how_it_works.png)
 
