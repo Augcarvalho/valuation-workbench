@@ -1,0 +1,2 @@
+company_id,period,metric,actual,budget,currency,source
+PORTCO:EXAMPLE,2026-01-31,revenue,105,100,USD,management reporting

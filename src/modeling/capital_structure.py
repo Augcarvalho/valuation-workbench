@@ -38,6 +38,13 @@ class CapitalStructure:
     leverage_headroom: float | None = None            # turns to covenant
     coverage_headroom: float | None = None            # x above coverage floor
     sponsor_capacity: float | None = None             # debt at 4.0x, floored at 0 incr
+    minimum_cash: float | None = None
+    available_cash: float | None = None
+    coverage_capacity: float | None = None
+    underwritten_capacity: dict = field(default_factory=dict)
+    underwritten_incremental: dict = field(default_factory=dict)
+    limiting_constraint: dict = field(default_factory=dict)
+    sponsor_leverage_capacity: float | None = None
     ltv: float | None = None                          # net debt / EV
     warnings: list[str] = field(default_factory=list)
 
@@ -52,7 +59,11 @@ def _clean(v):
     return None if np.isnan(f) or np.isinf(f) else f
 
 
-def build_capital_structure(row: pd.Series) -> CapitalStructure:
+def build_capital_structure(
+    row: pd.Series,
+    minimum_cash: float | None = None,
+    minimum_coverage: float = COVENANT_COVERAGE,
+) -> CapitalStructure:
     warnings: list[str] = []
     if str(row.get("business_model")) in ("financial", "insurer"):
         return CapitalStructure(
@@ -72,11 +83,20 @@ def build_capital_structure(row: pd.Series) -> CapitalStructure:
     interest = _clean(row.get("interest_expense_ttm", row.get("interest_expense")))
     mcap = _clean(row.get("market_cap"))
     ev = _clean(row.get("enterprise_value"))
+    restricted_cash = _clean(row.get("restricted_cash")) or 0.0
+    if minimum_cash is None:
+        minimum_cash = _clean(row.get("minimum_cash"))
+    if minimum_cash is None:
+        revenue = _clean(row.get("revenue_ttm"))
+        minimum_cash = max(restricted_cash, 0.02 * revenue) if revenue and revenue > 0 else restricted_cash
+        warnings.append("Minimum cash uses a 2% of revenue fallback; review before underwriting.")
+    available_cash = max((cash or 0.0) - minimum_cash, 0.0)
 
     cs = CapitalStructure(
         applicable=True, gross_debt=debt, cash=cash, net_debt=net_debt,
         market_cap=mcap, enterprise_value=ev, ebitda_ttm=ebitda,
-        interest_expense=interest, warnings=warnings)
+        interest_expense=interest, minimum_cash=minimum_cash,
+        available_cash=available_cash, warnings=warnings)
 
     if ebitda is None or ebitda <= 0:
         warnings.append("EBITDA missing or negative - leverage and capacity not meaningful.")
@@ -90,7 +110,11 @@ def build_capital_structure(row: pd.Series) -> CapitalStructure:
             cs.cash_pct_debt = cash / debt
     if interest is not None and interest > 0:
         cs.interest_coverage = ebitda / interest
-        cs.coverage_headroom = cs.interest_coverage - COVENANT_COVERAGE
+        cs.coverage_headroom = cs.interest_coverage - minimum_coverage
+        if debt is not None and debt > 0:
+            implied_kd = interest / debt
+            if implied_kd > 0:
+                cs.coverage_capacity = ebitda / (minimum_coverage * implied_kd)
     else:
         warnings.append("Interest expense missing/zero - coverage headroom not computable.")
     if ev and ev > 0 and net_debt is not None:
@@ -101,12 +125,21 @@ def build_capital_structure(row: pd.Series) -> CapitalStructure:
         total = turns * ebitda
         cs.capacity[turns] = total
         cs.incremental[turns] = total - (net_debt if net_debt is not None else 0.0)
+        coverage_cap = cs.coverage_capacity if cs.coverage_capacity is not None else total
+        underwritten = min(total, coverage_cap)
+        cs.underwritten_capacity[turns] = underwritten
+        cs.underwritten_incremental[turns] = max(underwritten - (debt or 0.0), 0.0)
+        cs.limiting_constraint[turns] = "interest coverage" if coverage_cap < total else "gross leverage"
     if cs.net_leverage is not None:
         cs.leverage_headroom = COVENANT_LEVERAGE - cs.net_leverage
     cs.sponsor_capacity = max(cs.incremental.get(4.0, 0.0), 0.0)
+    cs.sponsor_leverage_capacity = cs.underwritten_incremental.get(4.0, 0.0)
 
     if net_debt is not None and net_debt < 0:
-        warnings.append("Net cash position - 'debt capacity' is the full amount at each multiple.")
+        warnings.append(
+            "Net cash position - illustrative net-debt capacity includes cash, but lender-style "
+            "incremental capacity uses gross debt and preserves minimum cash."
+        )
     return cs
 
 

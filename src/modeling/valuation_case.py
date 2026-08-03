@@ -9,6 +9,9 @@ and the HTML export both consume, keeping every surface consistent.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from hashlib import sha256
+import json
 
 import pandas as pd
 
@@ -25,6 +28,7 @@ from src.modeling.dcf import (
 )
 from src.modeling.outliers import multiple_outlier_reason
 from src.modeling.recommendation import Recommendation, recommend
+from src.modeling.readiness import ReadinessResult, evaluate_readiness
 from src.modeling.valuation_assumptions import (
     ValuationAssumptions,
     load_valuation_assumptions,
@@ -90,6 +94,8 @@ class ValuationCase:
     exit_multiple_source: str
     market_reference_multiple: float | None
     market_reference_source: str
+    sponsor_exit_multiple: float
+    sponsor_exit_multiple_source: str
     scenarios: dict[str, DcfResult]
     sens_wacc_multiple: pd.DataFrame
     sens_growth_margin: pd.DataFrame
@@ -99,6 +105,14 @@ class ValuationCase:
     spread_stats: pd.DataFrame
     recommendation: Recommendation
     notes: list[str] = field(default_factory=list)
+    case_id: str = ""
+    built_at: str = ""
+    data_vintage: dict = field(default_factory=dict)
+    readiness: ReadinessResult | None = None
+    lbo: object | None = None
+    lbo_scenarios: dict = field(default_factory=dict)
+    underwriting_terms: dict = field(default_factory=dict)
+    methodology_version: str = "pe-underwriting-v2"
 
     @property
     def base(self) -> DcfResult:
@@ -260,7 +274,18 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
         ),
     )
 
-    return ValuationCase(
+    if assumptions.exit_multiple is not None:
+        sponsor_exit_multiple = float(assumptions.exit_multiple)
+        sponsor_exit_source = "manual transaction assumption"
+    else:
+        own_multiple = row.get("ev_to_ebitda_ttm")
+        own_multiple = float(own_multiple) if pd.notna(own_multiple) and own_multiple > 0 else None
+        candidates = [value for value in (own_multiple, market_reference_multiple, exit_multiple)
+                      if value is not None and value > 0]
+        sponsor_exit_multiple = float(min(candidates)) if candidates else float(exit_multiple)
+        sponsor_exit_source = "conservative no-expansion screen"
+
+    case = ValuationCase(
         company_id=company_id,
         assessment=assessment,
         assumptions=assumptions,
@@ -269,6 +294,8 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
         exit_multiple_source=exit_source,
         market_reference_multiple=market_reference_multiple,
         market_reference_source=market_reference_source,
+        sponsor_exit_multiple=sponsor_exit_multiple,
+        sponsor_exit_multiple_source=sponsor_exit_source,
         scenarios=scenarios,
         sens_wacc_multiple=sens_wm,
         sens_growth_margin=sens_gm,
@@ -279,3 +306,104 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
         recommendation=recommendation,
         notes=notes,
     )
+    case.built_at = datetime.now(timezone.utc).isoformat()
+    case.data_vintage = {
+        "financial_period": str(pd.to_datetime(row.get("fiscal_period_end", row.get("period"))).date()),
+        "market_period": str(pd.to_datetime(row.get("market_period"), errors="coerce").date())
+        if pd.notna(pd.to_datetime(row.get("market_period"), errors="coerce")) else None,
+        "estimate_period": str(pd.to_datetime(row.get("estimate_period"), errors="coerce").date())
+        if pd.notna(pd.to_datetime(row.get("estimate_period"), errors="coerce")) else None,
+        "peer_set": assessment.peer_set_name,
+        "peer_reviewed": assessment.peer_reviewed,
+    }
+    debt = row.get("total_debt")
+    debt = float(debt) if pd.notna(debt) else 0.0
+    cash = row.get("cash_st_invest")
+    if pd.isna(cash):
+        cash = row.get("cash")
+    cash = float(cash) if pd.notna(cash) else 0.0
+    restricted_cash = row.get("restricted_cash")
+    restricted_cash = float(restricted_cash) if pd.notna(restricted_cash) else 0.0
+    revenue = row.get("revenue_ttm")
+    revenue = float(revenue) if pd.notna(revenue) else 0.0
+    case.underwriting_terms = {
+        "entry_leverage": 3.0,
+        "hold_period_years": 5,
+        "minimum_cash": max(restricted_cash, revenue * 0.02),
+        "revolver_capacity": float(row.get("ebitda_ttm")) * 0.5,
+        "mandatory_amortization_pct": 0.01,
+        "financing_fees_pct_debt": 0.015,
+        "interest_deduction_cap_pct_ebitda": 0.30,
+        "max_net_leverage": 6.0,
+        "min_interest_coverage": 1.5,
+        "existing_debt_refinanced": debt,
+        "acquired_cash": cash,
+    }
+    payload = {
+        "company_id": company_id,
+        "fiscal_period_id": row.get("fiscal_period_id"),
+        "assumption_status": assumptions.status,
+        "scenario_drivers": {
+            name: {
+                "growth": scenario.revenue_growth,
+                "margin": scenario.ebitda_margin,
+                "capex": scenario.capex_pct,
+                "tax": scenario.tax_rate,
+                "exit_multiple": scenario.exit_multiple,
+            }
+            for name, scenario in assumptions.scenarios.items()
+        },
+        "wacc": wacc.wacc,
+        "exit_multiple": exit_multiple,
+        "sponsor_exit_multiple": sponsor_exit_multiple,
+        "underwriting_terms": case.underwriting_terms,
+        "peers": sorted(assessment.peers["company_id"].astype(str).tolist()),
+        "methodology": case.methodology_version,
+    }
+    case.case_id = sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:16]
+    fallback_kd = wacc.cost_of_debt_source == "fallback"
+    from src.modeling.data_audit import run_audit
+    from src.modeling.metrics import latest_rows
+
+    audit_issues = run_audit(
+        df,
+        latest_rows(df),
+        exports={},
+        refresh_log=getattr(store, "refresh_log", None),
+    )
+    case.readiness = evaluate_readiness(
+        row,
+        audit_issues=audit_issues,
+        assumptions_final=assumptions.status == "final",
+        peers_reviewed=assessment.peer_reviewed,
+        uses_fallback_beta=wacc.beta_source not in {"peers", "analyst"},
+        uses_fallback_cost_of_debt=fallback_kd,
+    )
+    from src.modeling.lbo import lbo_from_case, run_lbo
+
+    case.lbo = lbo_from_case(case, **case.underwriting_terms)
+    entry_ebitda = float(row.get("ebitda_ttm"))
+    own_multiple = row.get("ev_to_ebitda_ttm")
+    entry_multiple = (
+        float(own_multiple)
+        if pd.notna(own_multiple) and float(own_multiple) > 0
+        else case.sponsor_exit_multiple
+    )
+    for name, dcf_result in case.scenarios.items():
+        scenario_assumption = assumptions.scenarios[name]
+        if scenario_assumption.exit_multiple is not None:
+            scenario_exit = scenario_assumption.exit_multiple
+        elif name == "bear":
+            scenario_exit = max(case.sponsor_exit_multiple - 1.0, 2.0)
+        else:
+            scenario_exit = case.sponsor_exit_multiple
+        case.lbo_scenarios[name] = run_lbo(
+            dcf_result.forecast,
+            entry_ebitda=entry_ebitda,
+            entry_multiple=entry_multiple,
+            exit_multiple=scenario_exit,
+            cost_of_debt=wacc.cost_of_debt_pretax,
+            tax_rate=scenario_assumption.tax_rate,
+            **case.underwriting_terms,
+        )
+    return case

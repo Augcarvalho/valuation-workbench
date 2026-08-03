@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
+import os
+import tempfile
 
 import pandas as pd
 
@@ -25,7 +28,46 @@ def write_csv(df: pd.DataFrame, path: Path) -> Path:
     return path
 
 
+def write_csv_atomic(df: pd.DataFrame, path: Path) -> Path:
+    """Write a CSV only after the complete payload exists on disk."""
+    ensure_dir(path.parent)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    os.close(fd)
+    tmp = Path(tmp_name)
+    try:
+        df.to_csv(tmp, index=False)
+        tmp.replace(path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    return path
+
+
+def write_json_atomic(payload: dict, path: Path) -> Path:
+    ensure_dir(path.parent)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    os.close(fd)
+    tmp = Path(tmp_name)
+    try:
+        tmp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    return path
+
+
 def coerce_period(series: pd.Series) -> pd.Series:
+    """Parse reporting dates without destroying the issuer's fiscal calendar.
+
+    Earlier versions forced every date to calendar quarter-end. That collapsed
+    distinct fiscal observations for non-calendar and 52/53-week issuers.
+    Calendar-quarter labels should be derived separately for presentation.
+    """
+    return pd.to_datetime(series, errors="coerce").dt.normalize()
+
+
+def calendar_quarter_end(series: pd.Series) -> pd.Series:
     return pd.to_datetime(series, errors="coerce").dt.to_period("Q").dt.to_timestamp("Q")
 
 

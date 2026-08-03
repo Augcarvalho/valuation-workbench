@@ -15,10 +15,11 @@ import pandas as pd
 from jinja2 import Template
 
 from src.branding import PALETTE, VERDICT_COLORS
-from src.config import PRIVATE_DATA_DIR, REPORTS_SAMPLE_DIR
+from src.config import PRIVATE_CASE_HISTORY_DIR, PRIVATE_DATA_DIR, REPORTS_SAMPLE_DIR
 from src.ingestion.store import WatchlistStore, load_store
 from src.modeling.assessment import build_assessment
 from src.modeling.scenarios import implied_expectations, run_cases
+from src.modeling.valuation_case import CaseNotApplicableError, build_valuation_case
 from src.reporting.board_pack import _history_chart, _peer_chart, _png_uri, load_dataset
 from src.reporting.ic_memo_template import IC_MEMO_TEMPLATE, ic_memo_css
 from src.utils import ensure_dir, fmt_money, fmt_multiple, fmt_ordinal, fmt_pct, fmt_signed_pct
@@ -147,21 +148,49 @@ def build_memo_context(df: pd.DataFrame, company_id: str, store: WatchlistStore)
         valuation_rows.append({"label": f"Own-history percentile ({hc['column']})",
                                "value": fmt_ordinal(hc["percentile"]), "context": f"z {hc['z_score']:+.1f}"})
 
-    thesis_scen = thesis.scenarios if thesis else None
-    results = run_cases(row, thesis_scen)
+    canonical_case = None
     scenario_rows = []
-    for res in results:
-        scenario_rows.append({
-            "name": res.case.name.title(),
-            "cagr": fmt_signed_pct(res.case.revenue_cagr),
-            "margin": fmt_pct(res.case.exit_margin),
-            "multiple": f"{res.case.exit_multiple:g}x",
-            "moic": f"{res.moic:.2f}x" if res.valid else "n/a",
-            "irr": _tone_irr(res.irr if res.valid else None),
-        })
-    horizon = results[0].case.horizon_years if results else 3
-    scenario_note = ("Cases from manually maintained thesis." if (thesis_scen) else
-                     "Cases auto-derived from the company's current profile — refine in the thesis YAML.")
+    if not financial:
+        try:
+            canonical_case = build_valuation_case(df, company_id, store=store)
+        except CaseNotApplicableError:
+            canonical_case = None
+    if canonical_case is not None:
+        if not demo:
+            from src.modeling.case_history import persist_case_manifest
+
+            persist_case_manifest(canonical_case, PRIVATE_CASE_HISTORY_DIR)
+        horizon = 5
+        for name, dcf_result in canonical_case.scenarios.items():
+            sponsor = canonical_case.lbo_scenarios[name]
+            exit_revenue = float(dcf_result.forecast["revenue"].iloc[horizon - 1])
+            revenue_cagr = (exit_revenue / float(row.get("revenue_ttm"))) ** (1 / horizon) - 1
+            scenario_rows.append({
+                "name": name.title(),
+                "cagr": fmt_signed_pct(revenue_cagr),
+                "margin": fmt_pct(dcf_result.forecast["ebitda_margin"].iloc[horizon - 1]),
+                "multiple": f"{sponsor.exit_multiple:g}x",
+                "moic": f"{sponsor.moic:.2f}x" if sponsor.moic is not None else "n/a",
+                "irr": _tone_irr(sponsor.irr),
+            })
+        scenario_note = (
+            f"Canonical underwriting case {canonical_case.case_id}; {horizon}-year sponsor hold. "
+            f"Readiness: {canonical_case.readiness.status}. Returns reconcile to the valuation workbench."
+        )
+    else:
+        thesis_scen = thesis.scenarios if thesis else None
+        results = run_cases(row, thesis_scen)
+        for res in results:
+            scenario_rows.append({
+                "name": res.case.name.title(),
+                "cagr": fmt_signed_pct(res.case.revenue_cagr),
+                "margin": fmt_pct(res.case.exit_margin),
+                "multiple": f"{res.case.exit_multiple:g}x",
+                "moic": f"{res.moic:.2f}x" if res.valid else "n/a",
+                "irr": _tone_irr(res.irr if res.valid else None),
+            })
+        horizon = results[0].case.horizon_years if results else 3
+        scenario_note = "Financial institution: equity-value scenarios; EBITDA LBO is not applicable."
 
     fair_mult = med.get("pe_ttm") if financial else med.get("ev_to_ebitda_ttm")
     ie = implied_expectations(row, fair_mult, horizon_years=horizon)
@@ -231,6 +260,8 @@ def build_memo_context(df: pd.DataFrame, company_id: str, store: WatchlistStore)
         "scenario_note": scenario_note,
         "scenario_profit_label": ie["metric"],
         "horizon": horizon,
+        "case_id": canonical_case.case_id if canonical_case is not None else None,
+        "readiness": canonical_case.readiness.status if canonical_case is not None else "NOT_APPLICABLE",
         "thesis": {
             "analyst_status": thesis.analyst_status if thesis else "",
             "investment_pillars": thesis.investment_pillars if thesis else [],

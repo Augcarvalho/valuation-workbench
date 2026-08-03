@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "valuation-workbench"
 version = "0.1.0"
-description = "Capital IQ-powered micro-underwriting and valuation workbench for public-company investment analysis. Runs offline on demo data; licensed data stays local."
+description = "Capital IQ-powered public-company underwriting and sponsor-feasibility workbench with governed valuation cases and private monitoring extensions."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

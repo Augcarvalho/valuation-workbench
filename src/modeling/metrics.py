@@ -6,7 +6,7 @@ import pandas as pd
 from src.ingestion.classification import apply_classification
 from src.ingestion.schema import NUMERIC_COLUMNS
 from src.modeling.traffic_lights import add_traffic_lights
-from src.utils import clean_numeric, coerce_period
+from src.utils import calendar_quarter_end, clean_numeric, coerce_period
 
 TTM_COLUMNS = [
     "revenue",
@@ -23,6 +23,11 @@ TTM_COLUMNS = [
     "sbc",
     "dividends_paid",
     "buybacks",
+    "net_interest_income",
+    "provision_expense",
+    "noninterest_income",
+    "noninterest_expense",
+    "net_charge_offs",
 ]
 
 # Fallback cash-tax assumptions for the NOPAT proxy. Company-level effective
@@ -91,6 +96,34 @@ def _normalize_inputs(inputs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame
     for df in [financials, market, estimates]:
         if not df.empty and "period" in df.columns:
             df["period"] = coerce_period(df["period"])
+            df["calendar_period"] = calendar_quarter_end(df["period"])
+
+    if financials["period"].isna().any():
+        raise ValueError("financials contains an invalid fiscal period")
+    financials["fiscal_period_end"] = financials["period"]
+    financials["period_type"] = financials.get(
+        "period_type", pd.Series("quarterly", index=financials.index)
+    ).fillna("quarterly").astype(str).str.lower()
+    financials["fiscal_year"] = pd.to_numeric(
+        financials.get("fiscal_year", financials["period"].dt.year), errors="coerce"
+    ).fillna(financials["period"].dt.year).astype(int)
+    financials["fiscal_quarter"] = pd.to_numeric(
+        financials.get("fiscal_quarter", financials["period"].dt.quarter), errors="coerce"
+    ).fillna(financials["period"].dt.quarter).astype(int)
+    provided_id = financials.get("fiscal_period_id", pd.Series(pd.NA, index=financials.index))
+    generated_id = (
+        financials["company_id"].astype(str) + "|"
+        + financials["fiscal_period_end"].dt.strftime("%Y-%m-%d") + "|"
+        + financials["period_type"]
+    )
+    financials["fiscal_period_id"] = provided_id.where(
+        provided_id.notna() & provided_id.astype(str).str.strip().ne(""), generated_id
+    )
+    key = ["company_id", "fiscal_period_end", "period_type"]
+    duplicated = financials.duplicated(key, keep=False)
+    if duplicated.any():
+        examples = financials.loc[duplicated, key].head(5).to_dict("records")
+        raise ValueError(f"duplicate canonical financial observations: {examples}")
 
     for df in [financials, market, estimates]:
         for column in set(NUMERIC_COLUMNS).intersection(df.columns):
@@ -110,6 +143,48 @@ def _normalize_inputs(inputs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame
     }
 
 
+def _merge_period_table(financials: pd.DataFrame, table: pd.DataFrame, prefix: str) -> pd.DataFrame:
+    """Attach a side table without forcing fiscal dates to calendar quarter-end.
+
+    Capital IQ market/estimate snapshots are often labeled with a calendar
+    quarter while the financial observation retains an issuer-specific fiscal
+    end. The latest side-table record in that calendar quarter is attached,
+    but the original dates remain visible for provenance.
+    """
+    if table.empty:
+        return financials
+    side = table.sort_values(["company_id", "period"]).drop_duplicates(
+        ["company_id", "calendar_period"], keep="last"
+    )
+    side = side.rename(columns={"period": f"{prefix}_period"})
+    return financials.merge(side, on=["company_id", "calendar_period"], how="left")
+
+
+def _fiscal_completeness(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+    """Return TTM and YoY validity masks using issuer fiscal observations."""
+    ttm = pd.Series(False, index=df.index)
+    yoy = pd.Series(False, index=df.index)
+    for _, group in df.groupby("company_id", sort=False):
+        idx = list(group.index)
+        dates = group["fiscal_period_end"].reset_index(drop=True)
+        ordinals = (
+            group["fiscal_year"].astype(float) * 4
+            + group["fiscal_quarter"].astype(float)
+        ).reset_index(drop=True)
+        for pos in range(len(group)):
+            if pos >= 3:
+                date_steps = dates.iloc[pos - 3:pos + 1].diff().dt.days.dropna()
+                ordinal_steps = ordinals.iloc[pos - 3:pos + 1].diff().dropna()
+                valid_dates = len(date_steps) == 3 and date_steps.between(45, 140).all()
+                valid_ordinals = len(ordinal_steps) == 3 and ordinal_steps.eq(1).all()
+                ttm.loc[idx[pos]] = bool(valid_dates or valid_ordinals)
+            if pos >= 4:
+                date_gap = (dates.iloc[pos] - dates.iloc[pos - 4]).days
+                ordinal_gap = ordinals.iloc[pos] - ordinals.iloc[pos - 4]
+                yoy.loc[idx[pos]] = bool(300 <= date_gap <= 440 or ordinal_gap == 4)
+    return ttm, yoy
+
+
 def prepare_monitoring_dataset(inputs: dict[str, pd.DataFrame]) -> pd.DataFrame:
     normalized = _normalize_inputs(inputs)
     companies = normalized["companies"]
@@ -118,10 +193,8 @@ def prepare_monitoring_dataset(inputs: dict[str, pd.DataFrame]) -> pd.DataFrame:
     estimates = normalized["estimates"]
 
     df = financials.merge(companies, on="company_id", how="left")
-    if not market.empty:
-        df = df.merge(market, on=["company_id", "period"], how="left")
-    if not estimates.empty:
-        df = df.merge(estimates, on=["company_id", "period"], how="left")
+    df = _merge_period_table(df, market, "market")
+    df = _merge_period_table(df, estimates, "estimate")
 
     for column in ["fcf", "market_cap", "enterprise_value", "net_debt"]:
         if column not in df.columns:
@@ -138,30 +211,29 @@ def prepare_monitoring_dataset(inputs: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     df = _normalize_adr_market_currency(df)
 
-    df = df.sort_values(["company_id", "period"]).reset_index(drop=True)
+    df = df.sort_values(["company_id", "fiscal_period_end"]).reset_index(drop=True)
     grouped = df.groupby("company_id", group_keys=False)
 
     # TTM values require four consecutive fiscal quarters. A simple row count
     # is insufficient because a missing quarter would otherwise be summed into
     # a mislabeled trailing-twelve-month result.
     df["quarters_reported"] = grouped.cumcount() + 1
-    quarter_ordinal = df["period"].dt.to_period("Q").astype("int64")
-    df["_quarter_ordinal"] = quarter_ordinal
-    df["ttm_complete"] = grouped["_quarter_ordinal"].transform(
-        lambda series: series.rolling(4, min_periods=4).apply(
-            lambda values: float(np.all(np.diff(values) == 1)), raw=True
-        )
-    ).fillna(0).astype(bool)
+    df["ttm_complete"], yoy_complete = _fiscal_completeness(df)
     for column in TTM_COLUMNS:
         if column in df.columns:
             df[f"{column}_ttm"] = grouped[column].transform(
                 lambda series: series.rolling(4, min_periods=4).sum()
             ).where(df["ttm_complete"])
+    # Optional export fields must degrade to unavailable metrics, never crash a build.
+    for column in (
+        "working_capital", "net_debt", "interest_expense_ttm",
+        "enterprise_value", "market_cap", "revenue_consensus", "ebitda_consensus",
+    ):
+        if column not in df.columns:
+            df[column] = np.nan
 
-    yoy_complete = grouped["_quarter_ordinal"].diff(4).eq(4)
     df["revenue_yoy_growth"] = grouped["revenue"].pct_change(4, fill_method=None).where(yoy_complete)
     df["ebitda_yoy_growth"] = grouped["ebitda"].pct_change(4, fill_method=None).where(yoy_complete)
-    df = df.drop(columns="_quarter_ordinal")
 
     if {"ar", "ap"}.issubset(df.columns):
         inventory = df["inventory"].fillna(0.0) if "inventory" in df.columns else 0.0
@@ -177,7 +249,8 @@ def prepare_monitoring_dataset(inputs: dict[str, pd.DataFrame]) -> pd.DataFrame:
     df["net_income_margin_ttm"] = safe_divide(df["net_income_ttm"], df["revenue_ttm"])
     df["fcf_conversion_ttm"] = safe_divide_positive_denominator(df["fcf_ttm"], df["ebitda_ttm"])
     df["capex_intensity_ttm"] = safe_divide_positive_denominator(df["capex_ttm"], df["revenue_ttm"])
-    wc_base = df["operating_nwc"].where(df["operating_nwc"].notna(), df["working_capital"])
+    reported_wc = df["working_capital"] if "working_capital" in df.columns else pd.Series(np.nan, index=df.index)
+    wc_base = df["operating_nwc"].where(df["operating_nwc"].notna(), reported_wc)
     df["working_capital_days"] = safe_divide(wc_base, df["revenue_ttm"]) * 365
     df["net_debt_to_ebitda_ttm"] = safe_divide_positive_denominator(df["net_debt"], df["ebitda_ttm"])
     df["interest_coverage_ttm"] = safe_divide_positive_denominator(df["ebitda_ttm"], df["interest_expense_ttm"])

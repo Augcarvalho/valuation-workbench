@@ -373,6 +373,35 @@ class PeerResolution:
         return len(self.peers)
 
 
+def _issuer_key(frame: pd.DataFrame) -> pd.Series:
+    if "issuer_id" in frame.columns:
+        issuer = frame["issuer_id"].astype("string")
+    else:
+        issuer = pd.Series(pd.NA, index=frame.index, dtype="string")
+    if "company_name" in frame.columns:
+        name = (frame["company_name"].astype(str).str.lower()
+                .str.replace(r"[^a-z0-9]", "", regex=True))
+    else:
+        name = frame["company_id"].astype(str)
+    return issuer.where(issuer.notna() & issuer.str.strip().ne(""), name)
+
+
+def _dedupe_issuers(peers: pd.DataFrame, anchor_id: str) -> pd.DataFrame:
+    """Keep one listing per issuer and remove anchor cross-listings."""
+    if peers.empty:
+        return peers
+    out = peers.copy()
+    out["_issuer_key"] = _issuer_key(out)
+    anchor = out[out["company_id"].astype(str) == anchor_id]
+    anchor_key = anchor["_issuer_key"].iloc[0] if not anchor.empty else None
+    anchor_row = anchor.head(1)
+    candidates = out[out["company_id"].astype(str) != anchor_id]
+    if anchor_key is not None:
+        candidates = candidates[candidates["_issuer_key"] != anchor_key]
+    candidates = candidates.drop_duplicates("_issuer_key", keep="first")
+    return pd.concat([anchor_row, candidates], ignore_index=True).drop(columns="_issuer_key")
+
+
 def resolve_peers(latest: pd.DataFrame, row: pd.Series,
                   peer_sets_path: Path | None = None) -> PeerResolution:
     """Approved peer set > peer_group mapping > full universe (with warning).
@@ -386,7 +415,7 @@ def resolve_peers(latest: pd.DataFrame, row: pd.Series,
     approved = get_approved_peer_set(anchor_id, path)
     if approved:
         ids = set(approved["members"]) | {anchor_id}
-        peers = latest[latest["company_id"].isin(ids)].copy()
+        peers = _dedupe_issuers(latest[latest["company_id"].isin(ids)].copy(), anchor_id)
         valid = len(peers) - 1  # exclude anchor
         warning = None
         if valid < MIN_VALID_PEERS:
@@ -400,11 +429,11 @@ def resolve_peers(latest: pd.DataFrame, row: pd.Series,
     group = row.get(group_col)
     same_group = latest[latest[group_col] == group]
     if len(same_group) - 1 >= MIN_VALID_PEERS - 1 and len(same_group) >= 3:
-        return PeerResolution(peers=same_group.copy(), source="peer_group", reviewed=False,
+        return PeerResolution(peers=_dedupe_issuers(same_group.copy(), anchor_id), source="peer_group", reviewed=False,
                               set_name=str(group))
 
     return PeerResolution(
-        peers=latest.copy(), source="universe", reviewed=False,
+        peers=_dedupe_issuers(latest.copy(), anchor_id), source="universe", reviewed=False,
         warning=("No approved peer set and the mapped peer group has fewer than "
                  f"{MIN_VALID_PEERS} comps - benchmarking against the FULL universe. "
                  "Treat all peer statistics as directional."),

@@ -1,0 +1,2 @@
+company_id,initiative_id,initiative,owner,status,target_date,target_value,realized_value,source
+PORTCO:EXAMPLE,VC-001,Pricing optimization,Commercial lead,on_track,2026-12-31,10,2,management plan

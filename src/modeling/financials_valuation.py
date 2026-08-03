@@ -40,6 +40,12 @@ class FinancialsValuation:
     justified_pb: float | None = None
     excess_return_value: float | None = None
     excess_return_upside: float | None = None
+    net_interest_margin: float | None = None
+    credit_loss_ratio: float | None = None
+    efficiency_ratio: float | None = None
+    cet1_ratio: float | None = None
+    npl_ratio: float | None = None
+    reserve_coverage: float | None = None
     valid: bool = True
     warnings: list[str] = field(default_factory=list)
 
@@ -115,6 +121,33 @@ def build_financials_valuation(row: pd.Series, cost_of_equity: float,
         book_value=book, book_source=source, cost_of_equity=cost_of_equity,
         growth=growth, warnings=warnings,
         pb_label="P/TBV" if source == "tangible_common_equity" else "P/B")
+
+    net_interest_income = _clean(row.get("net_interest_income_ttm"))
+    earning_assets = _clean(row.get("average_earning_assets"))
+    if net_interest_income is not None and earning_assets and earning_assets > 0:
+        out.net_interest_margin = net_interest_income / earning_assets
+    provisions = _clean(row.get("provision_expense_ttm"))
+    average_loans = _clean(row.get("average_loans")) or _clean(row.get("loans"))
+    if provisions is not None and average_loans and average_loans > 0:
+        out.credit_loss_ratio = provisions / average_loans
+    noninterest_expense = _clean(row.get("noninterest_expense_ttm"))
+    noninterest_income = _clean(row.get("noninterest_income_ttm")) or 0.0
+    operating_income = (net_interest_income or 0.0) + noninterest_income
+    if noninterest_expense is not None and operating_income > 0:
+        out.efficiency_ratio = noninterest_expense / operating_income
+    direct_cet1 = _clean(row.get("cet1_ratio"))
+    cet1_capital = _clean(row.get("cet1_capital"))
+    rwa = _clean(row.get("risk_weighted_assets"))
+    out.cet1_ratio = direct_cet1 if direct_cet1 is not None else (
+        cet1_capital / rwa if cet1_capital is not None and rwa and rwa > 0 else None
+    )
+    npl = _clean(row.get("nonperforming_loans"))
+    loans = _clean(row.get("loans"))
+    reserves = _clean(row.get("loan_loss_reserves"))
+    if npl is not None and loans and loans > 0:
+        out.npl_ratio = npl / loans
+    if reserves is not None and npl and npl > 0:
+        out.reserve_coverage = reserves / npl
 
     if ni is not None and mcap and mcap > 0:
         out.pe = mcap / ni if ni > 0 else None

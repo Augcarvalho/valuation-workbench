@@ -20,6 +20,8 @@ SPREAD_COLUMNS = [
     "ev_to_revenue_fy1", "ev_to_revenue_fy2",
     "ev_to_ebitda_fy1", "ev_to_ebitda_fy2",
     "pe_fy1", "pe_fy2",
+    "revenue_cagr_fy2", "ebitda_margin_fy1", "ebitda_margin_fy2",
+    "ebitda_margin_expansion_fy2",
 ]
 
 STAT_METRICS = [
@@ -27,6 +29,8 @@ STAT_METRICS = [
     "ev_to_revenue_ttm", "ev_to_ebitda_ttm", "pe_ttm", "p_tbv",
     "ev_to_ebitda_ntm", "ev_to_revenue_ntm", "pe_ntm",
     "ev_to_ebitda_fy1", "ev_to_ebitda_fy2", "pe_fy1", "pe_fy2",
+    "revenue_cagr_fy2", "ebitda_margin_fy1", "ebitda_margin_fy2",
+    "ebitda_margin_expansion_fy2",
 ]
 
 # Optional FY+1/FY+2 consensus fields (export v3; n/a until exported).
@@ -78,6 +82,19 @@ def comps_spread(peers: pd.DataFrame, estimates: pd.DataFrame | None = None) -> 
     out["ev_to_ebitda_fy2"] = _fwd("ebitda_est_fy2")
     out["ev_to_revenue_fy1"] = _fwd("revenue_est_fy1")
     out["ev_to_revenue_fy2"] = _fwd("revenue_est_fy2")
+    revenue_ttm = out.get("revenue_ttm", pd.Series(np.nan, index=out.index))
+    out["revenue_cagr_fy2"] = (
+        (out["revenue_est_fy2"] / revenue_ttm.where(revenue_ttm > 0)) ** 0.5 - 1.0
+    )
+    out["ebitda_margin_fy1"] = (
+        out["ebitda_est_fy1"] / out["revenue_est_fy1"].where(out["revenue_est_fy1"] > 0)
+    )
+    out["ebitda_margin_fy2"] = (
+        out["ebitda_est_fy2"] / out["revenue_est_fy2"].where(out["revenue_est_fy2"] > 0)
+    )
+    out["ebitda_margin_expansion_fy2"] = (
+        out["ebitda_margin_fy2"] - out.get("ebitda_margin_ttm", np.nan)
+    )
     if price is not None:
         # NTM P/E guardrail: negative/zero/missing forward EPS -> NaN (N/M),
         # never a negative multiple silently entering a median.

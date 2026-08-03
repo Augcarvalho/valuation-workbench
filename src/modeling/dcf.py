@@ -55,11 +55,16 @@ class DcfResult:
     net_debt: float
     minority_interest: float
     preferred_equity: float
+    non_operating_assets: float
+    pension_liabilities: float
+    restricted_cash: float
+    diluted_shares_m: float | None
     implied_equity: float
     market_cap: float | None
     upside: float | None
     current_price: float | None
     target_price: float | None
+    equity_bridge: dict = field(default_factory=dict)
     valid: bool = True
     notes: list[str] = field(default_factory=list)
 
@@ -192,30 +197,46 @@ def run_dcf(
     implied_g = implied_growth_from_fundamentals(tv_exit, nopat_n, terminal_wacc, terminal_roic)
     implied_mult = (tv_perp / terminal_ebitda) if (not np.isnan(tv_perp) and terminal_ebitda > 0) else None
 
-    # Equity bridge.
-    net_debt = _clean(row.get("net_debt"))
+    # Explicit EV-to-diluted-equity bridge. Total debt from Capital IQ already
+    # includes finance leases in the current export, so lease liabilities are
+    # disclosed but not added again.
+    debt = _clean(row.get("total_debt"))
+    cash = _clean(row.get("cash_st_invest"))
+    if cash is None:
+        cash = _clean(row.get("cash"))
+    restricted_cash = _clean(row.get("restricted_cash")) or 0.0
+    minimum_cash = _clean(row.get("minimum_cash")) or 0.0
+    available_cash = max((cash or 0.0) - restricted_cash - minimum_cash, 0.0)
+    net_debt = (debt - available_cash) if debt is not None else _clean(row.get("net_debt"))
     if net_debt is None:
-        debt = _clean(row.get("total_debt"))
-        cash = _clean(row.get("cash_st_invest"))
-        if cash is None:
-            cash = _clean(row.get("cash"))
-        net_debt = (debt or 0.0) - (cash or 0.0)
-        notes.append("net debt derived from total debt minus cash and short-term investments")
+        net_debt = 0.0
+        notes.append("debt/cash unavailable; equity bridge assumes zero net debt")
+    elif minimum_cash > 0 or restricted_cash > 0:
+        notes.append("equity bridge preserves minimum/restricted cash")
     minority = _clean(row.get("minority_interest")) or 0.0
     preferred = _clean(row.get("preferred_equity")) or 0.0
-    implied_equity = ev_exit - net_debt - minority - preferred
+    pension = _clean(row.get("pension_liabilities")) or 0.0
+    non_operating_assets = _clean(row.get("non_operating_assets")) or 0.0
+    implied_equity = ev_exit - net_debt - minority - preferred - pension + non_operating_assets
 
     market_cap = _clean(row.get("market_cap"))
     price = _clean(row.get("share_price"))
     upside = None
     target = None
+    diluted_raw = _clean(row.get("shares_diluted"))
+    diluted_shares_m = None
+    if diluted_raw and diluted_raw > 0:
+        diluted_shares_m = diluted_raw / 1_000_000 if diluted_raw > 100_000 else diluted_raw
     valid = implied_equity > 0
     if not valid:
         notes.append("implied equity non-positive under this scenario")
     if market_cap and market_cap > 0 and valid:
         upside = implied_equity / market_cap - 1.0
-        if price and price > 0:
+        if diluted_shares_m and diluted_shares_m > 0:
+            target = implied_equity / diluted_shares_m
+        elif price and price > 0:
             target = price * (1.0 + upside)
+            notes.append("diluted shares unavailable; target price uses current market-cap scaling")
     elif market_cap is None:
         notes.append("market cap missing; upside not computable")
 
@@ -245,11 +266,28 @@ def run_dcf(
         net_debt=net_debt,
         minority_interest=minority,
         preferred_equity=preferred,
+        non_operating_assets=non_operating_assets,
+        pension_liabilities=pension,
+        restricted_cash=restricted_cash,
+        diluted_shares_m=diluted_shares_m,
         implied_equity=implied_equity,
         market_cap=market_cap,
         upside=upside,
         current_price=price,
         target_price=target,
+        equity_bridge={
+            "enterprise_value": ev_exit,
+            "gross_debt": debt or 0.0,
+            "available_cash": available_cash,
+            "minimum_cash": minimum_cash,
+            "restricted_cash": restricted_cash,
+            "minority_interest": minority,
+            "preferred_equity": preferred,
+            "pension_liabilities": pension,
+            "non_operating_assets": non_operating_assets,
+            "diluted_equity_value": implied_equity,
+            "diluted_shares_m": diluted_shares_m,
+        },
         valid=valid,
         notes=notes,
     )
@@ -262,7 +300,13 @@ def run_all_scenarios(
     exit_multiple: float,
 ) -> dict[str, DcfResult]:
     return {
-        name: run_dcf(row, scenario, assumptions, wacc, exit_multiple)
+        name: run_dcf(
+            row,
+            scenario,
+            assumptions,
+            wacc,
+            scenario.exit_multiple if scenario.exit_multiple is not None else exit_multiple,
+        )
         for name, scenario in assumptions.scenarios.items()
     }
 

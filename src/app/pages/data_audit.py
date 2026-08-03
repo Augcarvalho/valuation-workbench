@@ -43,6 +43,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     last_refresh = "n/a"
     if refresh_log is not None and not refresh_log.empty and "refreshed_at" in refresh_log.columns:
         last_refresh = str(refresh_log["refreshed_at"].iloc[-1])[:16]
+    manifest = getattr(store, "build_manifest", {})
+    build_id = str(manifest.get("build_id", manifest.get("built_at", "n/a")))[:19]
     st.markdown(
         f"""
         <div class="pe-header">
@@ -60,6 +62,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
               <div class="pe-meta-value">{pd.to_datetime(latest['period']).max().date()}</div></div>
             <div class="pe-meta-item"><div class="pe-meta-label">Last Full Refresh</div>
               <div class="pe-meta-value">{last_refresh}</div></div>
+            <div class="pe-meta-item"><div class="pe-meta-label">Dataset Build</div>
+              <div class="pe-meta-value">{build_id}</div></div>
           </div>
         </div>
         """,
@@ -143,6 +147,9 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             "Violations are FLAGGED, never silently flipped.\n"
             "- **LTM completeness**: 4 consecutive reported quarters required; financials are exempt from "
             "EBITDA-frame fields by design.\n"
+            "- **Fiscal identity**: issuer fiscal dates and fiscal-period IDs are preserved; market and "
+            "consensus snapshots attach through a separate calendar-quarter key. Duplicate canonical "
+            "observations block the build.\n"
             "- **Stale periods**: real dates vs the universe's latest period; 1 quarter medium, "
             "2+ high.\n"
             "- **Refresh consistency**: dataset vs export vs refresh_log counts (single-name "

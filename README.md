@@ -1,5 +1,9 @@
 # Investment Analysis Platform
 
+> **Posicionamento:** workbench de underwriting de companhias publicas e viabilidade de aquisicao por sponsor. O sistema nao confunde uma empresa listada com uma portfolio company privada: dados publicos/Capital IQ alimentam screening, valuation e um LBO indicativo; budget mensal, covenants reais, ownership e value-creation plans entram apenas pelos modulos privados opcionais.
+
+A metodologia institucional, os gates de readiness, a identidade fiscal, o bridge EV-to-equity e a logica do sponsor case estao documentados em [docs/PE_UNDERWRITING_METHODOLOGY.md](docs/PE_UNDERWRITING_METHODOLOGY.md).
+
 **Plataforma de análise de investimentos que transforma exports locais do S&P Capital IQ Pro em screening, acompanhamento financeiro, análise de peers, valuation e materiais para comitê de investimento.**
 
 O ambiente demonstrado possui **186 companhias**, entre empresas monitoradas e trading comps, com cobertura no Brasil e nos Estados Unidos. A mesma arquitetura analítica pode ser aplicada a qualquer companhia adicionada ao universo. A **Lululemon** é utilizada abaixo como case demonstrativo do fluxo completo.

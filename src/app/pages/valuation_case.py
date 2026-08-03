@@ -86,6 +86,27 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                          else ("red" if (fv.excess_return_upside or 0) < -0.15 else "yellow"))
                         if fv.excess_return_upside is not None else "n/a"),
                 ], columns=5)
+                bank_kpis = [
+                    Kpi("nim", "Net Interest Margin",
+                        f"{fv.net_interest_margin:.1%}" if fv.net_interest_margin is not None else "n/a",
+                        "LTM net interest income / average earning assets", "n/a"),
+                    Kpi("cost", "Credit Cost",
+                        f"{fv.credit_loss_ratio:.1%}" if fv.credit_loss_ratio is not None else "n/a",
+                        "LTM provisions / average loans", "n/a"),
+                    Kpi("eff", "Efficiency Ratio",
+                        f"{fv.efficiency_ratio:.1%}" if fv.efficiency_ratio is not None else "n/a",
+                        "noninterest expense / operating income", "n/a"),
+                    Kpi("cet1", "CET1 Ratio",
+                        f"{fv.cet1_ratio:.1%}" if fv.cet1_ratio is not None else "n/a",
+                        "reported or CET1 capital / RWA", "n/a"),
+                    Kpi("npl", "NPL / Loans",
+                        f"{fv.npl_ratio:.1%}" if fv.npl_ratio is not None else "n/a",
+                        (f"reserve coverage {fv.reserve_coverage:.1%}"
+                         if fv.reserve_coverage is not None else "credit quality"), "n/a"),
+                ]
+                if any(kpi.value != "n/a" for kpi in bank_kpis):
+                    ui.section("Bank Operating Metrics", "Displayed only when the Capital IQ export contains the inputs")
+                    ui.kpi_grid(bank_kpis, columns=5)
                 if fv.pb is not None and fv.justified_pb is not None:
                     verdict = "trades BELOW" if fv.pb < fv.justified_pb else "trades ABOVE"
                     ui.memo("Reading", f"At {fv.pb:.2f}x {fv.pb_label} vs a justified "
@@ -112,6 +133,14 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                     exc.detail,
                 ], "con")
         return
+
+    ui.footnote(
+        f"Canonical case <code>{case.case_id}</code> | Readiness: "
+        f"<strong>{case.readiness.status.replace('_', ' ')}</strong> | "
+        f"Methodology {case.methodology_version}"
+    )
+    for blocker in case.readiness.blockers:
+        st.error(f"Readiness blocker: {blocker}")
 
     a = case.assessment
     row = a.row
@@ -299,6 +328,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         st.plotly_chart(vch.terminal_value_chart(case), use_container_width=True, config=PLOTLY_CONFIG)
 
     # --- Row 6: PE lens - LBO returns -------------------------------------------------------
+    from src.modeling.capital_structure import build_capital_structure
     from src.modeling.lbo import lbo_from_case
 
     ui.section("Sponsor Feasibility - LBO Returns",
@@ -308,21 +338,53 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     default_entry = float(own_mult) if pd.notna(own_mult) and own_mult > 0 else float(case.exit_multiple)
     input_max = max(40.0, round(default_entry + 10.0, 0), round(float(case.exit_multiple) + 10.0, 0))
     kd_default = float(case.wacc.cost_of_debt_pretax or 0.08)
-    lc1, lc2, lc3, lc4 = st.columns(4)
+    capital = build_capital_structure(row_lbo)
+    minimum_cash_default = float(capital.minimum_cash or 0.0)
+    lc1, lc2, lc3, lc4, lc5 = st.columns(5)
     with lc1:
         entry_m = st.number_input("Entry EV/EBITDA (x)", min_value=2.0, max_value=input_max,
                                   value=round(default_entry, 1), step=0.5)
     with lc2:
         exit_m = st.number_input("Exit EV/EBITDA (x)", min_value=2.0, max_value=input_max,
-                                 value=round(float(case.exit_multiple), 1), step=0.5)
+                                 value=round(float(case.sponsor_exit_multiple), 1), step=0.5)
     with lc3:
         entry_leverage = st.slider("Entry debt / EBITDA (x)", 0.0, 6.0, 3.0, 0.25)
     with lc4:
         kd_in = st.number_input("Pre-tax cost of debt (%)", min_value=1.0, max_value=25.0,
                                 value=round(kd_default * 100, 1), step=0.5) / 100.0
+    with lc5:
+        hold_period = st.select_slider("Sponsor hold (years)", options=[3, 5, 7], value=5)
+
+    with st.expander("Transaction, liquidity, and covenant assumptions"):
+        ac1, ac2, ac3, ac4 = st.columns(4)
+        with ac1:
+            minimum_cash = st.number_input(
+                "Minimum cash", min_value=0.0, value=round(minimum_cash_default, 1), step=10.0,
+            )
+        with ac2:
+            revolver_capacity = st.number_input(
+                "Revolver capacity", min_value=0.0,
+                value=round(float(row_lbo.get("ebitda_ttm", 0.0) or 0.0) * 0.5, 1), step=10.0,
+            )
+        with ac3:
+            mandatory_amortization = st.number_input(
+                "Annual term amortization (%)", min_value=0.0, max_value=20.0,
+                value=1.0, step=0.5,
+            ) / 100.0
+        with ac4:
+            minimum_coverage = st.number_input(
+                "Minimum interest coverage (x)", min_value=1.0, max_value=5.0,
+                value=1.5, step=0.25,
+            )
 
     lbo = lbo_from_case(case, entry_multiple=entry_m, exit_multiple=exit_m,
-                        entry_leverage=entry_leverage, cost_of_debt=kd_in)
+                        entry_leverage=entry_leverage, cost_of_debt=kd_in,
+                        hold_period_years=hold_period, minimum_cash=minimum_cash,
+                        revolver_capacity=revolver_capacity,
+                        mandatory_amortization_pct=mandatory_amortization,
+                        financing_fees_pct_debt=0.015,
+                        interest_deduction_cap_pct_ebitda=0.30,
+                        min_interest_coverage=minimum_coverage)
     if lbo.valid:
         entry_leverage = lbo.entry_debt / lbo.entry_ebitda if lbo.entry_ebitda > 0 else None
         if entry_m > 30.0:
@@ -337,7 +399,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         exit_lev = (lbo.exit_debt / lbo.exit_ebitda) if lbo.exit_ebitda > 0 else None
         ui.kpi_grid([
             Kpi("chk", "Equity Check", f"{lbo.equity_check:,.0f}",
-                f"{(1 - lbo.debt_pct):.0%} of EV + fees", "n/a"),
+                "reconciled sources & uses", "n/a"),
             Kpi("moic", "MOIC", f"{lbo.moic:.2f}x" if lbo.moic else "n/a",
                 f"{lbo.horizon}-year hold", moic_tone),
             Kpi("irr", "Sponsor IRR", f"{lbo.irr:.1%}" if lbo.irr is not None else "n/a",
@@ -346,7 +408,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                 f"{(lbo.entry_debt / lbo.entry_ebitda):.1f}x -> {exit_lev:.1f}x" if exit_lev is not None else "n/a",
                 "debt / EBITDA", "n/a"),
             Kpi("xeq", "Exit Equity", f"{lbo.exit_equity:,.0f}",
-                f"EV {lbo.exit_ev:,.0f} - debt {lbo.exit_debt:,.0f} + cash {lbo.excess_cash:,.0f}", "n/a"),
+                f"EV {lbo.exit_ev:,.0f} - debt {lbo.exit_debt:,.0f} + cash "
+                f"{lbo.schedule['cash_end'].iloc[-1]:,.0f}", "n/a"),
         ], columns=5)
         c1, c2 = st.columns(2, gap="medium")
         with c1:
@@ -355,10 +418,33 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             st.plotly_chart(vch.debt_paydown_chart(lbo), use_container_width=True, config=PLOTLY_CONFIG)
         for note in lbo.notes:
             ui.footnote(note)
-        ui.footnote("Simple-LBO conventions: entry debt sized as debt / LTM EBITDA, 100% cash sweep, "
-                    "after-tax cash interest, no interim "
-                    "dividends, excess cash retained, fees 2% of EV. Base-scenario forecast; flex the assumptions "
-                    "file for segment-driven builds.")
+        with st.expander("Sources & uses, debt schedule, and covenant detail"):
+            su_rows = [
+                [str(item["section"]), str(item["line_item"]), fmt_money(item["amount"], currency)]
+                for _, item in lbo.sources_uses.iterrows()
+            ]
+            ui.html_table(["Section", "Line Item", "Amount"], su_rows, numeric_from=99)
+            schedule_rows = []
+            for _, item in lbo.schedule.iterrows():
+                schedule_rows.append([
+                    f"Y{int(item['year'])}", fmt_money(item["ebitda"], currency),
+                    fmt_money(item["cash_interest"], currency),
+                    fmt_money(item["debt_end"], currency),
+                    fmt_money(item["cash_end"], currency),
+                    f"{item['leverage']:.1f}x" if pd.notna(item["leverage"]) else "n/a",
+                    f"{item['interest_coverage']:.1f}x" if pd.notna(item["interest_coverage"]) else "n/a",
+                ])
+            ui.html_table(
+                ["Year", "EBITDA", "Cash Interest", "Debt", "Cash", "Net Leverage", "Coverage"],
+                schedule_rows,
+                numeric_from=99,
+            )
+            if lbo.covenant_breaches:
+                ui.flag_list([{"severity": "High", "title": "Covenant breach", "detail": text}
+                              for text in lbo.covenant_breaches])
+        ui.footnote("Sponsor conventions: explicit hold period, sources & uses, minimum cash, revolver, "
+                    "mandatory amortization, cash sweep, limited interest tax shield, and covenant tests. "
+                    "No interim dividends or add-on acquisitions are assumed.")
     else:
         st.info(lbo.notes[0] if lbo.notes else "LBO not applicable for this name.")
         if tv_note:
@@ -424,7 +510,12 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     # --- Export -----------------------------------------------------------------------------------
     ui.section("Export", "Generated only on request so opening the page stays fast and silent")
     export_state_key = f"valuation_case_export::{DEMO_MODE}::{company_id}"
-    if st.button("Generate / Refresh Valuation Case (HTML)",
+    export_label = (
+        "Generate Final Valuation Case (HTML)"
+        if case.readiness.can_export_final
+        else "Generate Screening Valuation Case (HTML)"
+    )
+    if st.button(export_label,
                  key=f"generate_valuation_case::{DEMO_MODE}::{company_id}"):
         with st.spinner("Rendering valuation case and chart images..."):
             generated_path = generate_valuation_case(demo=DEMO_MODE, company_id=company_id)
@@ -443,3 +534,26 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                     + (" - private outputs never enter version control." if not DEMO_MODE else "."))
     else:
         ui.footnote("The interactive dashboard is ready. Generate the standalone HTML only when you need it.")
+
+    if not DEMO_MODE:
+        from src.config import PRIVATE_CASE_HISTORY_DIR
+        from src.modeling.case_history import compare_case_manifests, load_case_manifests
+
+        history = load_case_manifests(PRIVATE_CASE_HISTORY_DIR, company_id)
+        with st.expander(f"Case audit trail ({len(history)} immutable version(s))"):
+            if not history:
+                st.caption("Generate a valuation case or IC memo to create the first private manifest.")
+            else:
+                ui.html_table(
+                    ["Case ID", "Built at", "Readiness", "Data vintage", "Methodology"],
+                    [[
+                        item.get("case_id", "n/a"), str(item.get("built_at", "n/a"))[:19],
+                        item.get("readiness", "n/a"), str(item.get("data_vintage", {})),
+                        item.get("methodology_version", "n/a"),
+                    ] for item in history[:10]],
+                    numeric_from=99,
+                    wrap=True,
+                )
+                if len(history) >= 2:
+                    changes = compare_case_manifests(history[1], history[0])
+                    st.dataframe(changes, hide_index=True, use_container_width=True)

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
 
-from src.branding import FONT_SANS, FONT_SERIF, PALETTE, signal_hex
+from src.branding import FONT_SANS, PALETTE, signal_hex
 from src.modeling.outliers import EV_EBITDA_MAX, adjusted_stats, multiple_outlier_reason
 
 COLOR_REVENUE = PALETTE["series_revenue"]

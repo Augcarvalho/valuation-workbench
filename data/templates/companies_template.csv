@@ -1,2 +1,2 @@
-company_id,ticker,company_name,sector,exchange,currency,source
-TOTS3.SA,TOTS3.SA,TOTVS S.A.,Software-Enabled Services,B3,BRL,Capital IQ
+company_id,ticker,company_name,sector,exchange,currency,source,issuer_id,country,primary_industry
+EXAMPLE_CO,EXMPL,Example Company,Software-Enabled Services,Example Exchange,USD,synthetic template example,EXAMPLE_ISSUER,United States,Application Software

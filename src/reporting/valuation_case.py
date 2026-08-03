@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from jinja2 import Template
 
-from src.config import PRIVATE_DATA_DIR, REPORTS_SAMPLE_DIR
+from src.config import PRIVATE_CASE_HISTORY_DIR, PRIVATE_DATA_DIR, REPORTS_SAMPLE_DIR
 from src.ingestion.store import load_store
 from src.modeling.valuation_case import (
     CaseNotApplicableError,
@@ -378,6 +378,10 @@ def generate_valuation_case(
         print(f"Valuation case not applicable for {company_id}: {exc.reason}")
         print(f"  {exc.detail}")
         return None
+    if not demo:
+        from src.modeling.case_history import persist_case_manifest
+
+        persist_case_manifest(case, PRIVATE_CASE_HISTORY_DIR)
     context = build_case_context(case, demo, df=df)
     ticker = str(context["company"].get("ticker", company_id)).replace(".SA", "").replace(":", "_")
     output_path = Path(output_dir) / f"valuation_case_{ticker}.html"

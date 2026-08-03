@@ -23,6 +23,36 @@ DEEP_FIELDS_NICE = ["sbc", "ar", "inventory", "ap", "minority_interest",
 FIN_DEEP_FIELDS = ["tangible_common_equity", "book_value"]
 
 
+def check_fiscal_identity(df: pd.DataFrame) -> list[dict]:
+    """Canonical fiscal keys must be unique before any rolling calculation."""
+    issues: list[dict] = []
+    stub = pd.Series({"company_id": "UNIVERSE", "ticker": "UNIVERSE"})
+    required = ["fiscal_period_end", "fiscal_period_id", "period_type"]
+    missing = [column for column in required if column not in df.columns]
+    if missing:
+        issues.append(_issue(
+            stub, "fiscal_identity", "high", "processed dataset",
+            f"missing canonical fiscal identity columns: {', '.join(missing)}",
+        ))
+        return issues
+    key = ["company_id", "fiscal_period_end", "period_type"]
+    duplicate_rows = df.duplicated(key, keep=False)
+    if duplicate_rows.any():
+        issues.append(_issue(
+            stub, "fiscal_identity", "high", "processed dataset",
+            f"{int(duplicate_rows.sum())} rows share a canonical fiscal key; TTM/YoY is blocked",
+            int(duplicate_rows.sum()),
+        ))
+    null_rows = df[required].isna().any(axis=1)
+    if null_rows.any():
+        issues.append(_issue(
+            stub, "fiscal_identity", "high", "processed dataset",
+            f"{int(null_rows.sum())} rows have an incomplete canonical fiscal key",
+            int(null_rows.sum()),
+        ))
+    return issues
+
+
 def _issue(row: pd.Series, check: str, severity: str, source: str, detail: str,
            value=None) -> dict:
     return {
@@ -233,6 +263,21 @@ def check_refresh_consistency(latest: pd.DataFrame, exports: dict[str, pd.DataFr
                              f"{n_export}", n_export - n_dataset))
     if refresh_log is not None and not refresh_log.empty:
         last = refresh_log.iloc[-1]
+        required_meta = ("refreshed_at", "status", "companies")
+        missing_meta = [key for key in required_meta
+                        if key not in last.index or pd.isna(last.get(key))
+                        or str(last.get(key)).strip() == ""]
+        if missing_meta:
+            issues.append(_issue(
+                stub, "refresh_consistency", "high", "refresh_log",
+                f"latest refresh record is incomplete: {', '.join(missing_meta)}",
+            ))
+        status = str(last.get("status", "")).strip().lower()
+        if status and status not in {"success", "completed", "ok", "scraped_from_saved_capiq_workbook_after_com_retry"}:
+            issues.append(_issue(
+                stub, "refresh_consistency", "high", "refresh_log",
+                f"latest refresh status is '{status}', not successful",
+            ))
         logged = _clean(last.get("companies"))
         if logged is not None and int(logged) != n_dataset:
             issues.append(_issue(stub, "refresh_consistency", "medium", "refresh_log",
@@ -313,6 +358,7 @@ def run_audit(df: pd.DataFrame, latest: pd.DataFrame,
     """All checks -> one issue table sorted by severity."""
     exports = exports or {}
     issues: list[dict] = []
+    issues += check_fiscal_identity(df)
     issues += check_market_cap_bridge(latest)
     issues += check_unit_sanity(latest)
     issues += check_ev_bridge(latest)

@@ -8,6 +8,12 @@ COMPANY_COLUMNS = [
     "source",
 ]
 
+COMPANY_OPTIONAL_COLUMNS = [
+    "issuer_id",
+    "country",
+    "primary_industry",
+]
+
 FINANCIAL_COLUMNS = [
     "company_id",
     "period",
@@ -58,6 +64,12 @@ SOURCE_LOG_COLUMNS = [
 # Optional deep-dive columns. Loaders keep them when present but never require
 # them, so older exports and the public demo keep working unchanged.
 FINANCIAL_OPTIONAL_COLUMNS = [
+    # Preserve issuer fiscal identity; ``period`` remains the raw fiscal end.
+    "fiscal_period_id",
+    "fiscal_year",
+    "fiscal_quarter",
+    "period_type",
+    "restatement_date",
     "d_and_a",
     "sbc",
     "dividends_paid",
@@ -84,6 +96,17 @@ FINANCIAL_OPTIONAL_COLUMNS = [
     "loans",
     "net_interest_income",
     "provision_expense",
+    "noninterest_income",
+    "noninterest_expense",
+    "average_earning_assets",
+    "average_loans",
+    "risk_weighted_assets",
+    "cet1_capital",
+    "cet1_ratio",
+    "net_charge_offs",
+    "nonperforming_loans",
+    "loan_loss_reserves",
+    "reported_eps",
 ]
 
 ESTIMATE_OPTIONAL_COLUMNS = [
@@ -111,6 +134,16 @@ ESTIMATE_OPTIONAL_COLUMNS = [
     "ebitda_est_ntm_30d_ago",
     "ebitda_est_ntm_90d_ago",
     "guidance_metric",
+    "guidance_direction",
+    "fy1_period",
+    "fy2_period",
+    "estimate_snapshot_id",
+    "revenue_est_fy1_dispersion",
+    "revenue_est_fy2_dispersion",
+    "ebitda_est_fy1_dispersion",
+    "ebitda_est_fy2_dispersion",
+    "eps_est_fy1_dispersion",
+    "eps_est_fy2_dispersion",
 ]
 
 # Optional market-data columns (never required; NA when absent).
@@ -121,6 +154,8 @@ MARKET_OPTIONAL_COLUMNS = [
     "avg_daily_value_traded",
     "week52_high",
     "week52_low",
+    "restricted_cash",
+    "debt_yield",
 ]
 
 # Monthly (or better) valuation series per company — powers multiple-vs-own-
@@ -193,6 +228,16 @@ NUMERIC_COLUMNS = [
     "loans",
     "net_interest_income",
     "provision_expense",
+    "noninterest_income",
+    "noninterest_expense",
+    "average_earning_assets",
+    "average_loans",
+    "risk_weighted_assets",
+    "cet1_capital",
+    "cet1_ratio",
+    "net_charge_offs",
+    "nonperforming_loans",
+    "loan_loss_reserves",
     "revenue_est_fy1",
     "revenue_est_fy2",
     "ebitda_est_fy1",
@@ -207,4 +252,13 @@ NUMERIC_COLUMNS = [
     "avg_daily_value_traded",
     "week52_high",
     "week52_low",
+    "restricted_cash",
+    "debt_yield",
+    "reported_eps",
+    "revenue_est_fy1_dispersion",
+    "revenue_est_fy2_dispersion",
+    "ebitda_est_fy1_dispersion",
+    "ebitda_est_fy2_dispersion",
+    "eps_est_fy1_dispersion",
+    "eps_est_fy2_dispersion",
 ]

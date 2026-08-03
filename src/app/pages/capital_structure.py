@@ -50,13 +50,21 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             "liquidity vs gross debt", "n/a"),
     ], columns=5)
 
-    ui.section("Debt Capacity", "What the business supports at standard leverage multiples")
+    ui.section("Debt Capacity", "Gross-debt capacity constrained by leverage and minimum coverage")
     rows = []
-    for turns in sorted(cs.capacity):
-        rows.append([f"{turns:.1f}x EBITDA", f"{cs.capacity[turns]:,.0f}",
-                     f"{cs.incremental[turns]:+,.0f}"])
-    ui.html_table(["Leverage level", f"Net debt supported ({currency}m)",
-                   "Incremental net debt vs today"], rows, numeric_from=1)
+    for turns in sorted(cs.underwritten_capacity):
+        rows.append([
+            f"{turns:.1f}x EBITDA",
+            f"{cs.capacity[turns]:,.0f}",
+            f"{cs.coverage_capacity:,.0f}" if cs.coverage_capacity is not None else "n/a",
+            f"{cs.underwritten_capacity[turns]:,.0f}",
+            f"{cs.underwritten_incremental[turns]:+,.0f}",
+            cs.limiting_constraint[turns],
+        ])
+    ui.html_table([
+        "Leverage level", f"Leverage cap ({currency}m)", f"Coverage cap ({currency}m)",
+        f"Underwritten gross debt ({currency}m)", "Incremental gross debt", "Binding constraint",
+    ], rows, numeric_from=1)
     ui.kpi_grid([
         Kpi("hl", "Covenant Headroom (Leverage)",
             f"{cs.leverage_headroom:+.1f}x" if cs.leverage_headroom is not None else "n/a",
@@ -66,10 +74,13 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             f"{cs.coverage_headroom:+.1f}x" if cs.coverage_headroom is not None else "n/a",
             "vs 2.0x interest-coverage floor",
             "green" if (cs.coverage_headroom or -1) > 1 else ("yellow" if (cs.coverage_headroom or -1) > 0 else "red")),
-        Kpi("sp", "Sponsor Net Debt Capacity",
-            f"{cs.sponsor_capacity:,.0f}" if cs.sponsor_capacity is not None else "n/a",
-            "incremental to 4.0x EBITDA", "n/a"),
-    ], columns=3)
+        Kpi("sp", "Incremental Debt Capacity",
+            f"{cs.sponsor_leverage_capacity:,.0f}" if cs.sponsor_leverage_capacity is not None else "n/a",
+            "lesser of 4.0x leverage and coverage capacity", "n/a"),
+        Kpi("mc", "Minimum Cash",
+            f"{cs.minimum_cash:,.0f}" if cs.minimum_cash is not None else "n/a",
+            "preserved for operations; review manually", "n/a"),
+    ], columns=4)
 
     ui.section("Current EV Bridge", "Calculated vs reported enterprise value")
     bridge = ev_bridge(row)
@@ -85,6 +96,6 @@ def render(df: pd.DataFrame, company_id: str) -> None:
 
     for w in cs.warnings:
         ui.footnote(w)
-    ui.footnote("Covenant thresholds (4.0x leverage, 2.0x coverage) are market-standard proxies, "
-                "not the company's actual covenants. Debt capacity is illustrative senior capacity, "
-                "before market conditions and rating constraints.")
+    ui.footnote("Covenant thresholds (4.0x leverage, 2.0x coverage) are screening proxies, "
+                "not actual credit-document terms. Capacity preserves minimum cash and uses the lower "
+                "of gross-leverage and interest-coverage constraints; it remains subject to lender review.")

@@ -6,6 +6,7 @@ import pandas as pd
 
 from src.ingestion.schema import (
     COMPANY_COLUMNS,
+    COMPANY_OPTIONAL_COLUMNS,
     ESTIMATE_COLUMNS,
     ESTIMATE_OPTIONAL_COLUMNS,
     FINANCIAL_COLUMNS,
@@ -19,7 +20,7 @@ from src.utils import read_table
 
 # table key -> (file stem, required columns, optional columns, required table?)
 TABLES = {
-    "companies": ("companies", COMPANY_COLUMNS, [], True),
+    "companies": ("companies", COMPANY_COLUMNS, COMPANY_OPTIONAL_COLUMNS, True),
     "financials": ("financials_quarterly", FINANCIAL_COLUMNS, FINANCIAL_OPTIONAL_COLUMNS, True),
     "market_data": ("market_data", MARKET_COLUMNS, MARKET_OPTIONAL_COLUMNS, True),
     "estimates": ("estimates", ESTIMATE_COLUMNS, ESTIMATE_OPTIONAL_COLUMNS, False),
@@ -103,4 +104,3 @@ def load_capiq_exports(input_dir: str | Path) -> dict[str, pd.DataFrame]:
             ]
         )
     return loaded
-

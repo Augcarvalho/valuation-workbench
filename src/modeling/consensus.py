@@ -26,6 +26,8 @@ class ConsensusRead:
     true_surprise: bool = False
     comparison_label: str = "Current FQ estimate comparison"
     missing: list[str] = field(default_factory=list)
+    forward: dict = field(default_factory=dict)
+    estimate_dispersion: dict = field(default_factory=dict)
 
 
 def _clean(v):
@@ -74,7 +76,7 @@ def build_consensus_read(row: pd.Series) -> ConsensusRead:
     pairs = [
         ("Revenue", _clean(row.get("revenue")), _clean(row.get("revenue_consensus"))),
         ("EBITDA", _clean(row.get("ebitda")), _clean(row.get("ebitda_consensus"))),
-        ("EPS", None, _clean(row.get("eps_consensus"))),   # reported EPS not exported yet
+        ("EPS", _clean(row.get("reported_eps")), _clean(row.get("eps_consensus"))),
     ]
     for name, actual, consensus in pairs:
         b = _comparison(actual, consensus, out.true_surprise)
@@ -117,4 +119,21 @@ def build_consensus_read(row: pd.Series) -> ConsensusRead:
     ne = row.get("next_earnings_date")
     out.next_earnings = str(ne)[:10] if ne is not None and str(ne) not in ("nan", "NaT", "None") else None
     out.num_analysts = _clean(row.get("num_analysts"))
+    out.forward = {
+        "fy1_period": row.get("fy1_period"),
+        "fy2_period": row.get("fy2_period"),
+        "revenue_fy1": _clean(row.get("revenue_est_fy1")),
+        "revenue_fy2": _clean(row.get("revenue_est_fy2")),
+        "ebitda_fy1": _clean(row.get("ebitda_est_fy1")),
+        "ebitda_fy2": _clean(row.get("ebitda_est_fy2")),
+        "eps_fy1": _clean(row.get("eps_est_fy1")),
+        "eps_fy2": _clean(row.get("eps_est_fy2")),
+    }
+    out.estimate_dispersion = {
+        metric: _clean(row.get(f"{metric}_dispersion"))
+        for metric in (
+            "revenue_est_fy1", "revenue_est_fy2", "ebitda_est_fy1",
+            "ebitda_est_fy2", "eps_est_fy1", "eps_est_fy2",
+        )
+    }
     return out

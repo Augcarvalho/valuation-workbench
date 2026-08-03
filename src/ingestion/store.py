@@ -11,6 +11,7 @@ given table.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from src.config import (
     DEMO_VALUATION_HISTORY,
     PRIVATE_ASSUMPTIONS_DIR,
     PRIVATE_ESTIMATES,
+    PRIVATE_MONITORING_DIR,
     PRIVATE_PROCESSED_DATASET,
     PRIVATE_SOURCE_LOG,
     PRIVATE_REFRESH_LOG,
@@ -32,6 +34,7 @@ from src.config import (
     PRIVATE_VALUATION_HISTORY,
 )
 from src.ingestion.schema import VALUATION_HISTORY_COLUMNS
+from src.ingestion.private_monitoring import load_private_monitoring
 
 
 @dataclass
@@ -44,6 +47,8 @@ class WatchlistStore:
     source_log: pd.DataFrame = field(default_factory=pd.DataFrame)
     theses_dir: Path | None = None
     assumptions_dir: Path | None = None
+    private_monitoring: dict[str, pd.DataFrame] = field(default_factory=dict)
+    build_manifest: dict = field(default_factory=dict)
 
     @property
     def has_valuation_history(self) -> bool:
@@ -109,6 +114,11 @@ def assumptions_dir(demo: bool) -> Path:
 
 def load_store(demo: bool) -> WatchlistStore:
     dataset_path = DEFAULT_PROCESSED_DATASET if (demo or not PRIVATE_PROCESSED_DATASET.exists()) else PRIVATE_PROCESSED_DATASET
+    manifest_path = dataset_path.parent / "build_manifest.json"
+    try:
+        build_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        build_manifest = {}
     return WatchlistStore(
         mode="demo" if demo else "private",
         dataset_path=dataset_path,
@@ -118,4 +128,8 @@ def load_store(demo: bool) -> WatchlistStore:
         source_log=load_source_log(demo),
         theses_dir=theses_dir(demo),
         assumptions_dir=assumptions_dir(demo),
+        private_monitoring=(
+            load_private_monitoring(None if demo else PRIVATE_MONITORING_DIR)
+        ),
+        build_manifest=build_manifest,
     )

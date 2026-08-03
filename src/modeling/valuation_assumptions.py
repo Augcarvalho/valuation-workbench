@@ -223,6 +223,7 @@ class ScenarioAssumptions:
     nwc_pct_revenue: list[float] | None
     nwc_mode: str                      # "days" | "pct"
     source: str = "derived"            # derived | analyst
+    exit_multiple: float | None = None
 
 
 VALID_STATUSES = ("final", "draft", "illustrative")
@@ -303,6 +304,13 @@ def _build_scenario(name: str, spec: dict, horizon: int, anchors: dict, source: 
                          if not days_mode else None),
         nwc_mode=anchors["nwc_mode"],
         source=source,
+        exit_multiple=(
+            None
+            if spec.get("exit_multiple") is None
+            or (isinstance(spec.get("exit_multiple"), str)
+                and spec.get("exit_multiple").strip().lower() == "auto")
+            else float(spec.get("exit_multiple"))
+        ),
     )
 
 
@@ -555,6 +563,7 @@ def load_valuation_assumptions(
         "revenue_growth", "ebitda_margin", "d_and_a_pct_revenue",
         "capex_pct_revenue", "tax_rate", "dso", "dih", "dpo",
         "nwc_pct_revenue",
+        "exit_multiple",
     )
     for name in SCENARIO_NAMES:
         spec = scenario_specs.get(name, {})

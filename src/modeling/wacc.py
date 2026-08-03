@@ -32,6 +32,7 @@ class WaccResult:
     cost_of_debt_aftertax: float
     beta: float
     beta_source: str                   # market_data | peers | default | analyst
+    cost_of_debt_source: str
     risk_free_rate: float
     equity_risk_premium: float
     country_risk_premium: float
@@ -66,15 +67,8 @@ def _resolve_beta(row: pd.Series, peers: pd.DataFrame | None, analyst_beta: floa
         return analyst_beta, "analyst"
 
     own = _clean(row.get("beta_2y"))
-    if own is not None and BETA_BOUNDS[0] <= own <= BETA_BOUNDS[1]:
-        return own, "market_data"
-    if own is not None and own > 0:
-        notes.append(
-            f"2-year beta {own:.2f} outside {BETA_BOUNDS[0]:.2f}-{BETA_BOUNDS[1]:.2f}; "
-            "using peer-relevered beta or fallback"
-        )
-
-    # Peer-median unlever/relever when peer betas exist (post export-v3).
+    # Bottom-up beta is the primary underwritten method; observed company beta
+    # is retained as a cross-check because short lookbacks can be noisy.
     if peers is not None and "beta_2y" in getattr(peers, "columns", []):
         usable = peers
         if "company_id" in usable.columns and row.get("company_id") is not None:
@@ -94,17 +88,32 @@ def _resolve_beta(row: pd.Series, peers: pd.DataFrame | None, analyst_beta: floa
                 if own_debt is not None and own_equity and own_equity > 0:
                     target_de = own_debt / own_equity
                 beta = relever_beta(float(np.median(unlevered)), target_de, tax_rate)
-                notes.append(f"beta relevered from {len(unlevered)} peer betas at D/E {target_de:.2f}")
+                notes.append(
+                    f"bottom-up beta relevered from {len(unlevered)} peer betas at D/E {target_de:.2f}"
+                    + (f"; observed 2-year beta {own:.2f} is a cross-check" if own is not None else "")
+                )
                 return beta, "peers"
+
+    if own is not None and BETA_BOUNDS[0] <= own <= BETA_BOUNDS[1]:
+        notes.append("approved peer beta unavailable; observed 2-year beta used as fallback")
+        return own, "market_data"
+    if own is not None and own > 0:
+        notes.append(
+            f"2-year beta {own:.2f} outside {BETA_BOUNDS[0]:.2f}-{BETA_BOUNDS[1]:.2f}; "
+            "using flagged default"
+        )
 
     notes.append("beta: default 1.0 — no beta data exported yet (export v3 adds IQ_BETA_2YR)")
     return DEFAULT_BETA, "default"
 
 
 def _resolve_cost_of_debt(row: pd.Series, params: dict, analyst_kd: float | None,
-                          notes: list[str]) -> float:
+                          notes: list[str]) -> tuple[float, str]:
     if analyst_kd is not None:
-        return analyst_kd
+        return analyst_kd, "manual"
+    debt_yield = _clean(row.get("debt_yield"))
+    if debt_yield is not None and KD_BOUNDS[0] <= debt_yield <= KD_BOUNDS[1]:
+        return debt_yield, "debt yield"
     interest = _clean(row.get("interest_expense_ttm"))
     debt = _clean(row.get("average_total_debt"))
     if debt is None:
@@ -114,10 +123,10 @@ def _resolve_cost_of_debt(row: pd.Series, params: dict, analyst_kd: float | None
         bounded = float(np.clip(kd, *KD_BOUNDS))
         if bounded != kd:
             notes.append(f"derived Kd {kd:.1%} outside sanity bounds; clipped to {bounded:.1%}")
-        return bounded
+        return bounded, "interest / average debt"
     fallback = params["risk_free_rate"] + params["country_risk_premium"] + 0.02
     notes.append(f"no interest/debt data for Kd; using rf + country premium + 200bps = {fallback:.1%}")
-    return fallback
+    return fallback, "fallback"
 
 
 def build_wacc(
@@ -133,7 +142,7 @@ def build_wacc(
 
     beta, beta_source = _resolve_beta(row, peers, beta_override, tax, notes)
     ke = params["risk_free_rate"] + beta * params["equity_risk_premium"] + params["country_risk_premium"]
-    kd_pre = _resolve_cost_of_debt(row, params, kd_override, notes)
+    kd_pre, kd_source = _resolve_cost_of_debt(row, params, kd_override, notes)
     kd_post = kd_pre * (1.0 - tax)
 
     equity = _clean(row.get("market_cap")) or 0.0
@@ -158,6 +167,7 @@ def build_wacc(
         cost_of_debt_aftertax=kd_post,
         beta=beta,
         beta_source=beta_source,
+        cost_of_debt_source=kd_source,
         risk_free_rate=params["risk_free_rate"],
         equity_risk_premium=params["equity_risk_premium"],
         country_risk_premium=params["country_risk_premium"],

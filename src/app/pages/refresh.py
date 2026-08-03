@@ -46,6 +46,17 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         else "data/sample/public_demo/monitoring_dataset.csv"
     )
     ui.footnote(f"Dataset: <code>{dataset_label}</code>")
+    manifest = getattr(store, "build_manifest", {})
+    if manifest:
+        ui.footnote(
+            "Build manifest: "
+            f"<code>{manifest.get('build_id', manifest.get('built_at', 'n/a'))}</code> | "
+            f"source <code>{manifest.get('source', 'n/a')}</code> | "
+            f"{manifest.get('processed_rows', len(df))} rows | "
+            f"{manifest.get('companies', latest.shape[0])} companies"
+        )
+    else:
+        st.warning("No build manifest found. Rebuild the dataset before relying on provenance.")
 
     if not DEMO_MODE:
         ui.section("CapIQ Refresh Log")

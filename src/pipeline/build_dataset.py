@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 
 from src.config import DEFAULT_PROCESSED_DATASET, DEFAULT_SOURCE_LOG, PROCESSED_DIR
 from src.ingestion.capiq_loader import load_capiq_exports
+from src.ingestion.contracts import build_manifest, validate_processed_dataset, validate_raw_inputs
 from src.ingestion.public_demo_loader import load_public_demo
 from src.modeling.metrics import prepare_monitoring_dataset
-from src.utils import ensure_dir, write_csv
+from src.utils import ensure_dir, write_csv_atomic, write_json_atomic
 
 
 def build_dataset(
@@ -35,17 +37,31 @@ def build_dataset(
     else:
         raise ValueError("source must be 'public-demo' or 'capiq'")
 
+    raw_contract = validate_raw_inputs(inputs)
+    raw_contract.require_valid()
     dataset = prepare_monitoring_dataset(inputs)
+    processed_contract = validate_processed_dataset(dataset)
+    processed_contract.require_valid()
     output = Path(output_path)
     ensure_dir(output.parent)
-    write_csv(dataset, output)
+    write_csv_atomic(dataset, output)
 
     source_log = inputs.get("source_log", pd.DataFrame())
     source_log_path = DEFAULT_SOURCE_LOG if output == DEFAULT_PROCESSED_DATASET else output.parent / "source_log.csv"
     if not source_log.empty:
-        write_csv(source_log, source_log_path)
+        write_csv_atomic(source_log, source_log_path)
     else:
-        write_csv(pd.DataFrame(), source_log_path)
+        write_csv_atomic(pd.DataFrame(), source_log_path)
+
+    manifest = build_manifest(
+        source,
+        dataset,
+        inputs,
+        raw_contract.warnings + processed_contract.warnings,
+    )
+    manifest["dataset_path"] = str(output.resolve())
+    manifest["built_at"] = datetime.now(timezone.utc).isoformat()
+    write_json_atomic(manifest, output.parent / "build_manifest.json")
 
     return output, source_log_path
 
