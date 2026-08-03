@@ -1,10 +1,8 @@
-# Investment Analysis Platform
+# Investment Analysis
 
 > **Posicionamento:** workbench de underwriting de companhias publicas e viabilidade de aquisicao por sponsor. O sistema nao confunde uma empresa listada com uma portfolio company privada: dados publicos/Capital IQ alimentam screening, valuation e um LBO indicativo; budget mensal, covenants reais, ownership e value-creation plans entram apenas pelos modulos privados opcionais.
 
-A metodologia institucional, os gates de readiness, a identidade fiscal, o bridge EV-to-equity e a logica do sponsor case estao documentados em [docs/PE_UNDERWRITING_METHODOLOGY.md](docs/PE_UNDERWRITING_METHODOLOGY.md).
-
-**Plataforma de análise de investimentos que transforma exports locais do S&P Capital IQ Pro em screening, acompanhamento financeiro, análise de peers, valuation e materiais para comitê de investimento.**
+**Plataforma de análise de empresas, acompanhamento financeiro, análise de peers e valuation.**
 
 O ambiente demonstrado possui **186 companhias**, entre empresas monitoradas e trading comps, com cobertura no Brasil e nos Estados Unidos. A mesma arquitetura analítica pode ser aplicada a qualquer companhia adicionada ao universo. A **Lululemon** é utilizada abaixo como case demonstrativo do fluxo completo.
 
@@ -28,7 +26,7 @@ O ambiente demonstrado possui **186 companhias**, entre empresas monitoradas e t
 
 ## Comparable companies
 
-| Peer set e governança | Trading comps e estatísticas |
+| Comparable Companies e estatísticas |
 | --- | --- |
 | [![Peer set da Lululemon](reports/sample/browser/04_peer_benchmarking_top.png)](reports/sample/browser/04_peer_benchmarking_top.png) | [![Valuation spread dos peers](reports/sample/browser/04b_peer_valuation_spread.png)](reports/sample/browser/04b_peer_valuation_spread.png) |
 | Peers sugeridos pelo Capital IQ, revisão humana, rejeições documentadas e mediana ex-company. | EV/Revenue, EV/EBITDA, P/E e P/TBV em LTM/NTM, com mean, median, quartis, high/low e tratamento de outliers. |
@@ -108,7 +106,7 @@ O WACC mostra custo de equity, custo da dívida, estrutura de capital e taxa ter
 
 O HTML standalone é gerado somente sob demanda e replica a mesma versão de premissas usada na interface.
 
-No case demonstrativo, a Lululemon apresenta preço de referência de **US$ 113,62** e WACC de **8,8%**. O DCF utiliza crescimento de longo prazo de **2,2%**, ROIC terminal de **11,0%** e múltiplo fundamental implícito de **7,7x**, mantendo o múltiplo dos peers como cross-check independente. O valor indicativo base é **US$ 230,34** e permanece marcado como draft até revisão e aprovação humana.
+No case demonstrativo, a Lululemon apresenta preço de referência de **US$ 113,62** e WACC de **8,8%**. O DCF utiliza crescimento de longo prazo de **2,2%**, ROIC terminal de **11,0%** e múltiplo fundamental implícito de **7,7x**, mantendo o múltiplo dos peers como cross-check independente. O valor indicativo base é **US$ 230,34**.
 
 ## Valuation e expectativas do mercado
 
