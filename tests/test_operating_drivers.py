@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from src.app.operating_driver_view import _projection_chart
+from src.branding import PALETTE
 from src.modeling.operating_drivers import (
     COMPANY_PROFILE,
     PROFILES,
@@ -226,3 +227,8 @@ def test_projection_chart_reserves_space_for_legend_and_growth_labels():
     assert fig.layout.legend.y < 0
     assert fig.layout.legend.yanchor == "top"
     assert all("Y%{x}" not in (trace.hovertemplate or "") for trace in fig.data)
+    growth_trace = next(trace for trace in fig.data if trace.name == "Revenue growth")
+    bar_colors = {trace.marker.color for trace in fig.data if trace.type == "bar"}
+    assert growth_trace.line.color == PALETTE["amber"]
+    assert growth_trace.line.color not in bar_colors
+    assert growth_trace.marker.color == PALETTE["panel"]
