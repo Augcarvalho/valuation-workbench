@@ -20,7 +20,7 @@ from src.modeling.valuation_case import build_valuation_case
 
 MANAGED_ROOT_KEYS = {
     "status", "horizon_years", "transition_years", "scenarios",
-    "wacc", "terminal", "segments", "review_note",
+    "wacc", "terminal", "segments", "operating_drivers", "review_note",
 }
 
 
@@ -126,6 +126,7 @@ def _scenario_editor(
     auto_horizon: int,
     prefix: str,
     raw_scenario: dict[str, Any],
+    physical_growth_source: bool = False,
 ) -> dict:
     overrides: dict[str, Any] = {}
 
@@ -136,20 +137,32 @@ def _scenario_editor(
     current_da = _endpoints(current.d_and_a_pct, horizon)
     current_capex = _endpoints(current.capex_pct, horizon)
 
-    st.caption(
-        f"Automatic anchors: growth {auto_growth[0]:+.1%} to {auto_growth[1]:+.1%}; "
-        f"margin {auto_margin[0]:.1%} to {auto_margin[1]:.1%}. "
-        "Only values changed from these anchors are stored as manual overrides."
-    )
+    if physical_growth_source:
+        st.caption(
+            f"Physical operating drivers determine detailed revenue. The top-down growth "
+            f"anchors ({auto_growth[0]:+.1%} to {auto_growth[1]:+.1%}) are retained only "
+            "as a cross-check and to shape the automatic stable-growth transition. "
+            f"EBITDA margin anchors are {auto_margin[0]:.1%} to {auto_margin[1]:.1%}."
+        )
+        growth_start_label = "Revenue growth cross-check - Year 1 (%)"
+        growth_end_label = "Transition growth anchor - final detailed year (%)"
+    else:
+        st.caption(
+            f"Automatic anchors: growth {auto_growth[0]:+.1%} to {auto_growth[1]:+.1%}; "
+            f"margin {auto_margin[0]:.1%} to {auto_margin[1]:.1%}. "
+            "Only values changed from these anchors are stored as manual overrides."
+        )
+        growth_start_label = "Revenue growth - Year 1 (%)"
+        growth_end_label = "Revenue growth - final detailed year (%)"
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         growth_start = _pct_input(
-            "Revenue growth - Year 1 (%)", current_growth[0],
+            growth_start_label, current_growth[0],
             f"{prefix}_{name}_growth_start",
         )
     with c2:
         growth_end = _pct_input(
-            "Revenue growth - final detailed year (%)", current_growth[1],
+            growth_end_label, current_growth[1],
             f"{prefix}_{name}_growth_end",
         )
     with c3:
@@ -255,6 +268,117 @@ def _scenario_editor(
     return overrides
 
 
+def _operating_driver_editor(build, raw: dict[str, Any], prefix: str) -> dict[str, Any]:
+    """Edit the physical revenue build while keeping an auditable YAML payload."""
+    st.markdown("##### Operating revenue drivers")
+    st.caption(
+        f"{build.profile.equation}. Defaults are pre-filled from the operating KPI layer; "
+        "saving makes the review decision explicit in the private assumptions file."
+    )
+    c1, c2, c3 = st.columns([1.0, 1.0, 2.0])
+    with c1:
+        calibrate = st.checkbox(
+            "Reconcile to consolidated growth case",
+            value=bool(raw.get("calibrate_to_consolidated", True)),
+            key=f"{prefix}_driver_calibrate",
+            help=("Keeps the physical build tied to the reviewed consolidated revenue path. "
+                  "Turn off only when the physical drivers themselves are the underwriting source."),
+        )
+    with c2:
+        review_status = st.selectbox(
+            "Driver review status",
+            ["source_anchored", "reviewed", "manual"],
+            index=["source_anchored", "reviewed", "manual"].index(
+                str(raw.get("review_status", "source_anchored"))
+                if str(raw.get("review_status", "source_anchored")) in
+                {"source_anchored", "reviewed", "manual"}
+                else "source_anchored"
+            ),
+            key=f"{prefix}_driver_status",
+        )
+    with c3:
+        driver_note = st.text_input(
+            "Driver review note",
+            value=str(raw.get("review_note", "")),
+            placeholder="Evidence, operating interpretation, and remaining diligence",
+            key=f"{prefix}_driver_note",
+        )
+
+    scenario_payload: dict[str, dict[str, Any]] = {}
+    paths = build.model_inputs.get("scenario_paths", {})
+    tabs = st.tabs(["Base drivers", "Bear drivers", "Bull drivers"])
+    for tab, scenario in zip(tabs, ("base", "bear", "bull")):
+        with tab:
+            values = paths[scenario]
+            explicit_years = int(values.get(
+                "explicit_driver_years", len(values["net_store_adds"])
+            ))
+            explicit_years = max(1, min(explicit_years, len(values["net_store_adds"])))
+            driver_table = pd.DataFrame({
+                "Year": [f"Y{year}" for year in range(1, explicit_years + 1)],
+                "Net store additions": values["net_store_adds"][:explicit_years],
+                "Store productivity (%)": [
+                    value * 100 for value in values["store_productivity_growth"][:explicit_years]
+                ],
+                "E-commerce growth (%)": [
+                    value * 100 for value in values["ecommerce_growth"][:explicit_years]
+                ],
+                "Other-channel growth (%)": [
+                    value * 100 for value in values["other_growth"][:explicit_years]
+                ],
+            })
+            edited = st.data_editor(
+                driver_table,
+                hide_index=True,
+                use_container_width=True,
+                disabled=["Year"],
+                key=f"{prefix}_{scenario}_driver_table",
+                column_config={
+                    "Year": st.column_config.TextColumn(width="small"),
+                    "Net store additions": st.column_config.NumberColumn(
+                        min_value=-100, max_value=1000, step=1, format="%.0f"
+                    ),
+                    "Store productivity (%)": st.column_config.NumberColumn(
+                        min_value=-100.0, max_value=150.0, step=0.25, format="%.2f%%"
+                    ),
+                    "E-commerce growth (%)": st.column_config.NumberColumn(
+                        min_value=-100.0, max_value=150.0, step=0.25, format="%.2f%%"
+                    ),
+                    "Other-channel growth (%)": st.column_config.NumberColumn(
+                        min_value=-100.0, max_value=150.0, step=0.25, format="%.2f%%"
+                    ),
+                },
+            )
+            st.caption(
+                "Only detailed forecast years are editable here. Any additional "
+                "transition years are generated automatically to converge to stable growth."
+            )
+            scenario_payload[scenario] = {
+                "net_store_adds": [
+                    round(float(value), 3) for value in edited["Net store additions"]
+                ],
+                "store_productivity_growth": [
+                    round(float(value) / 100.0, 8) for value in edited["Store productivity (%)"]
+                ],
+                "ecommerce_growth": [
+                    round(float(value) / 100.0, 8) for value in edited["E-commerce growth (%)"]
+                ],
+                "other_growth": [
+                    round(float(value) / 100.0, 8) for value in edited["Other-channel growth (%)"]
+                ],
+            }
+    payload: dict[str, Any] = {
+        "enabled": True,
+        "model": build.profile.model_id,
+        "review_status": review_status,
+        "calibrate_to_consolidated": calibrate,
+        "scenarios": scenario_payload,
+    }
+    if driver_note.strip():
+        payload["review_note"] = driver_note.strip()
+    return payload
+
+
 def render_assumption_workbench(
     df: pd.DataFrame,
     company_id: str,
@@ -338,7 +462,13 @@ def render_assumption_workbench(
                     help="Automatic limits the growth fade to approximately 200 bps per year.",
                 ))
 
-            if isinstance(raw.get("segments"), list):
+            driver_build = getattr(current, "operating_driver_build", None)
+            physical_driver_build = driver_build is not None and driver_build.tier == 3
+            operating_driver_payload = None
+            if physical_driver_build:
+                revenue_options = ["Physical operating driver build"]
+                revenue_index = 0
+            elif isinstance(raw.get("segments"), list):
                 revenue_options = [
                     "Preserve custom segment build",
                     "Capital IQ segment mix",
@@ -353,9 +483,16 @@ def render_assumption_workbench(
                 revenue_options,
                 index=revenue_index,
                 key=f"{prefix}_revenue_method",
-                help=("Capital IQ segments retain the reported mix and relative segment growth; "
-                      "the scenario growth paths below control the company-level trajectory."),
+                help=("Physical drivers use operating KPIs; Capital IQ segments retain reported "
+                      "mix and relative growth; top-down uses the consolidated scenario path."),
             )
+
+            if physical_driver_build:
+                operating_driver_payload = _operating_driver_editor(
+                    driver_build,
+                    raw.get("operating_drivers") or {},
+                    prefix,
+                )
 
             tabs = st.tabs(["Base case", "Bear case", "Bull case"])
             scenario_overrides: dict[str, dict] = {}
@@ -369,6 +506,7 @@ def render_assumption_workbench(
                         automatic.explicit_horizon_years,
                         prefix,
                         (raw.get("scenarios") or {}).get(name, {}),
+                        physical_growth_source=physical_driver_build,
                     )
                     if overrides:
                         scenario_overrides[name] = overrides
@@ -469,6 +607,9 @@ def render_assumption_workbench(
                     terminal_overrides[key] = override
             if terminal_overrides:
                 payload["terminal"] = terminal_overrides
+
+            if operating_driver_payload is not None:
+                payload["operating_drivers"] = operating_driver_payload
 
             if revenue_method == "Capital IQ segment mix":
                 payload["segments"] = "auto"

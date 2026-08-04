@@ -7,7 +7,8 @@
 #
 # Outputs (all inside data_private/, gitignored):
 #   companies.csv, financials_quarterly.csv, market_data.csv,
-#   valuation_history.csv, estimates.csv, source_log.csv, refresh_log.csv
+#   valuation_history.csv, estimates.csv, operating_kpis.csv, source_log.csv,
+#   refresh_log.csv
 
 $ErrorActionPreference = "Stop"
 
@@ -250,6 +251,48 @@ if ($null -ne $D) {
 $Estimates | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $OutDir "estimates.csv")
 Write-Host "estimate rows: $($Estimates.Count)"
 
+# --- operating KPIs ---------------------------------------------------------------
+
+$D = Get-SheetArray "operating_kpis_formula"
+$OperatingKpis = @()
+if ($null -ne $D) {
+    $M = Build-HeaderMap $D
+    for ($r = 2; $r -le $D.rows; $r++) {
+        $Id = As-Text (Get-Val $D $r $M "company_id")
+        $Value = As-Double (Get-Val $D $r $M "value")
+        $Period = As-DateString (Get-Val $D $r $M "period")
+        if (-not $Id -or -not $Period -or $null -eq $Value) { continue }
+        $OperatingKpis += [PSCustomObject]@{
+            company_id = $Id
+            period = $Period
+            fiscal_period = As-Text (Get-Val $D $r $M "fiscal_period")
+            metric_id = As-Text (Get-Val $D $r $M "metric_id")
+            metric_label = As-Text (Get-Val $D $r $M "metric_label")
+            value = $Value
+            unit = As-Text (Get-Val $D $r $M "unit")
+            scope = As-Text (Get-Val $D $r $M "scope")
+            period_type = As-Text (Get-Val $D $r $M "period_type")
+            data_type = As-Text (Get-Val $D $r $M "data_type")
+            source_type = "capital_iq_excel"
+            source_name = "S&P Capital IQ Pro Excel Add-In"
+            source_url = "local private export"
+            retrieved_at = (Get-Date).ToString("yyyy-MM-dd")
+            definition = As-Text (Get-Val $D $r $M "definition")
+            capiq_mnemonic = As-Text (Get-Val $D $r $M "capiq_mnemonic")
+            filing_form = $null
+            confidence = "high"
+            notes = "Reviewed company-specific Capital IQ operating KPI mapping"
+        }
+    }
+}
+$OperatingPath = Join-Path $OutDir "operating_kpis.csv"
+$ExistingNonCapiq = @()
+if (Test-Path $OperatingPath) {
+    $ExistingNonCapiq = @(Import-Csv $OperatingPath | Where-Object { $_.source_type -notlike "capital_iq*" })
+}
+@($ExistingNonCapiq + $OperatingKpis) | Export-Csv -NoTypeInformation -Encoding UTF8 -Path $OperatingPath
+Write-Host "operating KPI rows: $($OperatingKpis.Count)"
+
 # --- logs ---------------------------------------------------------------------------------
 
 $RetrievedAt = (Get-Date).ToString("yyyy-MM-dd")
@@ -259,6 +302,7 @@ $SourceLog = @(
     [PSCustomObject]@{ table_name = "market_data"; source_name = "Capital IQ Pro Excel Add-In"; source_url = "local private export"; retrieved_at = $RetrievedAt; notes = "Current market snapshot linked to each company's latest reported quarter." },
     [PSCustomObject]@{ table_name = "valuation_history"; source_name = "Capital IQ Pro Excel Add-In"; source_url = "local private export"; retrieved_at = $RetrievedAt; notes = "Monthly valuation series (price, market cap, TEV, LTM multiples)." },
     [PSCustomObject]@{ table_name = "estimates"; source_name = "Capital IQ Pro Excel Add-In"; source_url = "local private export"; retrieved_at = $RetrievedAt; notes = "Consensus for current quarter and NTM, with 30d/90d-ago snapshots for revision momentum." }
+    [PSCustomObject]@{ table_name = "operating_kpis"; source_name = "Capital IQ Pro Excel Add-In + issuer filings"; source_url = "local private export / filing URLs"; retrieved_at = $RetrievedAt; notes = "Company-specific operating drivers with source-level reconciliation." }
 )
 $SourceLog | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $OutDir "source_log.csv")
 
@@ -278,4 +322,4 @@ $Entry = [PSCustomObject]@{
 if (Test-Path $RefreshLogPath) { $Entry | Export-Csv -NoTypeInformation -Encoding UTF8 -Append -Force -Path $RefreshLogPath }
 else { $Entry | Export-Csv -NoTypeInformation -Encoding UTF8 -Path $RefreshLogPath }
 
-Write-Host "DONE: companies=$($Companies.Count) financials=$($Financials.Count) market=$($Market.Count) valuation=$($Valuation.Count) estimates=$($Estimates.Count)"
+Write-Host "DONE: companies=$($Companies.Count) financials=$($Financials.Count) market=$($Market.Count) valuation=$($Valuation.Count) estimates=$($Estimates.Count) operating_kpis=$($OperatingKpis.Count)"

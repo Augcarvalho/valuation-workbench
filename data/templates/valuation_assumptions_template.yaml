@@ -45,6 +45,29 @@ terminal:
   roic: auto                    # stable ROIC; reinvestment rate = perpetuity growth / ROIC
   wacc: auto                    # stable-state WACC; auto converges beta/capital structure
 
+# --- Business-model operating drivers (optional) ------------------------------
+# The application pre-fills the profile assigned to the selected company. Tier 3
+# uses physical KPIs loaded through operating_kpis.csv; Tier 2 uses reported
+# Capital IQ segments; Tier 1 retains reviewed consolidated revenue growth.
+# Capital IQ operating-statistic mnemonics vary by issuer. Verify each one in
+# Formula Builder and keep the private mapping in
+# data_private/operating_kpi_config.csv.
+#
+# Example for an omnichannel retailer. When calibrate_to_consolidated is false,
+# these paths, rather than the top-down revenue_growth path, drive DCF revenue.
+# operating_drivers:
+#   enabled: true
+#   model: retail_omnichannel
+#   review_status: reviewed
+#   calibrate_to_consolidated: false
+#   review_note: "Cross-checked to the latest filing and management guidance."
+#   scenarios:
+#     base:
+#       net_store_adds: [20, 25, 30, 30, 30]
+#       store_productivity_growth: [-0.04, 0.01, 0.02, 0.025, 0.025]
+#       ecommerce_growth: [-0.01, 0.03, 0.04, 0.05, 0.05]
+#       other_growth: [0.02, 0.03, 0.04, 0.04, 0.04]
+
 # --- Tier-2 operational drivers (optional) -------------------------------------
 # When present, REVENUE is built from physical drivers per segment
 # (units x revenue/unit, store-based or segment-based style) instead of % growth.

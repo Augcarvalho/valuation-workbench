@@ -11,6 +11,8 @@ from src.utils import ensure_dir, write_json_atomic
 
 
 def case_manifest(case) -> dict:
+    from src.modeling.operating_drivers import operating_driver_payload
+
     scenarios = {}
     for name, result in case.scenarios.items():
         sponsor = case.lbo_scenarios.get(name)
@@ -50,6 +52,9 @@ def case_manifest(case) -> dict:
             "sponsor_exit_source": case.sponsor_exit_multiple_source,
         },
         "underwriting_terms": case.underwriting_terms,
+        "operating_driver": operating_driver_payload(
+            case.assumptions.operating_driver_build
+        ),
         "peer_set": {
             "name": case.assessment.peer_set_name,
             "source": case.assessment.peer_source,

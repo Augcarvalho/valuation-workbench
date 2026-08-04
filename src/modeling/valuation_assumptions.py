@@ -258,6 +258,13 @@ class ValuationAssumptions:
     # Per-driver provenance used by the dashboard and exported appendix.
     # Values: analyst | anchored | mixed.
     provenance: dict[str, str] = field(default_factory=dict)
+    # Human-reviewed valuation cross-checks. Keys match diagnostic codes and
+    # values contain the rationale. Integrity errors can never be acknowledged
+    # away; this applies only to interpretive market cross-checks.
+    reviewed_cross_checks: dict[str, str] = field(default_factory=dict)
+    # Business-model-aware driver layer used to explain and, when complete,
+    # generate the revenue forecast (Tier 3 physical / Tier 2 segments / Tier 1).
+    operating_driver_build: object | None = None
 
     @property
     def from_file(self) -> bool:
@@ -425,34 +432,55 @@ def _auto_segments_from_capiq(
     weights = mine["revenue_usd"] / total
     blended = float((cagrs * weights).sum())
 
-    def path_for(start: float, end: float, tilt: float) -> list[float]:
+    def path_for(start: float, end: float) -> list[float]:
         n = max(horizon, 2)
-        return [round(start + (end - start) * t / (n - 1)
-                      + tilt * (1.0 - t / (n - 1)), 6) for t in range(n)]
+        return [float(start + (end - start) * t / (n - 1)) for t in range(n)]
 
-    def scenario_path(name: str, start: float, end: float, tilt: float) -> list[float]:
+    def aggregate_path(name: str, start: float, end: float) -> list[float]:
         scenario = (scenarios or {}).get(name)
         if scenario is None:
-            return path_for(start, end, tilt)
-        values = list(scenario.revenue_growth)
-        return [
-            round(float(value) + tilt * (1.0 - t / max(len(values) - 1, 1)), 6)
-            for t, value in enumerate(values)
-        ]
+            return path_for(start, end)
+        return [float(value) for value in scenario.revenue_growth]
+
+    # Scale relative-growth tilts together rather than clipping each one. This
+    # preserves their revenue-weighted mean at zero. We then re-center them
+    # annually using the evolving segment mix so the segment build reconciles
+    # exactly to the manually approved consolidated growth path.
+    relative_tilts = cagrs.to_numpy(dtype=float) - blended
+    max_abs_tilt = float(np.max(np.abs(relative_tilts)))
+    if max_abs_tilt > 0.08:
+        relative_tilts *= 0.08 / max_abs_tilt
+    initial_levels = weights.to_numpy(dtype=float) * revenue_ttm
+
+    aggregate_paths = {
+        "bear": aggregate_path("bear", max(g0 - 0.05, -0.05), max(tg - 0.01, 0.0)),
+        "base": aggregate_path("base", g0, tg),
+        "bull": aggregate_path("bull", g0 + 0.05, tg + 0.01),
+    }
+    segment_paths: dict[str, list[list[float]]] = {}
+    for name, targets in aggregate_paths.items():
+        levels = initial_levels.copy()
+        paths = [[] for _ in range(len(mine))]
+        denominator = max(len(targets) - 1, 1)
+        for year_index, target in enumerate(targets):
+            fade = 1.0 - year_index / denominator
+            candidate = float(target) + relative_tilts * fade
+            mix_growth = float(np.average(candidate, weights=levels))
+            rates = candidate + (float(target) - mix_growth)
+            for segment_index, rate in enumerate(rates):
+                paths[segment_index].append(round(float(rate), 8))
+            levels *= 1.0 + rates
+        segment_paths[name] = paths
 
     segments = []
-    for (_, seg), w, cagr in zip(mine.iterrows(), weights, cagrs):
-        tilt = float(np.clip(cagr - blended, -0.08, 0.08))
+    for segment_index, ((_, seg), w) in enumerate(zip(mine.iterrows(), weights)):
         segments.append({
             "name": str(seg["segment"]),
             "units": 1,
             "revenue_per_unit": float(w) * revenue_ttm,
             "rpu_growth": {
-                "bear": scenario_path(
-                    "bear", max(g0 - 0.05, -0.05), max(tg - 0.01, 0.0), tilt
-                ),
-                "base": scenario_path("base", g0, tg, tilt),
-                "bull": scenario_path("bull", g0 + 0.05, tg + 0.01, tilt),
+                name: paths[segment_index]
+                for name, paths in segment_paths.items()
             },
             "source": "capiq segments (auto)",
         })
@@ -465,6 +493,8 @@ def load_valuation_assumptions(
     row: pd.Series,
     assumptions_dir: Path | None,
     params: dict | None = None,
+    operating_kpis: pd.DataFrame | None = None,
+    company_segments: pd.DataFrame | None = None,
 ) -> ValuationAssumptions:
     """Assumptions for one company: YAML when present, anchored defaults otherwise."""
     company_id = str(row.get("company_id"))
@@ -590,6 +620,17 @@ def load_valuation_assumptions(
         v = wacc_raw.get(key)
         return None if v is None or (isinstance(v, str) and v.lower() == "auto") else float(v)
 
+    from src.modeling.operating_drivers import build_operating_driver_model
+
+    operating_driver_build = build_operating_driver_model(
+        row,
+        operating_kpis,
+        company_segments,
+        {name: list(scenario.revenue_growth) for name, scenario in scenarios.items()},
+        raw.get("operating_drivers") or {},
+        horizon,
+    )
+
     segments_raw = raw.get("segments")
     auto_segments_requested = (
         isinstance(segments_raw, str) and segments_raw.strip().lower() == "auto"
@@ -600,7 +641,13 @@ def load_valuation_assumptions(
         segments = [s for s in segments
                     if isinstance(s, dict) and s.get("units") is not None
                     and s.get("revenue_per_unit") is not None] or None
-    if segments is None and (path is None or auto_segments_requested):
+    if segments is None and operating_driver_build.tier == 3:
+        segments = operating_driver_build.segments
+        anchors.setdefault("notes", []).append(
+            f"revenue built from {operating_driver_build.profile.label.lower()} "
+            "with filing-defined KPIs reconciled to the Capital IQ LTM anchor"
+        )
+    elif segments is None and (path is None or auto_segments_requested):
         # Tier-2 auto: CapIQ business-segment mix + relative growth, when extracted.
         segments = _auto_segments_from_capiq(
             row,
@@ -648,4 +695,10 @@ def load_valuation_assumptions(
             "terminal.roic": _spec_source(terminal_roic_raw, path is not None),
             "terminal.wacc": _spec_source(terminal_wacc_raw, path is not None),
         },
+        reviewed_cross_checks={
+            str(key): str(value).strip()
+            for key, value in (raw.get("reviewed_cross_checks") or {}).items()
+            if str(value).strip()
+        },
+        operating_driver_build=operating_driver_build,
     )

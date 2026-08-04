@@ -13,7 +13,11 @@ data_private/
     financials_quarterly.csv
     market_data.csv
     estimates.csv
+    company_segments.csv
+    operating_kpis.csv
     source_log.csv
+
+  operating_kpi_config.csv
 ```
 
 `data_private/` is ignored by Git.
@@ -27,8 +31,29 @@ Use Capital IQ to export the following views:
 - Market data: share price, shares outstanding, market cap, enterprise value.
 - Consensus/guidance: revenue and EBITDA estimates where available.
 - Peer multiples: EV/Revenue, EV/EBITDA, P/E and related peer fields.
+- Reported business/geographic segments.
+- Company-specific operating KPIs such as store count, comparable sales,
+  club/member counts, fleet/utilization, backlog/orders, customers/retention,
+  shipment volume/ASP, TPV/take rate, or loan-book metrics.
 
 Match the column names in `data/templates/`. The loader accepts CSV and Excel files.
+
+Operating-statistic mnemonics vary by issuer and entitlement. Generate the
+private request queue with:
+
+```powershell
+python scripts/generate_operating_kpi_queue.py
+```
+
+Then review `data_private/operating_kpi_config.csv` in Capital IQ Formula
+Builder. Replace `VERIFY_IN_FORMULA_BUILDER` only after confirming the data
+item, period basis, unit, scope and definition. The exporter skips unverified
+rows rather than issuing speculative formulas.
+
+For every material physical KPI, add the issuer-filing observation to
+`operating_kpis.csv` as a separate row (`source_type=company_filing`). The
+dashboard compares Capital IQ and filing values at a 1% tolerance and never
+silently overwrites one source with the other.
 
 ## Build Private Dataset
 
@@ -37,6 +62,9 @@ python -m src.pipeline.build_dataset --source capiq --input data_private/capiq_e
 ```
 
 The command validates required columns, normalizes period dates, calculates KPIs, and writes a local processed dataset.
+
+Detailed revenue-driver methodology is documented in
+[`operating_driver_methodology.md`](operating_driver_methodology.md).
 
 ## Public GitHub Policy
 

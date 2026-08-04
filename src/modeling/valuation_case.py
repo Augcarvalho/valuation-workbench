@@ -134,6 +134,8 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
         row,
         getattr(store, "assumptions_dir", None),
         params,
+        operating_kpis=getattr(store, "operating_kpis", pd.DataFrame()),
+        company_segments=getattr(store, "company_segments", pd.DataFrame()),
     )
     if assumptions.terminal_roic_source == "anchored" and "roic_ttm" in assessment.peers.columns:
         peer_roic = pd.to_numeric(
@@ -360,6 +362,11 @@ def build_valuation_case(df: pd.DataFrame, company_id: str, store=None) -> Valua
         "peers": sorted(assessment.peers["company_id"].astype(str).tolist()),
         "methodology": case.methodology_version,
     }
+    from src.modeling.operating_drivers import operating_driver_payload
+
+    payload["operating_driver"] = operating_driver_payload(
+        assumptions.operating_driver_build
+    )
     case.case_id = sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:16]
     fallback_kd = wacc.cost_of_debt_source == "fallback"
     from src.modeling.data_audit import run_audit

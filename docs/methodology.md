@@ -31,6 +31,24 @@ explicit USD normalization fields; ratios and multiples remain unitless.
 | EV / EBITDA | Enterprise value / LTM EBITDA |
 | P/E | Market capitalization / LTM net income |
 
+## Operating Driver Architecture
+
+Every monitored company is mapped to an explicit business-model equation.
+Revenue is built at the deepest defensible level: physical operating KPIs
+(Tier 3), reported Capital IQ segments (Tier 2), or reviewed consolidated
+growth (Tier 1). Missing metrics remain visible in the Excel refresh queue and
+are never replaced by synthetic values.
+
+For omnichannel retail, revenue equals average stores times store productivity,
+plus e-commerce and other-channel revenue. Average stores, rather than the
+period-end count, captures the partial-year contribution of openings. Manual
+physical-driver paths supersede the top-down revenue-growth path and feed the
+same DCF and return analyses. Capital IQ and filing observations remain
+separate and are reconciled at a 1% tolerance.
+
+See [Operating Driver Methodology](operating_driver_methodology.md) for the
+equations, source hierarchy, Formula Builder workflow and governance rules.
+
 ## Period And Market-Date Convention
 
 The presentation separates the three clocks that coexist in public-company analysis:
@@ -260,6 +278,13 @@ Only the first class means the model cannot be relied upon mechanically. The
 other two are intentionally preserved because valuation requires human
 judgment; relabeling them prevents normal investment debate from looking like
 a software error while keeping every caveat visible.
+
+A final case may close an interpretive market cross-check only through a
+documented `reviewed_cross_checks` rationale in the versioned assumptions file.
+This acknowledgement records why the reviewed underwriting case deliberately
+differs from the market reference; it does not alter the calculation. Data
+contract failures, readiness blockers, and model-integrity exceptions cannot be
+acknowledged away and must be corrected before the case can be marked IC-ready.
 
 ## Peer review workflow
 

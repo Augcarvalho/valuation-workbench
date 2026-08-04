@@ -13,6 +13,8 @@ from src.ingestion.schema import (
     FINANCIAL_OPTIONAL_COLUMNS,
     MARKET_COLUMNS,
     MARKET_OPTIONAL_COLUMNS,
+    OPERATING_KPI_COLUMNS,
+    OPERATING_KPI_OPTIONAL_COLUMNS,
     SOURCE_LOG_COLUMNS,
     VALUATION_HISTORY_COLUMNS,
 )
@@ -26,6 +28,15 @@ TABLES = {
     "estimates": ("estimates", ESTIMATE_COLUMNS, ESTIMATE_OPTIONAL_COLUMNS, False),
     "valuation_history": ("valuation_history", VALUATION_HISTORY_COLUMNS, [], False),
     "source_log": ("source_log", SOURCE_LOG_COLUMNS, [], False),
+    "operating_kpis": (
+        "operating_kpis", OPERATING_KPI_COLUMNS, OPERATING_KPI_OPTIONAL_COLUMNS, False
+    ),
+    "company_segments": (
+        "company_segments",
+        ["company_id", "segment", "latest_fy", "revenue_usd", "cagr_3y"],
+        [],
+        False,
+    ),
 }
 
 

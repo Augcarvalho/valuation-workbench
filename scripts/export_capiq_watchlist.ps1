@@ -334,6 +334,46 @@ foreach ($Company in $Universe) {
 }
 $EstimatesSheet.Columns.AutoFit() | Out-Null
 
+# --- Sheet 6: company-specific operating KPIs -------------------------------------
+# Capital IQ operating KPI mnemonics vary by issuer and entitlement. They are
+# therefore supplied through a private, reviewed config rather than guessed in
+# code. Start from data/templates/operating_kpi_config_template.csv and verify
+# each mnemonic in the Capital IQ Formula Builder.
+$OperatingConfigPath = Join-Path $ProjectRoot "data_private\operating_kpi_config.csv"
+$OperatingSheet = Get-OrCreateSheet "operating_kpis_formula"
+Set-Headers $OperatingSheet @(
+    "company_id", "period", "fiscal_period", "metric_id", "metric_label",
+    "value", "unit", "scope", "period_type", "data_type", "capiq_mnemonic",
+    "definition"
+)
+$OperatingConfig = @()
+if (Test-Path $OperatingConfigPath) {
+    $OperatingConfig = @(Import-Csv $OperatingConfigPath)
+}
+$Row = 2
+foreach ($Metric in $OperatingConfig) {
+    if (-not $Metric.company_id -or -not $Metric.metric_id -or -not $Metric.capiq_mnemonic) { continue }
+    if ($Metric.capiq_mnemonic -eq "VERIFY_IN_FORMULA_BUILDER") { continue }
+    $OperatingSheet.Cells.Item($Row, 1).Value2 = $Metric.company_id
+    $OperatingSheet.Cells.Item($Row, 2).Value2 = $Metric.period
+    $OperatingSheet.Cells.Item($Row, 3).Value2 = $Metric.fiscal_period
+    $OperatingSheet.Cells.Item($Row, 4).Value2 = $Metric.metric_id
+    $OperatingSheet.Cells.Item($Row, 5).Value2 = $Metric.metric_label
+    if ($Metric.period_code) {
+        $OperatingSheet.Cells.Item($Row, 6).Formula = "=CIQ(""$($Metric.company_id)"",""$($Metric.capiq_mnemonic)"",""$($Metric.period_code)"")"
+    } else {
+        $OperatingSheet.Cells.Item($Row, 6).Formula = "=CIQ(""$($Metric.company_id)"",""$($Metric.capiq_mnemonic)"")"
+    }
+    $OperatingSheet.Cells.Item($Row, 7).Value2 = $Metric.unit
+    $OperatingSheet.Cells.Item($Row, 8).Value2 = $Metric.scope
+    $OperatingSheet.Cells.Item($Row, 9).Value2 = $Metric.period_type
+    $OperatingSheet.Cells.Item($Row, 10).Value2 = $(if ($Metric.data_type) { $Metric.data_type } else { "actual" })
+    $OperatingSheet.Cells.Item($Row, 11).Value2 = $Metric.capiq_mnemonic
+    $OperatingSheet.Cells.Item($Row, 12).Value2 = $Metric.definition
+    $Row++
+}
+$OperatingSheet.Columns.AutoFit() | Out-Null
+
 $Workbook.SaveAs($WorkbookPath) | Out-Null
 Write-Host "Workbook formula universe created: companies=$($Universe.Count) financial_rows=$($Universe.Count * $Periods.Count) valuation_rows=$($Universe.Count * $MonthEnds.Count)"
 
@@ -345,8 +385,9 @@ $PendingFinancials = Wait-Pending $FinancialsSheet 1800
 $PendingMarket = Wait-Pending $MarketSheet 360
 $PendingValuation = Wait-Pending $ValuationSheet 1800
 $PendingEstimates = Wait-Pending $EstimatesSheet 600
+$PendingOperating = if ($OperatingConfig.Count -gt 0) { Wait-Pending $OperatingSheet 900 } else { 0 }
 $Workbook.Save() | Out-Null
-Write-Host "Final pending: companies=$PendingCompanies financials=$PendingFinancials market=$PendingMarket valuation=$PendingValuation estimates=$PendingEstimates"
+Write-Host "Final pending: companies=$PendingCompanies financials=$PendingFinancials market=$PendingMarket valuation=$PendingValuation estimates=$PendingEstimates operating_kpis=$PendingOperating"
 
 # --- Scrape: companies ----------------------------------------------------------------
 
@@ -506,6 +547,44 @@ for ($Row = 2; $Row -le $EstimatesSheet.UsedRange.Rows.Count; $Row++) {
 }
 $Estimates | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $OutDir "estimates.csv")
 
+# --- Scrape: operating KPIs ---------------------------------------------------------
+
+$OperatingMap = Get-HeaderMap $OperatingSheet
+$OperatingKpis = @()
+for ($Row = 2; $Row -le $OperatingSheet.UsedRange.Rows.Count; $Row++) {
+    $Id = Get-CellText $OperatingSheet $Row $OperatingMap "company_id"
+    $Value = To-Double (Get-CellText $OperatingSheet $Row $OperatingMap "value")
+    $Period = TextToDateString (Get-CellText $OperatingSheet $Row $OperatingMap "period")
+    if (-not $Id -or -not $Period -or $null -eq $Value) { continue }
+    $OperatingKpis += [PSCustomObject]@{
+        company_id = $Id
+        period = $Period
+        fiscal_period = Get-CellText $OperatingSheet $Row $OperatingMap "fiscal_period"
+        metric_id = Get-CellText $OperatingSheet $Row $OperatingMap "metric_id"
+        metric_label = Get-CellText $OperatingSheet $Row $OperatingMap "metric_label"
+        value = $Value
+        unit = Get-CellText $OperatingSheet $Row $OperatingMap "unit"
+        scope = Get-CellText $OperatingSheet $Row $OperatingMap "scope"
+        period_type = Get-CellText $OperatingSheet $Row $OperatingMap "period_type"
+        data_type = Get-CellText $OperatingSheet $Row $OperatingMap "data_type"
+        source_type = "capital_iq_excel"
+        source_name = "S&P Capital IQ Pro Excel Add-In"
+        source_url = "local private export"
+        retrieved_at = (Get-Date).ToString("yyyy-MM-dd")
+        definition = Get-CellText $OperatingSheet $Row $OperatingMap "definition"
+        capiq_mnemonic = Get-CellText $OperatingSheet $Row $OperatingMap "capiq_mnemonic"
+        filing_form = $null
+        confidence = "high"
+        notes = "Reviewed company-specific Capital IQ operating KPI mapping"
+    }
+}
+$OperatingPath = Join-Path $OutDir "operating_kpis.csv"
+$ExistingNonCapiq = @()
+if (Test-Path $OperatingPath) {
+    $ExistingNonCapiq = @(Import-Csv $OperatingPath | Where-Object { $_.source_type -notlike "capital_iq*" })
+}
+@($ExistingNonCapiq + $OperatingKpis) | Export-Csv -NoTypeInformation -Encoding UTF8 -Path $OperatingPath
+
 # --- Source log + refresh log -----------------------------------------------------------------
 
 $RetrievedAt = (Get-Date).ToString("yyyy-MM-dd")
@@ -515,6 +594,7 @@ $SourceLog = @(
     [PSCustomObject]@{ table_name = "market_data"; source_name = "Capital IQ Pro Excel Add-In"; source_url = "local private export"; retrieved_at = $RetrievedAt; notes = "Current market snapshot linked to each company's latest reported quarter." },
     [PSCustomObject]@{ table_name = "valuation_history"; source_name = "Capital IQ Pro Excel Add-In"; source_url = "local private export"; retrieved_at = $RetrievedAt; notes = "Monthly valuation series, trailing $ValuationMonths months (price, market cap, TEV, LTM multiples)." },
     [PSCustomObject]@{ table_name = "estimates"; source_name = "Capital IQ Pro Excel Add-In"; source_url = "local private export"; retrieved_at = $RetrievedAt; notes = "Consensus for current quarter and NTM, with 30d/90d-ago as-of snapshots for revision momentum." }
+    [PSCustomObject]@{ table_name = "operating_kpis"; source_name = "Capital IQ Pro Excel Add-In + issuer filings"; source_url = "local private export / filing URLs"; retrieved_at = $RetrievedAt; notes = "Company-specific operating drivers; Capital IQ values remain separate from filing rows for reconciliation." }
 )
 $SourceLog | Export-Csv -NoTypeInformation -Encoding UTF8 -Path (Join-Path $OutDir "source_log.csv")
 
@@ -537,5 +617,5 @@ if (Test-Path $RefreshLogPath) {
     $RefreshEntry | Export-Csv -NoTypeInformation -Encoding UTF8 -Path $RefreshLogPath
 }
 
-Write-Host "Exported companies=$($Companies.Count) financials=$($Financials.Count) market=$($Market.Count) valuation=$($Valuation.Count) estimates=$($Estimates.Count)"
+Write-Host "Exported companies=$($Companies.Count) financials=$($Financials.Count) market=$($Market.Count) valuation=$($Valuation.Count) estimates=$($Estimates.Count) operating_kpis=$($OperatingKpis.Count)"
 Write-Host "Refresh logged to $RefreshLogPath"

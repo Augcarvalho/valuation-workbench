@@ -1,6 +1,6 @@
 # Investment Analysis
 
-> **Posicionamento:** O código executa um pipeline ETL em Python que lê, valida e normaliza os arquivos Excel/CSV alimentados pelo suplemento do S&P Capital IQ, utilizando-os como camada local de dados para demonstrações financeiras, mercado, consenso e múltiplos históricos.
+> **Posicionamento:** O código executa um pipeline ETL em Python que lê, valida e normaliza os arquivos Excel/CSV alimentados pelo suplemento do S&P Capital IQ, utilizando-os como camada local de dados para demonstrações financeiras, mercado, consenso, múltiplos históricos, segmentos e KPIs operacionais.
 
 **Plataforma de análise de empresas, acompanhamento financeiro, análise de peers e valuation.**
 
@@ -10,7 +10,7 @@ O ambiente demonstrado possui **26 companhias monitoradas e 160 trading comps**,
 
 [![Como a plataforma funciona](reports/sample/00_how_it_works.png)](reports/sample/00_how_it_works.png)
 
-> Clique em qualquer imagem para abrir em resolução completa. A galeria foi atualizada em agosto de 2026, recapturada em **1.584 px de largura nativa** e cobre os **39 gráficos atuais**, todas as páginas analíticas e o editor de premissas. Os outputs são indicativos, as premissas da Lululemon permanecem identificadas como draft e o material não constitui recomendação de investimento.
+> Clique em qualquer imagem para abrir em resolução completa. A galeria foi atualizada em agosto de 2026 em alta densidade de pixels e cobre as páginas analíticas, os principais gráficos, o modelo de drivers e o editor de premissas. O case da Lululemon utiliza premissas finais revisadas manualmente e um peer set aprovado; os outputs continuam indicativos e não constituem recomendação de investimento.
 
 ## Da watchlist à decisão
 
@@ -42,6 +42,29 @@ O ambiente demonstrado possui **26 companhias monitoradas e 160 trading comps**,
 
 Os gráficos de `growth vs. EV/Revenue`, `margin vs. EV/EBITDA` e `ROE vs. P/E` testam visualmente se o prêmio ou desconto da companhia é sustentado pelos fundamentos.
 
+## Drivers operacionais e projeção de receita
+
+| Histórico físico e por canal | Receita projetada pelos drivers |
+| --- | --- |
+| [![Receita por canal, lojas e produtividade](reports/sample/browser/current/04e_operating_driver_history.png)](reports/sample/browser/current/04e_operating_driver_history.png) | [![Build de receita da Lululemon](reports/sample/browser/current/04f_operating_driver_projection.png)](reports/sample/browser/current/04f_operating_driver_projection.png) |
+| Receita de lojas, e-commerce e outros canais é conciliada com o total; lojas e vendas por pé quadrado preservam a definição do filing. | Lojas médias, net store additions, produtividade, e-commerce e outros canais determinam a receita usada pelo DCF em Base, Bear e Bull. |
+
+Cada uma das **26 empresas monitoradas** possui uma arquitetura de receita
+explícita: lojas e produtividade, membros e clubes, frota e utilização,
+backlog e conversão, clientes e receita recorrente, volume e ASP, TPV e take
+rate, entre outras. O sistema usa três níveis de profundidade, sem inventar
+dados ausentes: **Tier 3** para KPIs físicos, **Tier 2** para segmentos
+reportados e **Tier 1** para crescimento consolidado revisado. A própria página
+mostra a cobertura e os campos necessários no próximo refresh do Excel.
+
+[![Editor manual dos drivers operacionais](reports/sample/browser/current/08j_operating_driver_assumptions.png)](reports/sample/browser/current/08j_operating_driver_assumptions.png)
+
+Os inputs físicos são pré-preenchidos e editáveis. Quando um case manual é
+salvo, os drivers operacionais passam a ser a fonte da projeção de receita e
+alimentam o mesmo DCF, sensitivities, sponsor-return screen e materiais de
+comitê. Capital IQ e filings permanecem como observações separadas; diferenças
+superiores a 1% são destacadas para investigação.
+
 ## Financials e estrutura de capital
 
 | Demonstrações e KPIs | Cash flow, capital efficiency e leverage |
@@ -58,7 +81,7 @@ O módulo de capital structure reconcilia market cap, dívida e caixa até o ent
 | Visão executiva do case | Editor de premissas |
 | --- | --- |
 | [![Valuation case da Lululemon](reports/sample/browser/current/08_valuation_case_top.png)](reports/sample/browser/current/08_valuation_case_top.png) | [![Assumption Workbench da Lululemon](reports/sample/browser/current/08_assumption_workbench.png)](reports/sample/browser/current/08_assumption_workbench.png) |
-| Preço atual, target indicativo, WACC, terminal multiple e status de revisão no primeiro bloco. | Base, Bear e Bull começam preenchidos pelos anchors automáticos e podem ser ajustados manualmente. |
+| Preço atual, target revisado, WACC, terminal multiple e status de revisão no primeiro bloco. | Base, Bear e Bull começam preenchidos pelos anchors automáticos e podem ser ajustados manualmente. |
 
 O **Assumption Workbench** permite editar Base, Bear e Bull diretamente na
 plataforma. Todo campo abre preenchido com o valor automático vigente; somente
@@ -78,11 +101,11 @@ As premissas ficam visíveis antes dos outputs: horizonte detalhado e fade, cres
 
 [![Fila de revisão manual e cross-checks](reports/sample/browser/current/08a_key_assumptions.png)](reports/sample/browser/current/08a_key_assumptions.png)
 
-O sistema separa erro de modelo de julgamento pendente. A recomendação só pode se tornar final após aprovação das premissas e dos peers; divergências de valuation continuam visíveis para reconciliação.
+O sistema separa erro de modelo de julgamento pendente. A recomendação só pode se tornar final após aprovação das premissas e dos peers. Cross-checks interpretativos podem ser encerrados apenas com uma justificativa manual registrada; falhas de dados, prontidão ou integridade matemática nunca podem ser dispensadas dessa forma.
 
 | Cenários e matriz WACC × múltiplo | Tornado e crescimento perpétuo implícito |
 | --- | --- |
-| [![Targets por cenário e sensitivity](reports/sample/browser/current/08b1_sensitivity_matrix.png)](reports/sample/browser/current/08b1_sensitivity_matrix.png) | [![Sensibilidade dos principais drivers](reports/sample/browser/current/08b2_range_detail.png)](reports/sample/browser/current/08b2_range_detail.png) |
+| [![Targets por cenário e sensitivity](reports/sample/browser/current/08b_valuation_range.png)](reports/sample/browser/current/08b_valuation_range.png) | [![Sensibilidade dos principais drivers](reports/sample/browser/current/08b1_sensitivity_matrix.png)](reports/sample/browser/current/08b1_sensitivity_matrix.png) |
 | Bear, Base e Bull contra o preço atual, com a célula-base destacada. | Receita, margem, WACC, capex e exit multiple testados isoladamente; o modelo também traduz o múltiplo em crescimento implícito. |
 
 [![Football field de valuation](reports/sample/browser/current/08b2_range_detail.png)](reports/sample/browser/current/08b2_range_detail.png)
@@ -112,7 +135,7 @@ O WACC mostra custo de equity, custo da dívida, estrutura de capital e taxa ter
 
 O HTML standalone é gerado somente sob demanda e replica a mesma versão de premissas usada na interface.
 
-No case demonstrativo, a Lululemon apresenta preço de referência de **US$ 113,62** e WACC de **8,8%**. O DCF utiliza crescimento de longo prazo de **2,2%**, ROIC terminal de **11,0%** e múltiplo fundamental implícito de **7,7x**, mantendo o múltiplo dos peers como cross-check independente. O valor indicativo base é **US$ 230,34**.
+No case demonstrativo, a Lululemon apresenta preço de referência de **US$ 113,62** e WACC de **9,4%**. O DCF utiliza crescimento de longo prazo de **2,5%**, ROIC terminal de **20,0%** e múltiplo fundamental implícito de **7,3x**. O valor indicativo é de **US$ 115,98** no Bear, **US$ 159,80** no Base e **US$ 187,25** no Bull. A mediana ajustada de **12,8x EV/EBITDA NTM** dos peers permanece como cross-check de upside, não como premissa terminal do Base. No sponsor screen, o cenário Base produz **2,04x MOIC** e **15,4% de IRR**, evidenciando que a assimetria é mais atraente como recuperação em public equities do que como take-private nos parâmetros atuais.
 
 ## Valuation e expectativas do mercado
 
@@ -154,6 +177,7 @@ Novas companhias podem ser incluídas por identificador, como `NASDAQ:LULU`, `NY
 ## O que a plataforma automatiza
 
 - Importação e normalização de financials trimestrais, market data, estimates e valuation history.
+- Arquiteturas de receita por business model, KPIs operacionais, segmentos reportados e reconciliação Capital IQ versus filings.
 - TTM/NTM, crescimento, margens, cash conversion, leverage, ROIC/ROE e múltiplos.
 - Peer statistics com a companhia analisada excluída da mediana e tratamento explícito de outliers.
 - DCF, WACC, sensitivities, football field, debt capacity, sponsor returns e report assembly.
@@ -163,11 +187,14 @@ Novas companhias podem ser incluídas por identificador, como `NASDAQ:LULU`, `NY
 
 - Aprovação, rejeição e justificativa dos peers.
 - Premissas operacionais, WACC, terminal value e cenários.
+- Aprovação dos drivers físicos, definições, fontes e divergências entre Capital IQ e filings.
 - Tese, variant perception, catalisadores, riscos e perguntas para management.
 - Interpretação dos resultados, diligência adicional e recomendação final.
 
 A metodologia completa de DCF, steady state, proveniência e classificação dos
 diagnósticos está documentada em [docs/methodology.md](docs/methodology.md).
+O contrato de KPIs, as equações por business model e o fluxo de reconciliação
+estão em [docs/operating_driver_methodology.md](docs/operating_driver_methodology.md).
 
 ## Capital IQ e confidencialidade
 

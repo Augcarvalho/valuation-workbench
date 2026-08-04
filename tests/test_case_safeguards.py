@@ -105,6 +105,23 @@ def test_case_warnings_terminal_value_thresholds(demo_df):
         assert "perpetual" in texts
 
 
+def test_final_case_can_document_and_clear_market_cross_check(demo_df):
+    df, store = demo_df
+    case = build_valuation_case(df, "GOOGL", store=store)
+    case.market_reference_multiple = case.exit_multiple * 2.0
+    case.assumptions.status = "final"
+
+    case.assumptions.reviewed_cross_checks = {}
+    pending = {d.code for d in diagnose_case(case)}
+    assert "market_fundamental_gap" in pending
+
+    case.assumptions.reviewed_cross_checks = {
+        "market_fundamental_gap": "Reviewed and retained as an upside-only market cross-check."
+    }
+    reviewed = {d.code for d in diagnose_case(case)}
+    assert "market_fundamental_gap" not in reviewed
+
+
 # --- universe management -----------------------------------------------------------------------
 
 def _bootstrap_files(tmp_path):

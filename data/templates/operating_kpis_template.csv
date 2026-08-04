@@ -1,0 +1,2 @@
+company_id,period,fiscal_period,metric_id,metric_label,value,unit,scope,period_type,data_type,source_type,source_name,source_url,retrieved_at,definition,capiq_mnemonic,filing_form,confidence,notes
+EXCHANGE:TICKER,2025-12-31,FY2025,store_count_total,Total company-operated stores,100,count,Consolidated,point_in_time,actual,capital_iq_excel,S&P Capital IQ Pro,local private export,2026-01-15,Company-operated stores at period end,VERIFY_IN_FORMULA_BUILDER,,high,Illustrative schema only; replace every field with a licensed local export

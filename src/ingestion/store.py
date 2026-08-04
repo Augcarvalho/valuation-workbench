@@ -22,10 +22,14 @@ from src.config import (
     DEFAULT_SOURCE_LOG,
     DEMO_ASSUMPTIONS_DIR,
     DEMO_ESTIMATES,
+    DEMO_COMPANY_SEGMENTS,
+    DEMO_OPERATING_KPIS,
     DEMO_THESES_DIR,
     DEMO_VALUATION_HISTORY,
     PRIVATE_ASSUMPTIONS_DIR,
     PRIVATE_ESTIMATES,
+    PRIVATE_COMPANY_SEGMENTS,
+    PRIVATE_OPERATING_KPIS,
     PRIVATE_MONITORING_DIR,
     PRIVATE_PROCESSED_DATASET,
     PRIVATE_SOURCE_LOG,
@@ -42,6 +46,8 @@ class WatchlistStore:
     mode: str                       # "demo" | "private"
     dataset_path: Path
     valuation_history: pd.DataFrame = field(default_factory=pd.DataFrame)
+    operating_kpis: pd.DataFrame = field(default_factory=pd.DataFrame)
+    company_segments: pd.DataFrame = field(default_factory=pd.DataFrame)
     estimates: pd.DataFrame = field(default_factory=pd.DataFrame)
     refresh_log: pd.DataFrame = field(default_factory=pd.DataFrame)
     source_log: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -99,6 +105,16 @@ def load_refresh_log(demo: bool) -> pd.DataFrame:
     return _read_csv(PRIVATE_REFRESH_LOG, parse_dates=["refreshed_at"])
 
 
+def load_operating_kpis(demo: bool) -> pd.DataFrame:
+    path = DEMO_OPERATING_KPIS if demo else PRIVATE_OPERATING_KPIS
+    return _read_csv(path, parse_dates=["period", "retrieved_at"])
+
+
+def load_company_segments(demo: bool) -> pd.DataFrame:
+    path = DEMO_COMPANY_SEGMENTS if demo else PRIVATE_COMPANY_SEGMENTS
+    return _read_csv(path)
+
+
 def load_source_log(demo: bool) -> pd.DataFrame:
     path = DEFAULT_SOURCE_LOG if demo else PRIVATE_SOURCE_LOG
     return _read_csv(path, parse_dates=["retrieved_at"])
@@ -123,6 +139,8 @@ def load_store(demo: bool) -> WatchlistStore:
         mode="demo" if demo else "private",
         dataset_path=dataset_path,
         valuation_history=load_valuation_history(demo),
+        operating_kpis=load_operating_kpis(demo),
+        company_segments=load_company_segments(demo),
         estimates=load_estimates(demo),
         refresh_log=load_refresh_log(demo),
         source_log=load_source_log(demo),

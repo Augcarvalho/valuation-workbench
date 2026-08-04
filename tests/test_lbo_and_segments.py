@@ -127,3 +127,51 @@ def test_segment_forecast_accepts_growth_sensitivity_delta():
     )
     assert flexed["revenue"].iloc[0] > base["revenue"].iloc[0]
     assert flexed["revenue"].iloc[1] > base["revenue"].iloc[1]
+
+
+def test_auto_segment_tilts_reconcile_to_consolidated_growth(tmp_path, monkeypatch):
+    from src.modeling.valuation_assumptions import (
+        ScenarioAssumptions,
+        _auto_segments_from_capiq,
+    )
+
+    pd.DataFrame([
+        {"company_id": "NASDAQ:TEST", "segment": "Core", "revenue_usd": 750.0,
+         "cagr_3y": -0.03, "latest_fy": 2025},
+        {"company_id": "NASDAQ:TEST", "segment": "Growth A", "revenue_usd": 125.0,
+         "cagr_3y": 0.20, "latest_fy": 2025},
+        {"company_id": "NASDAQ:TEST", "segment": "Growth B", "revenue_usd": 125.0,
+         "cagr_3y": 0.25, "latest_fy": 2025},
+    ]).to_csv(tmp_path / "company_segments.csv", index=False)
+    monkeypatch.setattr("src.config.PRIVATE_CAPIQ_DIR", tmp_path)
+
+    def scenario(name, growth):
+        return ScenarioAssumptions(
+            name=name, revenue_growth=growth, ebitda_margin=[0.20] * 3,
+            d_and_a_pct=[0.03] * 3, capex_pct=[0.04] * 3, tax_rate=0.30,
+            dso=None, dih=None, dpo=None, nwc_pct_revenue=[0.10] * 3,
+            nwc_mode="pct",
+        )
+
+    scenarios = {
+        "bear": scenario("bear", [-0.04, -0.01, 0.02]),
+        "base": scenario("base", [-0.01, 0.01, 0.025]),
+        "bull": scenario("bull", [0.02, 0.04, 0.03]),
+    }
+    segments = _auto_segments_from_capiq(
+        pd.Series({"company_id": "NASDAQ:TEST", "revenue_ttm": 1000.0}),
+        {"revenue_growth": -0.01},
+        horizon=3,
+        terminal_g=0.025,
+        notes=[],
+        scenarios=scenarios,
+    )
+
+    levels = [segment["revenue_per_unit"] for segment in segments]
+    for year, target in enumerate(scenarios["base"].revenue_growth):
+        opening = sum(levels)
+        levels = [
+            level * (1.0 + segment["rpu_growth"]["base"][year])
+            for level, segment in zip(levels, segments)
+        ]
+        assert sum(levels) / opening - 1.0 == pytest.approx(target, abs=1e-7)

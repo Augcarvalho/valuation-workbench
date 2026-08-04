@@ -161,6 +161,34 @@ def validate_assumption_payload(payload: dict[str, Any]) -> list[str]:
     if growth is not None and terminal_roic is not None and terminal_roic <= growth:
         errors.append("Terminal ROIC must exceed perpetuity growth")
 
+    operating = payload.get("operating_drivers") or {}
+    if not isinstance(operating, dict):
+        errors.append("Operating drivers must be a mapping")
+        operating = {}
+    driver_scenarios = operating.get("scenarios") or {}
+    if not isinstance(driver_scenarios, dict):
+        errors.append("Operating-driver scenarios must be a mapping")
+        driver_scenarios = {}
+    for scenario_name, scenario in driver_scenarios.items():
+        if scenario_name not in {"bear", "base", "bull"} or not isinstance(scenario, dict):
+            errors.append(f"Invalid operating-driver scenario: {scenario_name}")
+            continue
+        if "net_store_adds" in scenario:
+            _check_range(
+                scenario["net_store_adds"], -100.0, 1000.0,
+                f"{scenario_name.title()} net store additions", errors,
+            )
+        for key, label in (
+            ("store_productivity_growth", "store productivity growth"),
+            ("ecommerce_growth", "e-commerce growth"),
+            ("other_growth", "other-channel growth"),
+        ):
+            if key in scenario:
+                _check_range(
+                    scenario[key], -0.75, 2.00,
+                    f"{scenario_name.title()} {label}", errors,
+                )
+
     return errors
 
 

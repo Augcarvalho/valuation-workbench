@@ -49,6 +49,12 @@ def diagnose_case(case) -> list[ValuationDiagnostic]:
     base = case.base
     assumptions = case.assumptions
     wacc = case.wacc
+    reviewed_cross_checks = getattr(assumptions, "reviewed_cross_checks", {}) or {}
+
+    def _pending_cross_check(code: str) -> bool:
+        """Only documented, final manual reviews can clear market cross-checks."""
+        rationale = str(reviewed_cross_checks.get(code, "")).strip()
+        return assumptions.status != "final" or not rationale
 
     # --- Integrity: model must not be relied upon until these are resolved. ---
     if not base.valid or base.implied_equity <= 0:
@@ -162,7 +168,7 @@ def diagnose_case(case) -> list[ValuationDiagnostic]:
 
     if case.market_reference_multiple is not None and case.exit_multiple > 0:
         market_gap = case.market_reference_multiple / case.exit_multiple - 1.0
-        if abs(market_gap) > 0.25:
+        if abs(market_gap) > 0.25 and _pending_cross_check("market_fundamental_gap"):
             direction = "above" if market_gap > 0 else "below"
             _add(items, "market_fundamental_gap", "cross_check", "medium", "Market expectations",
                  f"The market reference multiple is {abs(market_gap):.0%} {direction} the "

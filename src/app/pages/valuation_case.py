@@ -195,6 +195,11 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         unsafe_allow_html=True,
     )
 
+    # --- Operating drivers: visible before the valuation assumption editor. ---
+    from src.app.operating_driver_view import render_operating_driver_build
+
+    render_operating_driver_build(case, str(currency))
+
     # --- Editable assumptions ------------------------------------------------------
     from src.app.assumption_workbench import render_assumption_workbench
 

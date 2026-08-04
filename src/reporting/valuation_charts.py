@@ -287,11 +287,19 @@ def assumptions_provenance(case) -> pd.DataFrame:
     for name in ("bear", "base", "bull"):
         scen = a.scenarios[name]
         growth_source = a.provenance.get(f"{name}.revenue_growth", "anchored")
+        growth_start, growth_end = scen.revenue_growth[0], scen.revenue_growth[-1]
+        build = getattr(a, "operating_driver_build", None)
+        if build is not None and build.tier == 3 and not build.projection.empty:
+            projected = build.projection[build.projection["scenario"] == name]
+            if not projected.empty:
+                growth_start = float(projected.iloc[0]["revenue_growth"])
+                growth_end = float(projected.iloc[-1]["revenue_growth"])
+                growth_source = "analyst" if build.status == "manual driver case" else "anchored"
         margin_source = a.provenance.get(f"{name}.ebitda_margin", "anchored")
         scenario_source = growth_source if growth_source == margin_source else "mixed"
         items.append({
             "item": f"{name.title()} scenario drivers",
-            "value": f"g {scen.revenue_growth[0]:+.0%}->{scen.revenue_growth[-1]:+.0%}, "
+            "value": f"g {growth_start:+.1%}->{growth_end:+.1%}, "
                      f"margin {scen.ebitda_margin[-1]:.0%}",
             "source": scenario_source,
         })
@@ -359,11 +367,24 @@ def key_assumptions_table(case, scenario_name: str = "base") -> pd.DataFrame:
         f"{a.explicit_horizon_years} detailed + {a.transition_years} transition"
         if a.transition_years else f"{a.explicit_horizon_years} detailed"
     )
+    growth_start, growth_end = s.revenue_growth[0], s.revenue_growth[-1]
+    growth_source = source(f"{scenario_name}.revenue_growth")
+    growth_method = "Year 1 to final explicit year."
+    build = getattr(a, "operating_driver_build", None)
+    if build is not None and build.tier == 3 and not build.projection.empty:
+        projected = build.projection[build.projection["scenario"] == scenario_name]
+        if not projected.empty:
+            growth_start = float(projected.iloc[0]["revenue_growth"])
+            growth_end = float(projected.iloc[-1]["revenue_growth"])
+            growth_source = "analyst" if build.status == "manual driver case" else "anchored"
+            growth_method = (
+                f"{build.profile.label}; transition years converge to stable growth."
+            )
     rows = [
         ("Forecast", "Forecast horizon", transition, a.transition_source,
          "Transition years fade growth to the stable-state rate."),
-        ("Operations", "Revenue growth", f"{s.revenue_growth[0]:+.1%} -> {s.revenue_growth[-1]:+.1%}",
-         source(f"{scenario_name}.revenue_growth"), "Year 1 to final explicit year."),
+        ("Operations", "Revenue growth", f"{growth_start:+.1%} -> {growth_end:+.1%}",
+         growth_source, growth_method),
         ("Operations", "EBITDA margin", f"{s.ebitda_margin[0]:.1%} -> {s.ebitda_margin[-1]:.1%}",
          source(f"{scenario_name}.ebitda_margin"), "Year 1 to final explicit year."),
         ("Capital needs", "D&A / revenue", f"{s.d_and_a_pct[0]:.1%} -> {s.d_and_a_pct[-1]:.1%}",

@@ -32,6 +32,7 @@ PAGES = [
     "Watchlist Home",
     "Company Situation",
     "Peer Benchmarking",
+    "Operating Drivers",
     "Actual vs Consensus",
     "Company Financials",
     "Capital Structure",
@@ -55,7 +56,17 @@ def _wait_settled(page, timeout_ms: int = 45_000) -> None:
     page.wait_for_timeout(2_000)  # let Plotly finish drawing
 
 
-def capture(url: str, out_dir: Path) -> list[Path]:
+def _select_company(page, ticker: str | None) -> None:
+    if not ticker:
+        return
+    selector = page.locator('[data-testid="stSidebar"] [role="combobox"]').first
+    selector.click()
+    selector.fill(ticker.upper())
+    selector.press("Enter")
+    _wait_settled(page)
+
+
+def capture(url: str, out_dir: Path, company: str | None = None) -> list[Path]:
     from playwright.sync_api import sync_playwright
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -63,10 +74,15 @@ def capture(url: str, out_dir: Path) -> list[Path]:
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         for width, height in VIEWPORTS:
-            page = browser.new_page(viewport={"width": width, "height": height})
+            context = browser.new_context(
+                viewport={"width": width, "height": height},
+                device_scale_factor=2,
+            )
+            page = context.new_page()
             page.goto(url, wait_until="domcontentloaded")
             page.wait_for_selector('[data-testid="stSidebar"]', timeout=60_000)
             _wait_settled(page)
+            _select_company(page, company)
             for name in PAGES:
                 try:
                     page.locator('[data-testid="stSidebar"]').get_by_text(name, exact=True).click()
@@ -88,7 +104,7 @@ def capture(url: str, out_dir: Path) -> list[Path]:
                 page.set_viewport_size({"width": width, "height": height})
                 written.append(target)
                 print(f"  ok {target.relative_to(PROJECT_ROOT)}")
-            page.close()
+            context.close()
         browser.close()
     return written
 
@@ -100,6 +116,8 @@ def main() -> None:
     parser.add_argument("--demo", action="store_true",
                         help="Assert the target app runs the public demo dataset; "
                              "required for any output path outside data_private/.")
+    parser.add_argument("--company", default=None,
+                        help="Ticker to select before capture (for example LULU).")
     args = parser.parse_args()
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -111,7 +129,7 @@ def main() -> None:
                  "Pass --demo only when the target app is running the public demo dataset.")
 
     print(f"Capturing {len(PAGES)} pages x {len(VIEWPORTS)} viewports from {args.url}")
-    written = capture(args.url, out_dir)
+    written = capture(args.url, out_dir, company=args.company)
     print(f"{len(written)} screenshots -> {out_dir}")
 
 

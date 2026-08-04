@@ -172,6 +172,35 @@ VALUATION_HISTORY_COLUMNS = [
     "source",
 ]
 
+# Long-form operating KPI contract. Values can come from the Capital IQ Excel
+# add-in, an issuer filing, or a documented manual input. Keeping both sources
+# as separate rows allows the model to reconcile them instead of silently
+# choosing one.
+OPERATING_KPI_COLUMNS = [
+    "company_id",
+    "period",
+    "fiscal_period",
+    "metric_id",
+    "metric_label",
+    "value",
+    "unit",
+    "scope",
+    "period_type",
+    "data_type",
+    "source_type",
+    "source_name",
+    "source_url",
+    "retrieved_at",
+    "definition",
+]
+
+OPERATING_KPI_OPTIONAL_COLUMNS = [
+    "capiq_mnemonic",
+    "filing_form",
+    "confidence",
+    "notes",
+]
+
 NUMERIC_COLUMNS = [
     "revenue",
     "gross_profit",
