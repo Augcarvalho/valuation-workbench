@@ -1,23 +1,17 @@
 # Investment Analysis
 
-> **Posicionamento:** O código executa um pipeline ETL em Python que lê, valida e normaliza os arquivos Excel/CSV alimentados pelo suplemento do S&P Capital IQ, utilizando-os como camada local de dados para demonstrações financeiras, mercado, consenso, múltiplos históricos, segmentos e KPIs operacionais.
-
-**Plataforma de análise de empresas, acompanhamento financeiro, análise de peers e valuation.**
-
 **Plataforma de análise de investimentos que transforma exports locais do S&P Capital IQ Pro em screening, acompanhamento financeiro, análise de peers, valuation e materiais para comitê de investimento.**
 
 O ambiente demonstrado possui **26 companhias monitoradas e 160 trading comps**, totalizando **186 nomes** com cobertura no Brasil e nos Estados Unidos. Qualquer empresa pode ser adicionada desde que seus dados estejam disponíveis no S&P Capital IQ Pro (a plataforma é alimentada por exports gerados por meio do meu acesso licenciado ao sistema). A mesma arquitetura analítica pode ser aplicada a qualquer companhia adicionada ao universo. A **Lululemon** é utilizada abaixo como case demonstrativo do fluxo completo, pois é uma empresa que acompanho e para a qual desenvolvi manualmente uma tese de investimento.
 
-[![Como a plataforma funciona](reports/sample/00_how_it_works.png)](reports/sample/00_how_it_works.png)
-
-> Clique em qualquer imagem para abrir em resolução completa. A galeria foi atualizada em agosto de 2026 em alta densidade de pixels e cobre as páginas analíticas, os principais gráficos, o modelo de drivers e o editor de premissas. O case da Lululemon utiliza premissas finais revisadas manualmente e um peer set aprovado; os outputs continuam indicativos e não constituem recomendação de investimento.
+> Clique em qualquer imagem para abrir em resolução completa. A galeria foi atualizada em agosto de 2026 e cobre as páginas analíticas, os principais gráficos, o modelo de drivers e o editor de premissas. O case da Lululemon utiliza premissas finais revisadas manualmente e um peer set aprovado; os outputs continuam indicativos e não constituem recomendação de investimento.
 
 ## Da watchlist à decisão
 
 | Watchlist priorizada | Comparação no fluxo de peers |
 | --- | --- |
-| [![Watchlist com múltiplas empresas](reports/sample/browser/current/01_watchlist_home.png)](reports/sample/browser/current/01_watchlist_home.png) | [![Comparação entre companhias](reports/sample/browser/current/02_compare.png)](reports/sample/browser/current/02_compare.png) |
-| Ranking de atenção combina valuation, revisões, inflexão operacional e red flags para direcionar a revisão humana. | O Peer Benchmarking termina com a comparação lado a lado de Lululemon, Nike e Deckers, reunindo performance, valuation, revisões e racional de priorização. |
+| [![Watchlist com múltiplas empresas](reports/sample/browser/current/01_watchlist_home.jpg)](reports/sample/browser/current/01_watchlist_home.jpg) | [![Comparação entre companhias](reports/sample/browser/current/02_compare.jpg)](reports/sample/browser/current/02_compare.jpg) |
+| Ranking de atenção combina valuation, revisões, inflexão operacional e red flags para direcionar a revisão humana. | O Peer Benchmarking termina com a comparação lado a lado de Lululemon, Crocs e Columbia, reunindo performance, valuation, revisões e racional de priorização. |
 
 ## Leitura da companhia e tese
 
@@ -143,10 +137,10 @@ Este bloco encerra o `Valuation Case`, confrontando o underwriting intrínseco c
 
 | Multi-multiple scorecard | Histórico de múltiplos |
 | --- | --- |
-| [![Scorecard de múltiplos](reports/sample/browser/current/09_valuation_snapshot.png)](reports/sample/browser/current/09_valuation_snapshot.png) | [![Histórico de múltiplos](reports/sample/browser/current/09b_historical_multiples.png)](reports/sample/browser/current/09b_historical_multiples.png) |
+| [![Scorecard de múltiplos](reports/sample/browser/current/09_valuation_snapshot.jpg)](reports/sample/browser/current/09_valuation_snapshot.jpg) | [![Histórico de múltiplos](reports/sample/browser/current/09b_historical_multiples.jpg)](reports/sample/browser/current/09b_historical_multiples.jpg) |
 | O sistema escolhe múltiplos relevantes por business model e separa primary, cross-check e not meaningful. | Série histórica da companhia contra mediana e quartis dos peers, com leitura de re-rating e de-rating. |
 
-[![Implied expectations e retornos](reports/sample/browser/current/09c_scenario_returns.png)](reports/sample/browser/current/09c_scenario_returns.png)
+[![Implied expectations e retornos](reports/sample/browser/current/09c_scenario_returns.jpg)](reports/sample/browser/current/09c_scenario_returns.jpg)
 
 O módulo converte preço e múltiplo em expectativas implícitas, retornos anualizados por cenário e sensibilidade de crescimento versus exit multiple.
 
@@ -160,19 +154,19 @@ O memo reúne situação, business quality, variant perception, valuation, cená
 
 | Auditoria de dados | Refresh, cobertura e proveniência |
 | --- | --- |
-| [![Data audit](reports/sample/browser/current/11_data_audit_charts.png)](reports/sample/browser/current/11_data_audit_charts.png) | [![Data e refresh](reports/sample/browser/current/12_data_governance.png)](reports/sample/browser/current/12_data_governance.png) |
+| [![Data audit](reports/sample/browser/current/11_data_audit_charts.jpg)](reports/sample/browser/current/11_data_audit_charts.jpg) | [![Data e refresh](reports/sample/browser/current/12_data_governance.jpg)](reports/sample/browser/current/12_data_governance.jpg) |
 | A página única `Data Audit & Refresh` identifica currency/unit mismatch, TTM incompleto, stale period, EV bridge, market-cap bridge, sinais incorretos e outliers. | No mesmo fluxo ficam cobertura, completeness, valuation history, estimates, source log e histórico de refresh do Capital IQ. |
 
 | Fila de exceções | Source log |
 | --- | --- |
-| [![Exceções prioritárias do data audit](reports/sample/browser/current/11b_urgent_findings.png)](reports/sample/browser/current/11b_urgent_findings.png) | [![Rastreabilidade das fontes](reports/sample/browser/current/12c_source_log.png)](reports/sample/browser/current/12c_source_log.png) |
+| [![Exceções prioritárias do data audit](reports/sample/browser/current/11b_urgent_findings.jpg)](reports/sample/browser/current/11b_urgent_findings.jpg) | [![Rastreabilidade das fontes](reports/sample/browser/current/12c_source_log.jpg)](reports/sample/browser/current/12c_source_log.jpg) |
 | Os achados prioritários permanecem visíveis até correção ou revisão documentada. | Cada dataset informa origem, período, cobertura e status de atualização. |
 
-[![Audit scores por companhia](reports/sample/browser/current/11c_company_audit_scores.png)](reports/sample/browser/current/11c_company_audit_scores.png)
+[![Audit scores por companhia](reports/sample/browser/current/11c_company_audit_scores.jpg)](reports/sample/browser/current/11c_company_audit_scores.jpg)
 
 O painel de audit scores compara completude, consistência e severidade dos achados entre todas as companhias monitoradas, permitindo priorizar a revisão dos dados antes do uso analítico.
 
-[![Inclusão de companhia pelo Capital IQ](reports/sample/browser/current/12b_add_company.png)](reports/sample/browser/current/12b_add_company.png)
+[![Inclusão de companhia pelo Capital IQ](reports/sample/browser/current/12b_add_company.jpg)](reports/sample/browser/current/12b_add_company.jpg)
 
 Novas companhias podem ser incluídas por identificador, como `NASDAQ:LULU`, `NYSE:NKE` ou `BOVESPA:GMAT3`. O lookup utiliza o Capital IQ Excel Add-In autenticado localmente e mantém os dados licenciados fora do repositório.
 
