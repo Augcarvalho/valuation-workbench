@@ -14,7 +14,17 @@ from src.modeling.assessment import Kpi
 from src.utils import fmt_money, fmt_pct
 
 
-def _style(fig: go.Figure, title: str, subtitle: str, height: int = 350) -> go.Figure:
+def _style(
+    fig: go.Figure,
+    title: str,
+    subtitle: str,
+    height: int = 350,
+    *,
+    top_margin: int = 88,
+    bottom_margin: int = 42,
+    legend_y: float = 1.01,
+    legend_yanchor: str = "bottom",
+) -> go.Figure:
     fig.update_layout(
         title=dict(
             text=f"<b>{title}</b>", x=0, xanchor="left",
@@ -22,11 +32,17 @@ def _style(fig: go.Figure, title: str, subtitle: str, height: int = 350) -> go.F
             font=dict(size=17, family=FONT_SANS, color=PALETTE["ink"]),
         ),
         height=height,
-        margin=dict(l=24, r=20, t=88, b=42),
+        margin=dict(l=24, r=20, t=top_margin, b=bottom_margin),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family=FONT_SANS, color=PALETTE["slate"], size=11),
-        legend=dict(orientation="h", y=1.01, x=1, xanchor="right"),
+        legend=dict(
+            orientation="h",
+            y=legend_y,
+            yanchor=legend_yanchor,
+            x=1,
+            xanchor="right",
+        ),
         hoverlabel=dict(bgcolor=PALETTE["panel"], bordercolor=PALETTE["line"]),
     )
     fig.update_xaxes(showgrid=False, linecolor=PALETTE["line"])
@@ -127,7 +143,7 @@ def _projection_chart(
                 go.Bar(
                     name=label, x=labels, y=projected[column],
                     marker_color=color,
-                    hovertemplate=f"Y%{{x}}<br>{label}: %{{y:,.1f}} {currency}m<extra></extra>",
+                    hovertemplate=f"%{{x}}<br>{label}: %{{y:,.1f}} {currency}m<extra></extra>",
                 ),
                 secondary_y=False,
             )
@@ -139,7 +155,7 @@ def _projection_chart(
             text=[f"{value:+.1%}" for value in projected["revenue_growth"]],
             textposition="top center",
             line=dict(color=PALETTE["slate"], width=2.5),
-            hovertemplate="Y%{x}<br>%{y:+.1%}<extra></extra>",
+            hovertemplate="%{x}<br>%{y:+.1%}<extra></extra>",
         ),
         secondary_y=True,
     )
@@ -150,7 +166,11 @@ def _projection_chart(
         fig,
         f"{scenario.title()} Revenue Build",
         "Y = detailed operating build | T = automatic transition to stable growth",
-        height=390,
+        height=445,
+        top_margin=96,
+        bottom_margin=86,
+        legend_y=-0.17,
+        legend_yanchor="top",
     )
 
 

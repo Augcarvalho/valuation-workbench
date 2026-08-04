@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from src.app.operating_driver_view import _projection_chart
 from src.modeling.operating_drivers import (
     COMPANY_PROFILE,
     PROFILES,
@@ -209,3 +210,19 @@ def test_operating_driver_fingerprint_changes_with_manual_driver_output():
         )
 
     assert operating_driver_payload(build(5)) != operating_driver_payload(build(10))
+
+
+def test_projection_chart_reserves_space_for_legend_and_growth_labels():
+    row = pd.Series({"company_id": "NASDAQ:LULU", "revenue_ttm": 1200.0})
+    growth = {name: [0.02, 0.03, 0.025] for name in ("bear", "base", "bull")}
+    build = build_operating_driver_model(
+        row, _kpis(), pd.DataFrame(), growth, {}, 3
+    )
+
+    fig = _projection_chart(build, "base", "USD", explicit_years=3)
+
+    assert fig.layout.height >= 440
+    assert fig.layout.margin.b >= 80
+    assert fig.layout.legend.y < 0
+    assert fig.layout.legend.yanchor == "top"
+    assert all("Y%{x}" not in (trace.hovertemplate or "") for trace in fig.data)
