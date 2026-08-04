@@ -124,7 +124,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             c1, c2 = st.columns(2, gap="medium")
             with c1:
                 ui.bullet_list("Available now", [
-                    "Valuation & Expectations page: P/E vs peers and vs own history, revision momentum.",
+                    "Valuation & Market Expectations below: P/E vs peers, own history, and revision momentum.",
                     "Peer Benchmarking: growth / profitability / multiple quartiles on the true comp set.",
                     "Company Situation: qualitative thesis case and journal.",
                 ], "q")
@@ -562,3 +562,8 @@ def render(df: pd.DataFrame, company_id: str) -> None:
                 if len(history) >= 2:
                     changes = compare_case_manifests(history[1], history[0])
                     st.dataframe(changes, hide_index=True, use_container_width=True)
+
+    # End the underwriting case with market cross-checks that challenge the model.
+    from src.app.pages import valuation_expectations
+
+    valuation_expectations.render(df, company_id, embedded=True)

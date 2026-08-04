@@ -1,4 +1,4 @@
-"""Data Audit: trust the data before trusting the valuation."""
+"""Data audit and refresh governance: trust the data before the valuation."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
           <div class="pe-header-top">
             <div>
               <div class="kicker">Investment Watchlist | Quality Control</div>
-              <h1>Data Audit<span class="ticker">{latest['company_id'].nunique()} names</span></h1>
+              <h1>Data Audit &amp; Refresh<span class="ticker">{latest['company_id'].nunique()} names</span></h1>
             </div>
             <span class="pe-mode-pill {'pe-mode-demo' if DEMO_MODE else 'pe-mode-private'}">{mode_txt}</span>
           </div>
@@ -157,6 +157,11 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             "- **Outliers**: same rules as the comps engine; excluded from adjusted medians, "
             "never hidden."
         )
+
+    # Audit findings and their remediation workflow belong on the same page.
+    from src.app.pages import refresh
+
+    refresh.render(df, company_id, embedded=True)
 
 
 # --- router -----------------------------------------------------------------

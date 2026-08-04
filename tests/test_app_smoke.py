@@ -25,3 +25,14 @@ def test_routes_cover_exactly_the_sidebar_pages():
         "Sidebar nav and ROUTES diverged - a page is unreachable or a ghost entry remains."
     )
     assert all(callable(fn) for fn in ROUTES.values())
+
+
+def test_consolidated_workflows_do_not_leave_standalone_navigation_entries():
+    from src.app.context import PAGES
+
+    nav = [p for group in PAGES.values() for p in group]
+    assert "Compare" not in nav
+    assert "Valuation & Expectations" not in nav
+    assert "Data Audit" not in nav
+    assert "Data & Refresh" not in nav
+    assert "Data Audit & Refresh" in nav

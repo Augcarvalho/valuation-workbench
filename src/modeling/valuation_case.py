@@ -61,7 +61,7 @@ def dcf_applicability(row: pd.Series) -> tuple[bool, str, str]:
     if revenue is None or pd.isna(revenue) or revenue <= 0:
         return (False, "Missing revenue anchor",
                 "The trailing-twelve-month revenue anchor is missing or non-positive in the latest "
-                "export, so no forecast can be built. Check field coverage on Data & Refresh.")
+                "export, so no forecast can be built. Check field coverage on Data Audit & Refresh.")
     ebitda = row.get("ebitda_ttm")
     if ebitda is None or pd.isna(ebitda) or ebitda <= 0:
         return (False, "Non-positive EBITDA anchor",

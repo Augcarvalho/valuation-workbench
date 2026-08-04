@@ -37,8 +37,7 @@ PAGES = [
     "Company Financials",
     "Capital Structure",
     "Valuation Case",
-    "Valuation & Expectations",
-    "Data Audit",
+    "Data Audit & Refresh",
 ]
 
 

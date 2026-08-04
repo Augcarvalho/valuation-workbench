@@ -14,10 +14,10 @@ O ambiente demonstrado possui **26 companhias monitoradas e 160 trading comps**,
 
 ## Da watchlist à decisão
 
-| Watchlist priorizada | Comparação entre companhias |
+| Watchlist priorizada | Comparação no fluxo de peers |
 | --- | --- |
 | [![Watchlist com múltiplas empresas](reports/sample/browser/current/01_watchlist_home.png)](reports/sample/browser/current/01_watchlist_home.png) | [![Comparação entre companhias](reports/sample/browser/current/02_compare.png)](reports/sample/browser/current/02_compare.png) |
-| Ranking de atenção combina valuation, revisões, inflexão operacional e red flags para direcionar a revisão humana. | Comparação lado a lado de Lululemon, Nike e Deckers, com performance, valuation, revisões e racional de priorização. |
+| Ranking de atenção combina valuation, revisões, inflexão operacional e red flags para direcionar a revisão humana. | O Peer Benchmarking termina com a comparação lado a lado de Lululemon, Nike e Deckers, reunindo performance, valuation, revisões e racional de priorização. |
 
 ## Leitura da companhia e tese
 
@@ -139,6 +139,8 @@ No case demonstrativo, a Lululemon apresenta preço de referência de **US$ 113,
 
 ## Valuation e expectativas do mercado
 
+Este bloco encerra o `Valuation Case`, confrontando o underwriting intrínseco com histórico de múltiplos, posicionamento relativo e expectativas implícitas no preço.
+
 | Multi-multiple scorecard | Histórico de múltiplos |
 | --- | --- |
 | [![Scorecard de múltiplos](reports/sample/browser/current/09_valuation_snapshot.png)](reports/sample/browser/current/09_valuation_snapshot.png) | [![Histórico de múltiplos](reports/sample/browser/current/09b_historical_multiples.png)](reports/sample/browser/current/09b_historical_multiples.png) |
@@ -156,10 +158,10 @@ O memo reúne situação, business quality, variant perception, valuation, cená
 
 ## Integridade e proveniência
 
-| Data Audit | Data & Refresh |
+| Auditoria de dados | Refresh, cobertura e proveniência |
 | --- | --- |
 | [![Data audit](reports/sample/browser/current/11_data_audit_charts.png)](reports/sample/browser/current/11_data_audit_charts.png) | [![Data e refresh](reports/sample/browser/current/12_data_governance.png)](reports/sample/browser/current/12_data_governance.png) |
-| Currency/unit mismatch, TTM incompleto, stale period, EV bridge, market-cap bridge, sinais incorretos e outliers. | Cobertura, completeness, valuation history, estimates, source log e histórico de refresh do Capital IQ. |
+| A página única `Data Audit & Refresh` identifica currency/unit mismatch, TTM incompleto, stale period, EV bridge, market-cap bridge, sinais incorretos e outliers. | No mesmo fluxo ficam cobertura, completeness, valuation history, estimates, source log e histórico de refresh do Capital IQ. |
 
 | Fila de exceções | Source log |
 | --- | --- |

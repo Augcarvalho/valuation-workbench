@@ -134,7 +134,7 @@ Each company gets a headline verdict in `src/modeling/assessment.py`, combining 
 | **Watch** | Mixed signals, one isolated red, or incomplete valuation context - no forced action |
 | **Avoid / Pass** | Deteriorating KPIs without valuation support |
 
-LTM metrics require four consecutive reported quarters (`ttm_complete` flags partial history rather than annualizing it silently). Extreme premiums remain visible; the Data Audit and outlier rules determine whether the underlying multiple is reliable rather than suppressing a valuation observation solely because the premium is large.
+LTM metrics require four consecutive reported quarters (`ttm_complete` flags partial history rather than annualizing it silently). Extreme premiums remain visible; the Data Audit & Refresh and outlier rules determine whether the underlying multiple is reliable rather than suppressing a valuation observation solely because the premium is large.
 
 The same assessment object also produces the executive commentary, investment view, key positives, key concerns, management questions, and the valuation premium/discount narrative. This keeps the dashboard and the exported board pack perfectly consistent because both consume one judgment layer.
 
@@ -148,9 +148,9 @@ Public data is not a replacement for internal monthly portfolio-company reportin
 
 For an actual PE portfolio company, the same schema can be expanded to include monthly budget, initiatives, sales pipeline, churn, operational KPIs, and covenant certificates.
 
-## Data Audit
+## Data Audit & Refresh
 
-Nine check families run over the dataset and raw exports (Data Audit page):
+Nine check families run over the dataset and raw exports (Data Audit & Refresh page):
 market-cap bridge (price x shares vs cap; 5/15/30% tiers), EV bridge
 (cap + debt + minority + preferred - cash vs reported TEV; cash means cash &
 ST investments - CapIQ's TEV basis - when exported, plain cash & equivalents

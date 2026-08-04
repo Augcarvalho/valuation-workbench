@@ -29,11 +29,11 @@ DEMO_MODE = "--demo" in sys.argv
 PLOTLY_CONFIG = {"displayModeBar": False, "responsive": True}
 
 PAGES = {
-    "SCREEN": ["Watchlist Home", "Compare"],
+    "SCREEN": ["Watchlist Home"],
     "UNDERWRITE": ["Company Situation", "Peer Benchmarking", "Operating Drivers",
                    "Company Financials", "Capital Structure", "Valuation Case"],
-    "MONITOR": ["Actual vs Consensus", "Valuation & Expectations"],
-    "GOVERNANCE": ["IC Memo Export", "Data Audit", "Data & Refresh"],
+    "MONITOR": ["Actual vs Consensus"],
+    "GOVERNANCE": ["IC Memo Export", "Data Audit & Refresh"],
 }
 
 

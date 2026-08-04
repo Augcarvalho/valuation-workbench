@@ -1493,10 +1493,10 @@ def platform_workflow_snapshot(path: Path) -> None:
 
     _section(ax, 0.018, 0.625, "Analytical workbench", "Every page answers a specific investment question")
     columns = [
-        ("1  TRIAGE", "Watchlist Home\nCompare", "Where should manual review focus?"),
-        ("2  UNDERWRITE", "Situation | Financials\nPeers | Consensus", "Is performance improving, and why?"),
-        ("3  VALUE", "Capital Structure\nDCF | Multiples | Scenarios", "What is priced in and what can go wrong?"),
-        ("4  COMMUNICATE", "Data Audit\nIC Memo | Decision Journal", "Can the conclusion survive IC scrutiny?"),
+        ("1  TRIAGE", "Watchlist Home", "Where should manual review focus?"),
+        ("2  UNDERWRITE", "Situation | Financials\nPeers + Compare | Consensus", "Is performance improving, and why?"),
+        ("3  VALUE", "Capital Structure\nDCF + Expectations | Scenarios", "What is priced in and what can go wrong?"),
+        ("4  COMMUNICATE", "Data Audit & Refresh\nIC Memo | Decision Journal", "Can the conclusion survive IC scrutiny?"),
     ]
     cgap = 0.014
     cwidth = (0.964 - cgap * 3) / 4
@@ -1527,7 +1527,7 @@ def platform_workflow_snapshot(path: Path) -> None:
 
 
 def multiples_history_snapshot(path: Path) -> None:
-    """Valuation & Expectations page focused on history and re-rating momentum."""
+    """Valuation and market-expectations block focused on history and re-rating momentum."""
     df, cid = _load()
     store = _store()
     assessment = build_assessment(df, cid, store=store)
@@ -1538,7 +1538,7 @@ def multiples_history_snapshot(path: Path) -> None:
     fig.patch.set_facecolor(BG)
     ax = _bg_axes(fig)
     _header_clean(ax, row, assessment)
-    _section(ax, 0.018, 0.815, "Valuation & Expectations",
+    _section(ax, 0.018, 0.815, "Valuation & Market Expectations",
              "Own history vs peer median, multiple momentum and re-rating attribution")
 
     metrics = [("EV / EBITDA (LTM)", "ev_to_ebitda_ltm"), ("P / E (LTM)", "pe_ltm")]
@@ -1606,7 +1606,7 @@ def multiples_history_snapshot(path: Path) -> None:
 
 
 def data_refresh_snapshot(path: Path) -> None:
-    """Data & Refresh page without exposing local paths or licensed tables."""
+    """Data Audit & Refresh block without exposing local paths or licensed tables."""
     df, _ = _load()
     store = _store()
     latest = latest_rows(df)
@@ -1617,7 +1617,7 @@ def data_refresh_snapshot(path: Path) -> None:
     ax = _bg_axes(fig)
     _platform_header(
         ax,
-        "Data & Refresh",
+        "Data Audit & Refresh",
         "Capital IQ Excel workflow, source governance and controlled company onboarding",
     )
 

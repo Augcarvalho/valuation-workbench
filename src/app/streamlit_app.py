@@ -29,17 +29,14 @@ from src.app import components as ui                      # noqa: E402
 from src.app.context import DEMO_MODE, PAGES, load_data   # noqa: E402
 from src.app.pages import (                               # noqa: E402
     capital_structure,
-    compare,
     consensus,
     data_audit,
     financials,
     ic_memo,
     operating_drivers,
     peers,
-    refresh,
     situation,
     valuation_case,
-    valuation_expectations,
     watchlist,
 )
 from src.app.theme import inject_theme                    # noqa: E402
@@ -49,7 +46,6 @@ inject_theme()
 
 ROUTES = {
     "Watchlist Home": watchlist.render,
-    "Compare": compare.render,
     "Company Situation": situation.render,
     "Peer Benchmarking": peers.render,
     "Operating Drivers": operating_drivers.render,
@@ -57,10 +53,8 @@ ROUTES = {
     "Company Financials": financials.render,
     "Capital Structure": capital_structure.render,
     "Valuation Case": valuation_case.render,
-    "Valuation & Expectations": valuation_expectations.render,
     "IC Memo Export": ic_memo.render,
-    "Data Audit": data_audit.render,
-    "Data & Refresh": refresh.render,
+    "Data Audit & Refresh": data_audit.render,
 }
 
 

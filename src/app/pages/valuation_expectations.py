@@ -1,4 +1,4 @@
-"""Valuation & Expectations: multi-multiple scorecard, momentum, scenarios."""
+"""Market cross-checks appended to the valuation case."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from src.reporting.periods import company_snapshot_context
 from src.utils import fmt_money, fmt_multiple, fmt_ordinal, fmt_pct, fmt_signed_pct
 
 
-def render(df: pd.DataFrame, company_id: str) -> None:
+def render(df: pd.DataFrame, company_id: str, *, embedded: bool = False) -> None:
     from src.modeling.comps import comps_spread
     from src.modeling.multiples import (
         MULTIPLE_SPECS,
@@ -31,7 +31,13 @@ def render(df: pd.DataFrame, company_id: str) -> None:
     currency = row.get("currency", "USD")
     val = a.valuation
     financial = a.business_model == "financial"
-    ui.header_band(row, DEMO_MODE)
+    if embedded:
+        ui.section(
+            "Valuation & Market Expectations",
+            "Trading context, multiple history, implied expectations, and public-market returns",
+        )
+    else:
+        ui.header_band(row, DEMO_MODE)
 
     ui.section("Valuation Snapshot",
                f"{company_snapshot_context(store, row)} | current market values over LTM denominators")

@@ -1,4 +1,4 @@
-"""Data & Refresh: mode, dataset, refresh log, add-company workflow."""
+"""Refresh block: mode, dataset, source log, and add-company workflow."""
 
 from __future__ import annotations
 
@@ -13,18 +13,22 @@ from src.modeling.metrics import latest_rows
 from src.utils import fmt_pct
 
 
-def render(df: pd.DataFrame, company_id: str) -> None:
+def render(df: pd.DataFrame, company_id: str, *, embedded: bool = False) -> None:
     store = get_store(DEMO_MODE)
     a = build_assessment(df, company_id, store=store)
     row = a.row
-    ui.header_band(row, DEMO_MODE)
+    if not embedded:
+        ui.header_band(row, DEMO_MODE)
 
     latest = latest_rows(df)
     dataset_path = _dataset_path(DEMO_MODE)
     refreshed = pd.Timestamp(dataset_path.stat().st_mtime, unit="s").strftime("%d %b %Y %H:%M")
     mode = "Public Demo" if DEMO_MODE else "Capital IQ - Private"
 
-    ui.section("Data Governance", "Mode, freshness, and side-table population")
+    ui.section(
+        "Refresh, Coverage & Provenance" if embedded else "Data Governance",
+        "Mode, freshness, side-table population, and controlled Capital IQ updates",
+    )
     cards = [
         Kpi("m", "Data Mode", mode, "Source environment", "green" if not DEMO_MODE else "yellow"),
         Kpi("r", "Dataset", f"{len(df):,} rows", f"{latest.shape[0]} companies · rebuilt {refreshed}"),

@@ -31,6 +31,10 @@ OPERATING_CAPTURES = [
     Capture("04f_operating_driver_projection.png", "Base Revenue Build", -80),
 ]
 
+PEER_CAPTURES = [
+    Capture("02_compare.png", "Side-by-Side Comparison", -70),
+]
+
 VALUATION_CAPTURES = [
     Capture("08_valuation_case_top.png"),
     Capture("08_assumption_workbench.png", "Assumption Workbench | Edit valuation assumptions", -70),
@@ -46,6 +50,18 @@ VALUATION_CAPTURES = [
     Capture("08e_sponsor_returns.png", "Sponsor Feasibility - LBO Returns", -70),
     Capture("08f_market_context.png", "Market Context", -70),
     Capture("08g_provenance_and_export.png", "Assumptions Provenance", -70),
+    Capture("09_valuation_snapshot.png", "Valuation & Market Expectations", -70),
+    Capture("09b_historical_multiples.png", "Historical Multiples", -70),
+    Capture("09c_scenario_returns.png", "Public-Market Scenario Returns", -70),
+]
+
+DATA_GOVERNANCE_CAPTURES = [
+    Capture("11_data_audit_charts.png", "Findings Overview", -70),
+    Capture("11b_urgent_findings.png", "Most Urgent Fixes", -70),
+    Capture("11c_company_audit_scores.png", "Company Audit Scores", -70),
+    Capture("12_data_governance.png", "Refresh, Coverage & Provenance", -70),
+    Capture("12b_add_company.png", "Add Company", -70),
+    Capture("12c_source_log.png", "Source Log", -70),
 ]
 
 
@@ -112,6 +128,10 @@ def capture(url: str, output: Path, company: str) -> None:
         _wait_settled(page)
         _select_company(page, company)
 
+        _open_page(page, "Peer Benchmarking")
+        for specification in PEER_CAPTURES:
+            _capture(page, output, specification)
+
         _open_page(page, "Operating Drivers")
         for specification in OPERATING_CAPTURES:
             _capture(page, output, specification)
@@ -130,6 +150,10 @@ def capture(url: str, output: Path, company: str) -> None:
         workbench.click()
         _wait_settled(page)
         for specification in VALUATION_CAPTURES[6:]:
+            _capture(page, output, specification)
+
+        _open_page(page, "Data Audit & Refresh")
+        for specification in DATA_GOVERNANCE_CAPTURES:
             _capture(page, output, specification)
 
         context.close()

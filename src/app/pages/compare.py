@@ -1,4 +1,4 @@
-"""Compare: 2-4 names side by side."""
+"""Reusable 2-4 company comparison for the peer-benchmarking workflow."""
 
 from __future__ import annotations
 
@@ -12,7 +12,13 @@ from src.modeling.metrics import latest_rows
 from src.utils import fmt_money, fmt_multiple, fmt_ordinal, fmt_pct, fmt_signed_pct
 
 
-def render(df: pd.DataFrame, company_id: str) -> None:
+def render(
+    df: pd.DataFrame,
+    company_id: str,
+    *,
+    embedded: bool = False,
+    default_company_ids: list[str] | None = None,
+) -> None:
     store = get_store(DEMO_MODE)
     latest = latest_rows(df)
     labels = {
@@ -20,24 +26,43 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         for r in latest.sort_values("ticker").itertuples()
     }
     default_label = next((k for k, v in labels.items() if v == company_id), list(labels.keys())[0])
+    requested_defaults = default_company_ids or [company_id]
+    label_by_id = {cid: label for label, cid in labels.items()}
+    default_labels = [
+        label_by_id[cid] for cid in requested_defaults if cid in label_by_id
+    ][:4]
+    if default_label not in default_labels:
+        default_labels.insert(0, default_label)
 
-    st.markdown(
-        f"""
-        <div class="pe-header">
-          <div class="pe-header-top">
-            <div>
-              <div class="kicker">Investment Watchlist | Side-by-Side</div>
-              <h1>Compare</h1>
+    if embedded:
+        ui.section(
+            "Side-by-Side Comparison",
+            "Selected company and approved peers | choose up to four names for manual review",
+        )
+    else:
+        st.markdown(
+            f"""
+            <div class="pe-header">
+              <div class="pe-header-top">
+                <div>
+                  <div class="kicker">Investment Watchlist | Side-by-Side</div>
+                  <h1>Compare</h1>
+                </div>
+                <span class="pe-mode-pill {'pe-mode-demo' if DEMO_MODE else 'pe-mode-private'}">
+                  {'Public Demo Data' if DEMO_MODE else 'Capital IQ - Private'}</span>
+              </div>
             </div>
-            <span class="pe-mode-pill {'pe-mode-demo' if DEMO_MODE else 'pe-mode-private'}">
-              {'Public Demo Data' if DEMO_MODE else 'Capital IQ - Private'}</span>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
 
-    picks = st.multiselect("Companies (2–4)", list(labels.keys()), default=[default_label], max_selections=4)
+    picks = st.multiselect(
+        "Companies (2-4)",
+        list(labels.keys()),
+        default=default_labels,
+        max_selections=4,
+        key="peer_benchmarking_compare" if embedded else "standalone_compare",
+    )
     if len(picks) < 2:
         ui.footnote("Pick at least two names to compare.")
         return
@@ -68,7 +93,15 @@ def render(df: pd.DataFrame, company_id: str) -> None:
         metric_row("Open flags", lambda a: str(sum(1 for f in a.red_flags if f.get("severity") in {"High", "Medium"}))),
         metric_row("Financials through", lambda a: ui.quarter_label(a.row["period"])),
     ]
-    ui.section("Side-by-Side", "Quarterly growth is latest-quarter YoY; margins, returns, leverage and multiples are LTM")
+    if not embedded:
+        ui.section(
+            "Side-by-Side",
+            "Quarterly growth is latest-quarter YoY; margins, returns, leverage and multiples are LTM",
+        )
+    else:
+        ui.footnote(
+            "Quarterly growth is latest-quarter YoY; margins, returns, leverage and multiples are LTM."
+        )
     ui.html_table(headers, rows, numeric_from=1)
 
     ui.section("Verdict Rationale")

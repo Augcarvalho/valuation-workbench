@@ -186,7 +186,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             st.markdown(
                 "Names S&P lists as peers of your watchlist companies but that are "
                 "not in the universe yet - ranked by how many of your anchors "
-                "reference them. Add the top ones via **Data & Refresh -> Add Company** "
+                "reference them. Add the top ones via **Data Audit & Refresh -> Add Company** "
                 "to make the official comp sets usable end-to-end."
             )
             ui.html_table(["CapIQ ticker", "Company", "Referenced by (# anchors)"],
@@ -202,7 +202,7 @@ def render(df: pd.DataFrame, company_id: str) -> None:
             ", ".join(f"{k.replace('_', ' ')} {v}pts" for k, v in WEIGHTS.items()) +
             "; cross-business-model candidates are penalized 20pts. Size uses log market-cap proximity "
             "(USD-normalized); margin/growth use absolute proximity bands. Candidates are limited to the "
-            "exported universe - add outside names via Data & Refresh first."
+            "exported universe - add outside names via Data Audit & Refresh first."
         )
 
     time_context = peer_snapshot_context(store, a.peers)
@@ -337,3 +337,14 @@ def render(df: pd.DataFrame, company_id: str) -> None:
 
     st.plotly_chart(valuation_chart(df, None, company_id, peer_ids=peer_ids), use_container_width=True, config=PLOTLY_CONFIG)
     ui.memo("Is the Multiple Earned?", a.valuation.get("commentary", ""))
+
+    # Keep relative selection and side-by-side judgment in one underwriting flow.
+    from src.app.pages import compare
+
+    comparison_ids = [company_id] + [pid for pid in peer_ids if pid != company_id][:2]
+    compare.render(
+        df,
+        company_id,
+        embedded=True,
+        default_company_ids=comparison_ids,
+    )
