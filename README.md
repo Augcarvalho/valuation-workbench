@@ -80,10 +80,10 @@ O módulo de capital structure reconcilia market cap, dívida e caixa até o ent
 
 | Visão executiva do case | Editor de premissas |
 | --- | --- |
-| [![Valuation case da Lululemon](reports/sample/browser/current/08_valuation_case_top.png)](reports/sample/browser/current/08_valuation_case_top.png) | [![Assumption Workbench da Lululemon](reports/sample/browser/current/08_assumption_workbench.png)](reports/sample/browser/current/08_assumption_workbench.png) |
+| [![Valuation case da Lululemon](reports/sample/browser/current/08_valuation_case_top.png)](reports/sample/browser/current/08_valuation_case_top.png) | [![Assumptions da Lululemon](reports/sample/browser/current/08_assumption_workbench.png)](reports/sample/browser/current/08_assumption_workbench.png) |
 | Preço atual, target revisado, WACC, terminal multiple e status de revisão no primeiro bloco. | Base, Bear e Bull começam preenchidos pelos anchors automáticos e podem ser ajustados manualmente. |
 
-O **Assumption Workbench** permite editar Base, Bear e Bull diretamente na
+O **Assumption tab** permite editar Base, Bear e Bull diretamente na
 plataforma. Todo campo abre preenchido com o valor automático vigente; somente
 as alterações feitas manualmente são gravadas como overrides. O salvamento
 recalcula DCF, sensitivities, bridges, sponsor returns e exports a partir da
