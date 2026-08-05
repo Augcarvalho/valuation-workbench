@@ -1,6 +1,6 @@
 # Investment Analysis
 
-**Plataforma de análise de investimentos que transforma exports locais do S&P Capital IQ Pro em screening, acompanhamento financeiro, análise de peers, valuation e materiais para comitê de investimento.**
+**Plataforma de análise de investimentos que transforma exports locais do S&P Capital IQ Pro em screening, acompanhamento financeiro, análise de peers, valuation e materiais para decisao de investimento.**
 
 O ambiente demonstrado possui **26 companhias monitoradas e 160 trading comps**, totalizando **186 nomes** com cobertura no Brasil e nos Estados Unidos. Qualquer empresa pode ser adicionada desde que seus dados estejam disponíveis no S&P Capital IQ Pro (a plataforma é alimentada por exports gerados por meio do meu acesso licenciado ao sistema). A mesma arquitetura analítica pode ser aplicada a qualquer companhia adicionada ao universo. A **Lululemon** é utilizada abaixo como case demonstrativo do fluxo completo, pois é uma empresa que acompanho e para a qual desenvolvi manualmente uma tese de investimento.
 
